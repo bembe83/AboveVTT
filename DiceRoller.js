@@ -307,7 +307,7 @@ class DiceRoller {
      * @param diceRoll {DiceRoll} the dice expression to parse and roll. EG: 1d20+4
      * @returns {boolean} whether or not dice were rolled
      */
-    async roll(diceRoll, multiroll = false, critRange = 20, critType = 2, spellSave = undefined) {
+    async roll(diceRoll, multiroll = false, critRange = 20, critType = 2, spellSave = undefined, damageType=undefined) {
         try {
             if (diceRoll === undefined || diceRoll.expression === undefined || diceRoll.expression.length === 0) {
                 console.warn("DiceRoller.parseAndRoll received an invalid diceRoll object", diceRoll);
