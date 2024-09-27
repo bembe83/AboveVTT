@@ -98,13 +98,10 @@ $(function() {
         if(window.EXPERIMENTAL_SETTINGS['streamDiceRolls']){
           enable_dice_streaming_feature(window.JOINTHEDICESTREAM );
         }
-		if(window.EXPERIMENTAL_SETTINGS['rpgRoller'] == true){
-          	//Enable GoDice RollBar and Roller
-			if(window.godice.dicebar){
-				window.godice.dicebar.enable(newValue);
-				window.godice.dicebar.render();
-			}
-        }
+		if(window.godice.dicebar){
+			window.godice.dicebar.enable(window.EXPERIMENTAL_SETTINGS['rpgRoller'] );
+			window.godice.dicebar.render();
+		}
         tabCommunicationChannel.addEventListener ('message', (event) => {
           if(event.data.msgType == 'CharacterData' && !find_pc_by_player_id(event.data.characterId, false))
             return;

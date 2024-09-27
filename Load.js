@@ -65,8 +65,6 @@ window.scripts = [
 	{ src: "mousetrap.1.6.5.min.js" },
 	{ src: "peerjs.min.js" },
 	{ src: "fuse.min.js" },
-	//GoDiceLibrary
-	{ src: "GoDiceLibrary/module/godice_main.js", type: "module" },
 	// AboveVTT Files
 	{ src: "environment.js" },
 	{ src: "AboveApi.js" },
@@ -116,6 +114,8 @@ window.scripts = [
 	{ src: "audio/index.js", type: "module" },
 	{ src: "onedrive/onedrivemsal.js" },
 	{ src: "onedrive/onedrivepicker.js" },
+	//GoDiceLibrary
+	{ src: "GoDiceLibrary/module/godice_main.js", type: "module" },
 	// Startup must be the last file to execute. This is what actually loads the app. It requires all the previous files to be loaded first
 	{ src: "Startup.js", type: "module" }
 

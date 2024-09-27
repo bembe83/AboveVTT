@@ -528,7 +528,7 @@ function set_avtt_setting_value(name, newValue) {
 		    })
 			//Enable GoDice RollBar and Roller
 			if(window.godice.dicebar){
-				window.godice.dicebar.enable(newValue);
+				window.godice.dicebar.enable(window.EXPERIMENTAL_SETTINGS['rpgRoller']);
 				window.godice.dicebar.render();
 			}
 		  }
