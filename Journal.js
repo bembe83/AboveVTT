@@ -855,31 +855,42 @@ class JournalManager{
 		});
 	}
 
-	getDataTooltip(url, callback){
+	async getDataTooltip(url, callback){
 		if(window.spellIdCache == undefined){
 			window.spellIdCache = {};
 		}
 		const urlRegex = /www\.dndbeyond\.com\/[a-zA-Z\-]+\/([0-9]+)/g;
 		const urlType = /www\.dndbeyond\.com\/([a-zA-Z\-]+)/g;
 		let itemId = (url.matchAll(urlRegex).next().value) ? url.matchAll(urlRegex).next().value[1] : 0;
-		const itemType = url.matchAll(urlType).next().value[1];
+		let itemType = url.matchAll(urlType).next().value[1];
 		url = url.toLowerCase();
-		if(itemId == 0){
+		if(itemId == 0 || itemType == 'equipment'){
 			if(window.spellIdCache[url]){
-				callback(`www.dndbeyond.com/${itemType}/${window.spellIdCache[url]}-tooltip?disable-webm=1`, itemType.slice(0, -1));	
+				callback(`www.dndbeyond.com/${window.spellIdCache[url].type}/${window.spellIdCache[url].id}-tooltip?disable-webm=1`, itemType.slice(0, -1));	
 			}
 			else{
-				let spellPage = '';			
-				$.get(url,  function (data) {
-				    spellPage = data;
-				}).done(function(){
-					const regex = /window\.cobaltVcmList\.push\(\{.+id\:([0-9]+)/g;
-					const itemId = spellPage.matchAll(regex).next().value[1];
-					window.spellIdCache[url] = itemId;
-					callback(`www.dndbeyond.com/${itemType}/${itemId}-tooltip?disable-webm=1`, itemType.slice(0, -1));	
-				})
-			}
-			
+				if(url.includes('weapon-properties')){
+					let splitUrl = url.split('/');
+					let name = splitUrl[splitUrl.length-1];
+					itemId = window.ddbConfigJson.weaponProperties.filter(d=> d.name.toLowerCase() == name.toLowerCase())[0]?.id
+				}
+				else{
+							
+					let itemPage = await $.get(url)		
+					if($(itemPage).find('.b-breadcrumb-wrapper>.b-breadcrumb-item:last-of-type a').length>0){
+						let splitUrl = $(itemPage).find('.b-breadcrumb-wrapper>.b-breadcrumb-item:last-of-type a').attr('href').split('/');
+						itemId = parseInt(splitUrl[splitUrl.length-1]);
+						itemType = $(itemPage).find('.details-container-content-description-text span:first-of-type')?.text()?.toLowerCase()?.includes('weapon') ? 'weapons' : url.includes('equipment') ? 'adventuring-gear' : itemType
+					    
+					}
+					else {
+						const regex = /window\.cobaltVcmList\.push\(\{.+id\:([0-9]+)/g;
+						itemId = itemPage.matchAll(regex).next().value[1];	
+					}
+				}
+				window.spellIdCache[url] = {id: itemId, type: itemType};
+				callback(`www.dndbeyond.com/${itemType}/${itemId}-tooltip?disable-webm=1`, itemType.slice(0, -1));
+			}	
 		}
 		else{
 			callback(`www.dndbeyond.com/${itemType}/${itemId}-tooltip?disable-webm=1`, itemType.slice(0, -1));	
@@ -939,14 +950,14 @@ class JournalManager{
 		}
 
 		const rollImage = (tokenId) ? window.TOKEN_OBJECTS[tokenId].options.imgsrc : window.PLAYER_IMG
-		const rollName = (tokenId) ? window.TOKEN_OBJECTS[tokenId].options.revealname == true ? window.TOKEN_OBJECTS[tokenId].options.name : '' : window.PLAYER_NAME
+		const rollName = (tokenId) ? window.TOKEN_OBJECTS[tokenId].options.revealname == true || window.TOKEN_OBJECTS[tokenId].options.player_owned ? window.TOKEN_OBJECTS[tokenId].options.name : '' : window.PLAYER_NAME
 
 		const clickHandler = function(clickEvent) {
-			roll_button_clicked(clickEvent, rollName, rollImage)
+			roll_button_clicked(clickEvent, rollName, rollImage, tokenId ? "monster" : undefined, tokenId)
 		};
 
 		const rightClickHandler = function(contextmenuEvent) {
-			roll_button_contextmenu_handler(contextmenuEvent, rollName, rollImage);
+			roll_button_contextmenu_handler(contextmenuEvent, rollName, rollImage, tokenId ? "monster" : undefined, tokenId);
 		}
 
 		// replace all "to hit" and "damage" rolls
@@ -1049,19 +1060,30 @@ class JournalManager{
 				rollAction = 'Hit Points';
 				rollType = 'Roll';	
 			}
+			else if(rollAction.replace(' ', '').toLowerCase() == 'initiative'){
+				rollType = 'Roll';
+			}
 			
 			$(this).attr('data-actiontype', rollAction);
 			$(this).attr('data-rolltype', rollType);
+
+			const followingText = $(this)[0].nextSibling?.textContent?.trim()?.split(' ')[0]
+			
+			const damageType = followingText && window.ddbConfigJson.damageTypes.some(d => d.name.toLowerCase() == followingText.toLowerCase()) ? followingText : undefined
+			if(damageType != undefined){
+				$(this).attr('data-damagetype', damageType);
+			}
 		})
 
-	
-		
-		
+		const tokenName = window.TOKEN_OBJECTS[tokenId]?.options?.name ? window.TOKEN_OBJECTS[tokenId]?.options?.name  : window.PLAYER_NAME
+		const tokenImage = window.TOKEN_OBJECTS[tokenId]?.options?.imgsrc ? window.TOKEN_OBJECTS[tokenId]?.options?.imgsrc : window.PLAYER_IMG
+		const entityType = tokenId ? "monster" : "character";
+
 		// terminate the clones reference, overkill but rather be safe when it comes to memory
 		currentElement = null
 
 
-	
+		
 		$(target).find(".avtt-roll-button").click(clickHandler);
 		$(target).find(".avtt-roll-button").on("contextmenu", rightClickHandler);
 
@@ -1069,8 +1091,10 @@ class JournalManager{
 		clickEvent.stopPropagation();
 
 			const slashCommand = $(clickEvent.currentTarget).attr("data-slash-command");
-			const diceRoll = DiceRoll.fromSlashCommand(slashCommand, window.PLAYER_NAME, window.PLAYER_IMG, "character", window.PLAYER_ID); // TODO: add gamelog_send_to_text() once that's available on the characters page without avtt running
-			window.diceRoller.roll(diceRoll);
+			const followingText = $(clickEvent.currentTarget)[0].nextSibling?.textContent?.trim()?.split(' ')[0]
+			const damageType = followingText && window.ddbConfigJson.damageTypes.some(d => d.name.toLowerCase() == followingText.toLowerCase()) ? followingText : undefined			
+			const diceRoll = DiceRoll.fromSlashCommand(slashCommand, tokenName, tokenImage, entityType, tokenId, damageType); // TODO: add gamelog_send_to_text() once that's available on the characters page without avtt running
+			window.diceRoller.roll(diceRoll, undefined, undefined, undefined, undefined, damageType);
 		});
 		$(target).find(`button.avtt-roll-formula-button`).off('contextmenu.rpg-roller').on('contextmenu.rpg-roller', function(e){
 		  e.stopPropagation();
@@ -1086,10 +1110,10 @@ class JournalManager{
 		  
 		  
 		  if (rollData.rollType === "damage") {
-		    damage_dice_context_menu(rollData.expression, rollData.modifier, rollData.rollTitle, rollData.rollType, window.PLAYER_NAME, window.PLAYER_IMG)
+		    damage_dice_context_menu(rollData.expression, rollData.modifier, rollData.rollTitle, rollData.rollType, tokenName, tokenImage, entityType, tokenId, damageType)
 		      .present(e.clientY, e.clientX) // TODO: convert from iframe to main window
 		  } else {
-		    standard_dice_context_menu(rollData.expression, rollData.modifier, rollData.rollTitle, rollData.rollType, window.PLAYER_NAME, window.PLAYER_IMG)
+		    standard_dice_context_menu(rollData.expression, rollData.modifier, rollData.rollTitle, rollData.rollType, tokenName, tokenImage, entityType, tokenId)
 		      .present(e.clientY, e.clientX) // TODO: convert from iframe to main window
 		  }
 		})
@@ -1257,6 +1281,18 @@ class JournalManager{
             	const spellUrl = spell.replace(/\s/g, '-').split(';')[0];;
             	spell = (spell.split(';')[1]) ? spell.split(';')[1] : spell;
                 return `<a class="tooltip-hover spell-tooltip" href="https://www.dndbeyond.com/spells/${spellUrl}" aria-haspopup="true" target="_blank">${spell}</a>`
+            })
+             input = input.replace(/\[item\](.*?)\[\/item\]/g, function(m){
+            	let item = m.replace(/<\/?p>/g, '').replace(/\s?\[item\]\s?|\s?\[\/item\]\s?/g, '').replace('[/item]', '');   	
+            	const itemUrl = item.replace(/\s/g, '-').split(';')[0];;
+            	item = (item.split(';')[1]) ? item.split(';')[1] : item;
+                return `<a class="tooltip-hover item-tooltip" href="https://www.dndbeyond.com/equipment/${itemUrl}" aria-haspopup="true" target="_blank">${item}</a>`
+            })
+               input = input.replace(/\[wprop\](.*?)\[\/wprop\]/g, function(m){
+            	let wprop = m.replace(/<\/?p>/g, '').replace(/\s?\[wprop\]\s?|\s?\[\/wprop\]\s?/g, '').replace('[/wprop]', '');   	
+            	const wpropUrl = wprop.replace(/\s/g, '-').split(';')[0];;
+            	wprop = (wprop.split(';')[1]) ? wprop.split(';')[1] : wprop;
+                return `<a class="tooltip-hover wprop-tooltip" href="https://www.dndbeyond.com/weapon-properties/${wpropUrl}" aria-haspopup="true" target="_blank">${wprop}</a>`
             })
             input = input.replace(/\[roll\](.*?)\[\/roll\]/g, function(m){
             	let roll = m.replace(/<\/?p>/g, '').replace(/\s?\[roll\]\s?|\s?\[\/roll\]\s?/g, '').replace('[/roll]', '');   	

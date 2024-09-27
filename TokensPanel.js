@@ -3179,11 +3179,13 @@ function convert_challenge_rating_id(crId) {
     }
 }
 
+
+
 function display_monster_filter_modal() {
 
     let iframe = $(`<iframe id='monster-filter-iframe'></iframe>`);
     iframe.css({
-        "width": "100%",
+        "width": "1920px",
         "height": "100%",
         "top": "0px",
         "left": "0px",
@@ -3207,17 +3209,33 @@ function display_monster_filter_modal() {
 
         let filter_observer = new MutationObserver(function() {
             let filterButton = $(event.target).contents().find(".monster-listing__header button");
-            if (filterButton.length > 0){
+            let monsterListing = $(event.target).contents().find(".qa-monster-filters:not('above-loaded')")
+            if (filterButton.length > 0 || monsterListing.length>0){
                 filter_observer.disconnect();
                 $(event.target).contents().find("head").append(
                 `<style>
                     .input-select .input-select__dropdown-wrapper {
                         transition: max-height 0.5s ease 0.1s;
                     }
+                    .is-open {
+                        z-index:10000000 !important;
+                    }
+                    .monster-filters.qa-monster-filters.monster-listing__sidebar-filters {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        z-index: 100000;
+                        width: 340px;
+                        overflow: auto;
+                    }
                 </style>`
                 );
                 $(event.target).contents().find("body").addClass("prevent-sidebar-modal-close");
+
                 $(event.target).contents().find(".monster-listing__header button").click();
+                $(event.target).contents().find('.qa-monster-filters').toggleClass('above-loaded', true);
                 $(event.target).contents().find(".popup-overlay").css("background", "rgb(235, 241, 245)");
                 $(event.target).contents().find(".popup-content").css({
                     "width": "100%",
@@ -3226,11 +3244,8 @@ function display_monster_filter_modal() {
                     "max-height": "100%",
                     "margin": 0
                 });
-                $(event.target).contents().find(".popup-overlay").on("click", function (e) {
-                    if ($(e.target).hasClass("popup-overlay")) {
-                        e.stopPropagation();
-                    }
-                });
+
+
               $(`<label class="input-checkbox input-checkbox-label qa-input-checkbox_label qa-monster-filters_accessible-content" title="Only show content I have access to">
                 <input class="input-checkbox__input qa-input-checkbox_input" tabindex="0" type="checkbox" ${(localStorage.getItem(`${gameId}-ownedMonsterFilter`) != 'undefined' && $.parseJSON(localStorage.getItem(`${gameId}-ownedMonsterFilter`)) == true) ? 'checked="checked"' : ''}>
                     <div class="input-checkbox__focus-indicator"></div>
@@ -3243,7 +3258,7 @@ function display_monster_filter_modal() {
                     
                 let closeButton = build_close_button();
                 closeButton.css({
-                    "position": "fixed",
+                    "position": "absolute",
                     "top": "10px",
                     "right": "10px",
                     "box-shadow": "rgb(51 51 51) 0px 0px 60px 0px"
@@ -3252,7 +3267,7 @@ function display_monster_filter_modal() {
                     clickEvent.stopPropagation();
                     close_monster_filter_iframe();
                 });
-                $(event.target).contents().find(".popup-content").prepend(closeButton);
+                $(event.target).contents().find(".qa-monster-filters").prepend(closeButton);
 
                 tokensPanel.remove_sidebar_loading_indicator();
                 iframe.css({ "z-index": 10 });
@@ -3400,7 +3415,7 @@ function register_custom_token_image_context_menu() {
                 items.border = "---";
                 items.remove = {
                     name: "Remove",
-                    callback: function (itemKey, opt, originalEvent) {
+                    callback: async function (itemKey, opt, originalEvent) {
                         let selectedItem = $(opt.$trigger[0]);
                         let imgSrc = selectedItem.find(".token-image").attr("src");
                         if(tokenChangeImage){
@@ -3431,11 +3446,13 @@ function register_custom_token_image_context_menu() {
                                 showError("register_custom_token_image_context_menu Remove failed to find a token customization object matching listItem: ", listItem);
                                 return;
                             }
-                            customization.removeAlternativeImage(imgSrc);
-                            persist_token_customization(customization);
-                            let listingImage = (customization.tokenOptions?.alternativeImages && customization.tokenOptions?.alternativeImages[0] != undefined) ? customization.tokenOptions?.alternativeImages[0] : listItem.image;     
-                            $(`.sidebar-list-item-row[id='${listItem.id}'] .token-image`).attr('src', listingImage);
-                            redraw_token_images_in_modal(window.current_sidebar_modal, listItem, placedToken);
+                            await customization.removeAlternativeImage(imgSrc);
+                            persist_token_customization(customization, function(){
+                                let listingImage = (customization.tokenOptions?.alternativeImages && customization.tokenOptions?.alternativeImages[0] != undefined) ? customization.tokenOptions?.alternativeImages[0] : listItem.image;     
+                                $(`.sidebar-list-item-row[id='${listItem.id}'] .token-image`).attr('src', listingImage);
+                                redraw_token_images_in_modal(window.current_sidebar_modal, listItem, placedToken);
+                            });
+     
                         } else if (!tokenChangeImage) {
                             showError("register_custom_token_image_context_menu Remove attempted to remove a custom image with an invalid type. listItem:", listItem);
                             return;

@@ -280,27 +280,49 @@ function remove_zoom_from_storage() {
 */
 function apply_zoom_from_storage() {
 	console.group("apply_zoom_from_storage");
-	const zoomState = localStorage.getItem("zoom");
-	if (zoomState != null) {
-		const zooms = JSON.parse(zoomState);
-		const zoomIndex = zooms.findIndex(zoom => zoom.title === window.CURRENT_SCENE_DATA.title);
-		if(zoomIndex !== -1) {
-			console.log("restoring zoom level", zooms[zoomIndex]);
-			change_zoom(zooms[zoomIndex].zoom)
-			const sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? 340 : 0);
-			window.scrollTo(zooms[zoomIndex].leftOffset - window.innerWidth/2 + sidebarSize/2, zooms[zoomIndex].topOffset - window.innerHeight/2)
-		}
-		else{
-			// Zooms in storage but not for this scene
-			console.log("scene does not have a zoom stored")
-			reset_zoom()
-		}
+	const sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? 340 : 0);
+	let initial_x = isNaN(parseInt(window.CURRENT_SCENE_DATA.initial_x)) ? undefined : window.CURRENT_SCENE_DATA.initial_x - window.innerWidth/2 + sidebarSize/2;
+	let initial_y =  isNaN(parseInt(window.CURRENT_SCENE_DATA.initial_y)) ? undefined : window.CURRENT_SCENE_DATA.initial_y - window.innerHeight/2;
+	let initial_zoom =  isNaN(parseInt(window.CURRENT_SCENE_DATA.initial_zoom)) ? undefined : window.CURRENT_SCENE_DATA.initial_zoom;
+
+	if(initial_zoom != undefined){
+		change_zoom(initial_zoom)
+		if(initial_x != undefined && initial_y != undefined)
+			window.scrollTo(initial_x, initial_y)
 	}
 	else{
-		// no zooms in storage
-		console.log("no zooms in storage")
-		reset_zoom()
+		const zoomState = localStorage.getItem("zoom");
+		if (zoomState != null) {
+			const zooms = JSON.parse(zoomState);
+			const zoomIndex = zooms.findIndex(zoom => zoom.title === window.CURRENT_SCENE_DATA.title);
+			if(zoomIndex !== -1) {
+				console.log("restoring zoom level", zooms[zoomIndex]);
+				change_zoom(zooms[zoomIndex].zoom)
+
+				if(initial_x != undefined && initial_y != undefined)
+					window.scrollTo(initial_x, initial_y)
+				else
+					window.scrollTo(zooms[zoomIndex].leftOffset - window.innerWidth/2 + sidebarSize/2, zooms[zoomIndex].topOffset - window.innerHeight/2)
+			}
+			else{
+				// Zooms in storage but not for this scene
+				console.log("scene does not have a zoom stored")
+				reset_zoom()
+				if(initial_x != undefined && initial_y != undefined)
+					window.scrollTo(initial_x, initial_y)
+			}
+		}
+		else{
+			// no zooms in storage
+			console.log("no zooms in storage")
+			reset_zoom()
+			if(initial_x != undefined && initial_y != undefined)
+				window.scrollTo(initial_x, initial_y)
+		}
 	}
+
+
+	
 	console.groupEnd()
 }
 
@@ -1406,36 +1428,6 @@ function init_splash() {
 	$(window.document.body).append(cont);
 }
 
-let MYCOBALT_TOKEN = false;
-let MYCOBALT_TOKEN_EXPIRATION = 0;
-/**
- * UNIFIED TOKEN HANDLING
- * Triggers callback with a valid DDB cobalt token
- * @param {Function} callback
- * @returns void
- */
-function get_cobalt_token(callback) {
-	if (Date.now() < MYCOBALT_TOKEN_EXPIRATION) {
-		console.log("TOKEN IS CACHED");
-		callback(MYCOBALT_TOKEN);
-		return;
-	}
-	console.log("GETTING NEW TOKEN");
-	$.ajax({
-		url: "https://auth-service.dndbeyond.com/v1/cobalt-token",
-		type: "post",
-		xhrFields: {
-			// To allow cross domain cookies
-			withCredentials: true
-		},
-		success: function(data) {
-			console.log("GOT NEW TOKEN");
-			MYCOBALT_TOKEN = data.token;
-			MYCOBALT_TOKEN_EXPIRATION = Date.now() + (data.ttl * 1000) - 10000;
-			callback(data.token);
-		}
-	});
-}
 
 
 let DDB_WS_OBJ = null;

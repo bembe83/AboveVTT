@@ -866,7 +866,8 @@ function token_context_menu_expanded(tokenIds, e) {
 		let quickRollMenu = $("<button class='material-icons open-menu'>Add/Remove from Quick Rolls</button>")
 		body.append(quickRollMenu);
 		quickRollMenu.on("click", function(clickEvent){
-			$("#qrm_dialog").show()
+			if(!childWindows['Quick Roll Menu'])
+				$("#qrm_dialog").show()
 			if ($('#quick_roll_area').length == 0){
 				close_token_context_menu()
 				open_quick_roll_menu(e)
@@ -985,9 +986,11 @@ function token_context_menu_expanded(tokenIds, e) {
 		$(".hpMenuInput").prop('readonly', false);
 	}
 	else { 
-		$(".maxHpMenuInput, .acMenuInput, .hpMenuInput").off('click.message').on('click.message', function(){
-			showTempMessage('Player HP/AC must be adjusted on the character sheet.')
-		})
+		if(tokens[0].isPlayer()){
+			$(".maxHpMenuInput, .acMenuInput, .hpMenuInput").off('click.message').on('click.message', function(){
+				showTempMessage('Player HP/AC must be adjusted on the character sheet.')
+			})
+		}
 		$(".maxHpMenuInput").prop('readonly', true);
 		$(".acMenuInput").prop('readonly', true);
 		$(".hpMenuInput").prop('readonly', true);
@@ -2352,9 +2355,9 @@ function build_menu_stat_inputs(tokenIds) {
 
 
 	
-	hpMenuInput.on('keyup', function(event) {
+	hpMenuInput.find('input').on('keyup', function(event) {
 		let newValue = event.target.value;
-		if(newValue == '')
+		if($(event.target).prop('readonly') || newValue == '')
 			return;		
 		if (event.key == "Enter" && newValue !== undefined && newValue.length > 0) {
 			tokens.forEach(token => {
@@ -2375,9 +2378,9 @@ function build_menu_stat_inputs(tokenIds) {
 			});
 		}
 	});
-	hpMenuInput.on('focusout', function(event) {
+	hpMenuInput.find('input').on('focusout', function(event) {
 		let newValue = event.target.value;
-		if(newValue == '')
+		if($(event.target).prop('readonly') || newValue == '')
 			return;	
 		tokens.forEach(token => {
 			if(token.isPlayer())
@@ -2398,9 +2401,9 @@ function build_menu_stat_inputs(tokenIds) {
 		});
 	});
 
-	maxHpMenuInput.on('keyup', function(event) {
+	maxHpMenuInput.find('input').on('keyup', function(event) {
 		let newValue = event.target.value;
-		if(newValue == '')
+		if($(event.target).prop('readonly') || newValue == '')
 			return;		
 		if (event.key == "Enter" && newValue !== undefined && newValue.length > 0) {
 			tokens.forEach(token => {
@@ -2422,9 +2425,9 @@ function build_menu_stat_inputs(tokenIds) {
 			});
 		}
 	});
-	maxHpMenuInput.on('focusout', function(event) {
+	maxHpMenuInput.find('input').on('focusout', function(event) {
 		let newValue = event.target.value;
-		if(newValue == '')
+		if($(event.target).prop('readonly') || newValue == '')
 			return;
 		tokens.forEach(token => {
 			if(token.isPlayer())
@@ -2444,9 +2447,9 @@ function build_menu_stat_inputs(tokenIds) {
 		});
 	});
 
-	acMenuInput.on('keyup', function(event) {
+	acMenuInput.find('input').on('keyup', function(event) {
 		let newValue = event.target.value;
-		if(newValue == '')
+		if($(event.target).prop('readonly') || newValue == '')
 			return;		
 		if (event.key == "Enter" && newValue !== undefined && newValue.length > 0) {
 			tokens.forEach(token => {
@@ -2468,9 +2471,9 @@ function build_menu_stat_inputs(tokenIds) {
 			});
 		}
 	});
-	acMenuInput.on('focusout', function(event) {
+	acMenuInput.find('input').on('focusout', function(event) {
 		let newValue = event.target.value;
-		if(newValue == '')
+		if($(event.target).prop('readonly') || newValue == '')
 			return;
 		tokens.forEach(token => {
 			if(token.isPlayer())
@@ -2490,7 +2493,7 @@ function build_menu_stat_inputs(tokenIds) {
 		});
 	});
 
-	elevMenuInput.on('keyup', function(event) {
+	elevMenuInput.find('input').on('keyup', function(event) {
 		if(event.target.value == '')
 			return;
 		if (event.key == "Enter") {
@@ -2500,7 +2503,7 @@ function build_menu_stat_inputs(tokenIds) {
 			});
 		}
 	});
-	elevMenuInput.on('focusout', function(event) {
+	elevMenuInput.find('input').on('focusout', function(event) {
 		if(event.target.value == '')
 			return;
 		tokens.forEach(token => {

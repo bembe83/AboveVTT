@@ -3677,9 +3677,9 @@ input.condition-duration-input {
 .context-menu-icon-disadvantage:before {
     background-image: url(assets/conditons/disadvantage.png);
 }
-.icon-flamed:before,
-.context-menu-icon-flamed:before {
-    background-image: url(assets/conditons/flamed.png);
+.icon-burning:before,
+.context-menu-icon-burning:before {
+    background-image: url(assets/conditons/burning.png);
 }
 .icon-flying:before,
 .context-menu-icon-flying:before {
@@ -3851,6 +3851,7 @@ audio::-webkit-media-controls-time-remaining-display{
     top: 31px;
     left: 11px;
     background: #e9e9e9;
+    z-index: 10;
 }
 .visibility_toggle_row{
     margin:5px;
@@ -4375,7 +4376,21 @@ h3#error-message{
     overflow:hidden;
     text-overflow: ellipsis;
 }
+div#initialPosition_row input{
+    width: 60px;
+    margin: 0px 4px;
+}
 
+div#initialPosition_row input::-webkit-outer-spin-button,
+div#initialPosition_row input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+
+div#initialPosition_row input[type=number] {
+  -moz-appearance: textfield;
+}
 .note-text table.table-compendium>thead>tr {
     background-color: var(--theme-table-header-bg-color,#fdfdfd);
     color: var(--theme-table-header-fg-color,#222)
@@ -4626,7 +4641,6 @@ button.block-send-to-game-log span {
 .sidebar-list-item-row-details div {
     display: flex;
     flex-direction: column;
-    flex-grow: 1;
     justify-content: center;
 }
 .sidebar-list-item-row-details-title {
@@ -4651,6 +4665,7 @@ button.block-send-to-game-log span {
     letter-spacing: 0px;
     padding: 0px 6px;
 }
+
 #door_types{
     padding: 2px;
     width: 105px;
@@ -4729,11 +4744,16 @@ button.block-send-to-game-log span {
 }
 .sidebar-list-item-row .sidebar-list-item-row-details-subtitle .subtitle-attibute {
     font-size: 12px;
-    min-width: 34px;
+    min-width: 50px;
     display: flex;
     flex-direction: row;
     justify-content: flex-start;
     align-items: flex-end;
+}
+.sidebar-list-item-row .sidebar-list-item-row-details-subtitle .subtitle-attibute.legacy-attribute{
+    flex-grow: 1;
+    display:flex;
+    justify-content: flex-end;
 }
 .sidebar-list-item-row .sidebar-list-item-row-details-subtitle .subtitle-attibute img {
     width: 24px;
@@ -7429,7 +7449,7 @@ button span.onedrive-btn-status{
 .icon-reaction-used:before,
 .icon-inspiration:before,
 .icon-flying:before,
-.icon-flamed:before,
+.icon-burning:before,
 .icon-rage:before,
 .icon-blessed:before,
 .icon-baned:before,
@@ -7441,7 +7461,7 @@ button span.onedrive-btn-status{
 .context-menu-icon-concentration-reminder:before,
 .context-menu-icon-inspiration:before,
 .context-menu-icon-flying:before,
-.context-menu-icon-flamed:before,
+.context-menu-icon-burning:before,
 .context-menu-icon-rage:before,
 .context-menu-icon-blessed:before,
 .context-menu-icon-baned:before,
@@ -9210,6 +9230,7 @@ button.journal-view-button.journal-button {
 [data-animation='aurafx-rotate'] .islight,
 .aura-element[data-animation='aurafx-rotate'][id*='aura_'] {
     animation: aurafx-rotate 40s infinite linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
 }
 
 [data-animation='flicker-fx'] .islight,
@@ -9230,6 +9251,7 @@ button.journal-view-button.journal-button {
 [data-animation='rays-fx'] .islight:after,
 .aura-element[data-animation='rays-fx'][id*='aura_']:after{
     animation: aurafx-rotate 100s infinite linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     content:'';
     width:100%;
     height:100%;
@@ -9242,15 +9264,19 @@ button.journal-view-button.journal-button {
 }
 .aura-element[data-animation='rays-fx'][id*='aura_']{
     animation: aurafx-rotate 100s infinite linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     -webkit-mask-image: repeating-conic-gradient(from 0deg, #fff 0deg 3deg, transparent 5deg 7deg, #fff 9deg);
 }
 [data-animation='wild-fx'] .islight,
 .aura-element[data-animation='wild-fx'][id*='aura_'] {
     animation: aurafx-wild 20s infinite linear reverse;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0))) skew(calc(1deg * var(--animation-skew-x)), calc(1deg * var(--animation-skew-y)));
 }
 [data-animation='wild-fx'] .islight:after,
 .aura-element[data-animation='wild-fx'][id*='aura_']:after {
     animation: aurafx-wild-hue 10s infinite linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0))) skew(calc(1deg * var(--animation-skew-x)), calc(1deg * var(--animation-skew-y)));
+    filter: hue-rotate(calc(1deg * var(--animation-rotation, 0)));
     content:'';
     width:100%;
     height:100%;
@@ -9276,6 +9302,7 @@ button.journal-view-button.journal-button {
 [data-animation='force-fx'] .islight:before,
 .aura-element[data-animation='force-fx'][id*='aura_']:before {
   animation: aurafx-force 1s infinite linear alternate;
+  transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
   content: "";
   position: absolute;
   background: radial-gradient(circle at 50% 120%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 70%), radial-gradient(ellipse at 35% 30%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.8) 5%, rgba(255, 255, 255, 0) 25%);
@@ -9293,11 +9320,13 @@ button.journal-view-button.journal-button {
 .aura-element[data-animation='fairy-fx'][id*='aura_'] {
     animation: aurafx-fairy 150s infinite linear;
     -webkit-mask-size: var(--animation-width);
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
 }
 
 [data-animation='fairy-fx'] .islight:before,
 .aura-element[data-animation='fairy-fx'][id*='aura_']:before {
     animation: aurafx-fairy2 50s infinite linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     content: '';
     position: absolute;
     width: 100%;
@@ -9313,18 +9342,21 @@ button.journal-view-button.journal-button {
 [data-animation='magic-circle-fx'] .islight,
 .aura-element[data-animation='magic-circle-fx'][id*='aura_'] {
     animation: aurafx-rotate 80s infinite linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
    -webkit-mask-size: contain;
 }
 
 [data-animation='magic-circle-2-fx'] .islight,
 .aura-element[data-animation='magic-circle-2-fx'][id*='aura_'] {
     animation: aurafx-rotate 80s infinite linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     -webkit-mask-size: contain;
 }
 
 [data-animation='spore-fx'] .islight,
 .aura-element[data-animation='spore-fx'][id*='aura_'] {
     animation: aurafx-rotate 180s infinite linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
    -webkit-mask-size: contain;
    filter:blur(5px);
 }
@@ -9342,6 +9374,7 @@ button.journal-view-button.journal-button {
 [data-animation='hurricane-fx'] .islight,
 .aura-element[data-animation='hurricane-fx'][id*='aura_'] {
     animation: aurafx-rotate 30s infinite linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     -webkit-mask-size: contain;
     --light1-blur-size: var(--radius1);
     --light2-blur-size: var(--radius2);
@@ -9353,6 +9386,7 @@ button.journal-view-button.journal-button {
 .aura-element[data-animation='hurricane-fx'][id*='aura_']:before
 {
     animation: lightning 5s infinite linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     content: '';
     position: absolute;
     width: 100%;
@@ -9377,6 +9411,7 @@ button.journal-view-button.journal-button {
 .aura-element[data-animation='snow-fx'][id*='aura_']:after
 {
     animation: snow 5s infinite linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     content: '';
     position: absolute;
     width: 100%;
@@ -9390,14 +9425,15 @@ button.journal-view-button.journal-button {
     -webkit-mask-size: var(--animation-width);
     overflow:hidden;
     border-radius:50%;
-    --starting-deg: 0deg;
+    --starting-deg: 0;
 }
 
 [data-animation='snow-fx'] .islight:before,
 .aura-element[data-animation='snow-fx'][id*='aura_']:before
 {
     animation: snow 5s infinite 2.5s linear;
-    --starting-deg: 230deg;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
+    --starting-deg: 230;
     --opacity:0;
 }
 
@@ -9415,6 +9451,7 @@ button.journal-view-button.journal-button {
 .aura-element[data-animation='bubble-fx'][id*='aura_']:after
 {
     animation: bubble 6s infinite linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     content: '';
     position: absolute;
     width: 100%;
@@ -9433,6 +9470,7 @@ button.journal-view-button.journal-button {
 .aura-element[data-animation='bubble-fx'][id*='aura_']:before
 {
     animation: bubble 6s infinite 3s linear;
+    transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     rotate:200deg;
 }
 
@@ -9552,13 +9590,13 @@ float: right;
 @keyframes bubble {
      0%{
         --opacity: 0;
-        transform: scale(1);
+        --animation-scale: 1;
     }
     50%{
          --opacity: 1;
     }
     100%{
-        transform: scale(1.4);
+        --animation-scale: 1.4;
         --opacity: 0;
     }
 }
@@ -9567,35 +9605,35 @@ float: right;
 
 @keyframes lightning {
     0%{
-        scale: 3.5;
+        --animation-scale: 3.5;
         --opacity: 0;
     }
     20%{
-        scale: 3.5;
+        --animation-scale: 3.5;
         --opacity: 0;
     }
     21%{
-       scale: 3.5;
+       --animation-scale: 3.5;
        --opacity: 1;
     }
     25%{
         --opacity: 0;
-        scale: 3.5;
+        --animation-scale: 3.5;
     }
     70%{
-        scale: 5.5;
+        --animation-scale: 5.5;
         --opacity: 0;
     }
     71%{
-       scale: 5.5;
+       --animation-scale: 5.5;
        --opacity: 1;
     }
     75%{
-        scale: 5.5;
+        --animation-scale: 5.5;
         --opacity: 0;
     }
     100%{
-        scale: 5.5;
+        --animation-scale: 5.5;
         --opacity: 0;
     }
 }
@@ -9603,28 +9641,28 @@ float: right;
 @keyframes snow {
     0%{
         --opacity: 0;
-        transform: scale(1);
-        rotate: calc(var(--starting-deg) + 200deg);
+        --animation-scale: 1;
+        --animation-rotation: calc(var(--starting-deg) + 200);
     }
     25%{
-        rotate: calc(var(--starting-deg) + 200deg);
+        --animation-rotation: calc(var(--starting-deg) + 200);
         --opacity: 1;
     }
     50%{
-        rotate: calc(var(--starting-deg) + 200deg);
+        --animation-rotation: calc(var(--starting-deg) + 200);
         --opacity: 0;
     }
     51%{
-        rotate: var(--starting-deg);
+        --animation-rotation: var(--starting-deg) + 200;
         --opacity: 0;
     }
     75%{
-        rotate: var(--starting-deg);
+        --animation-rotation: var(--starting-deg) + 200;
         --opacity: 1;
     }
     100%{
-        rotate: var(--starting-deg);
-        transform: scale(0.5);
+        --animation-rotation: var(--starting-deg) + 200;
+        --animation-scale: 0.5;
         --opacity: 0;
     }
 }
@@ -9633,25 +9671,30 @@ float: right;
 
 @keyframes aurafx-fairy {
     0% {
-        transform: scale(0.98) rotate(0deg);
+        --animation-scale: 0.98;
+        --animation-rotation: 0;
     }
     50% {
-        transform: scale(1) rotate(180deg);
+         --animation-scale: 1;
+        --animation-rotation: 180;
     }
     100% {
-        transform: scale(0.98) rotate(360deg);
+        --animation-scale: 0.98;
+        --animation-rotation: 360;
     }
 }
 @keyframes aurafx-fairy2 {
     0% {
-        transform: rotate(360deg) scale(1.5);
+        --animation-scale: 1.5;
+        --animation-rotation: 360;
     }
-
     50% {
-        transform: rotate(180deg) scale(1);
+        --animation-scale: 1;
+        --animation-rotation: 180;
     }
     100% {
-        transform: rotate(0deg) scale(1.5);
+        --animation-scale: 1.5;
+        --animation-rotation: 0;
     }
 }
 @property --light1-blur-size-animated {
@@ -9675,6 +9718,34 @@ float: right;
   initial-value: 1;
   inherits: false;
 }
+@property --animation-scale{
+  syntax: '<number>'; /* <- defined as type number for the transition to work */
+  initial-value: 1;
+  inherits: false;
+}
+@property --animation-rotation{
+  syntax: '<number>'; /* <- defined as type number for the transition to work */
+  initial-value: 1;
+  inherits: false;
+}
+@property --animation-skew-x{
+  syntax: '<number>'; /* <- defined as type number for the transition to work */
+  initial-value: 1;
+  inherits: false;
+}
+@property --animation-skew-y{
+  syntax: '<number>'; /* <- defined as type number for the transition to work */
+  initial-value: 1;
+  inherits: false;
+}
+
+
+
+
+
+
+
+
 @keyframes aurafx-flicker{
       0% { 
         --opacity: 0.7;
@@ -9691,11 +9762,11 @@ float: right;
 }
 @keyframes aurafx-rotate{
     from {
-        transform: rotate(0deg);
+        --animation-rotation: 0;
    
       }
       to {
-         transform: rotate(360deg);
+         --animation-rotation: 360;
       }
 }
 
@@ -9786,30 +9857,42 @@ float: right;
 }
 @keyframes aurafx-wild{
     from {
-        transform: rotate(0deg) skew(5deg, 0deg);
+        --animation-rotation: 0;
+        --animation-skew-x: 5;
+        --animation-skew-y: 0;
       }
       to {
-        transform: rotate(360deg) skew(0deg, 5deg);
+        --animation-rotation: 360;
+        --animation-skew-x: 0;
+        --animation-skew-y: 5;
       }
 }
 @keyframes aurafx-wild-hue{
     from {
-        transform: rotate(0deg) skew(5deg, 0deg);
-        filter: hue-rotate(0deg);
+        --animation-rotation: 0;
+        --animation-skew-x: 5;
+        --animation-skew-y: 0;
       }
       to {
-        transform: rotate(360deg) skew(0deg, 5deg);
-        filter: hue-rotate(360deg);
+        --animation-rotation: 360;
+        --animation-skew-x: 0;
+        --animation-skew-y: 5;
       }
 }
 @keyframes aurafx-force{
     from {
-        transform: scale(0.99);
+        --animation-scale: 0.99;
       }
       to {
-        transform: scale(1)
+        --animation-scale: 1;
       }
 }
+
+
+
+
+
+
 
 
 
@@ -10118,8 +10201,8 @@ button#editAnimations {
 .dropdown-disadvantage {
     background-image: url(assets/conditons/disadvantage.png) !important;
 }
-.dropdown-flamed {
-    background-image: url(assets/conditons/flamed.png) !important;
+.dropdown-burning {
+    background-image: url(assets/conditons/burning.png) !important;
 }
 .dropdown-flying {
     background-image: url(assets/conditons/flying.png) !important;

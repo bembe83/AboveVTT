@@ -312,7 +312,6 @@ function get_scene_data_pbtso() {
 		"disableSceneVision": "0",
 		"grid_color": "rgba(0, 0, 0, 0.5)",
 		"snap": "1",
-		"map": "https://media.dndbeyond.com/compendium-images/pbtso/3WCYZRRvYTovFYbD/map-1.01-Goblin-Ambush-player.png",
 		"conversion": 1,
 		"width": 1002,
 		"height": 1369
@@ -5635,7 +5634,6 @@ function get_scene_data_pbtso() {
 		"disableSceneVision": "0",
 		"grid_color": "rgba(0, 0, 0, 0.5)",
 		"snap": "1",
-		"map": "https://media.dndbeyond.com/compendium-images/pbtso/3WCYZRRvYTovFYbD/map-1.02-Cragmaw-Hideout.png",
 		"conversion": 1,
 		"width": 2029,
 		"height": 1452
@@ -5652,30 +5650,9 @@ function get_scene_data_pbtso() {
 		"grid_subdivided": "1",
 		"scale_factor": "2"
 	},
-	"pbtso/trouble-in-phandalin/Map202RedbrandHideout": {
-		
-		"reveals": [
-			[
-				0,
-				0,
-				0,
-				0,
-				2,
-				0,
-				1
-			]
-		],
-		"gridStrokeNumberInput": "0.5",
-		"scale": 100,
+"pbtso/trouble-in-phandalin/Map202RedbrandHideout": {
 		"vpps": 70.5,
-		"darkness_filter_number": "100",
 		"title": "Map 2.2: Redbrand Hideout ",
-		"fog_of_war": "1",
-		
-		"upsq": "ft",
-		"scaleX": 1,
-		"scaleY": 1,
-		"gridType": "1",
 		"drawings": [
 			[
 				"line",
@@ -5857,17 +5834,6 @@ function get_scene_data_pbtso() {
 				"line",
 				"wall",
 				"rgba(0, 255, 0, 1)",
-				1102,
-				198,
-				1178,
-				198,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0, 1)",
 				759,
 				201,
 				1040,
@@ -5956,17 +5922,6 @@ function get_scene_data_pbtso() {
 				"line",
 				"wall",
 				"rgba(0, 255, 0, 1)",
-				1036,
-				200,
-				1103,
-				200,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0, 1)",
 				1179,
 				200,
 				1328,
@@ -6078,9 +6033,9 @@ function get_scene_data_pbtso() {
 				"wall",
 				"rgba(0, 255, 0 ,1)",
 				1391,
-				769,
+				845,
 				1391,
-				769,
+				818,
 				6,
 				1
 			],
@@ -6093,50 +6048,6 @@ function get_scene_data_pbtso() {
 				1391,
 				818,
 				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1391,
-				818,
-				1391,
-				769,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0 ,1)",
-				1391,
-				769,
-				1391,
-				769,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0 ,1)",
-				1391,
-				845,
-				1391,
-				818,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1391,
-				818,
-				1391,
-				769,
-				12,
 				1
 			],
 			[
@@ -6166,54 +6077,10 @@ function get_scene_data_pbtso() {
 				"wall",
 				"rgba(0, 255, 0 ,1)",
 				1391,
-				769,
-				1391,
-				768,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1391,
-				768,
-				1391,
-				723,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0 ,1)",
-				1391,
 				723,
 				1391,
 				723,
 				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0 ,1)",
-				1391,
-				769,
-				1391,
-				768,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1391,
-				768,
-				1391,
-				723,
-				12,
 				1
 			],
 			[
@@ -6224,17 +6091,6 @@ function get_scene_data_pbtso() {
 				1338,
 				1742,
 				1338,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0, 1)",
-				1393,
-				906,
-				1611,
-				906,
 				6,
 				1
 			],
@@ -6499,39 +6355,6 @@ function get_scene_data_pbtso() {
 				1258,
 				1109,
 				1193,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0, 1)",
-				1391,
-				1335,
-				1036,
-				1340,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0, 1)",
-				1036,
-				1340,
-				1029,
-				1339,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0, 1)",
-				1029,
-				1339,
-				1031,
-				1196,
 				6,
 				1
 			],
@@ -7957,105 +7780,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 0.5)",
-				1951,
-				1112,
-				1951,
-				1061,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0 ,1)",
-				1393,
-				1341,
-				1393,
-				1331,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1393,
-				1331,
-				1393,
-				1261,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0 ,1)",
-				1391,
-				975,
-				1391,
-				993,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0 ,1)",
-				1391,
-				1055,
-				1391,
-				1039,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1391,
-				1039,
-				1391,
-				993,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0 ,1)",
-				1393,
-				906,
-				1393,
-				993,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0 ,1)",
-				1393,
-				1261,
-				1393,
-				1039,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1393,
-				1039,
-				1393,
-				993,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				1326,
 				902,
@@ -8331,17 +8055,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				205,
-				1121.2341597796144,
-				254,
-				1121.3691460055097,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				115,
 				910,
@@ -8364,17 +8077,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				207,
-				910,
-				254,
-				910,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				115,
 				554,
@@ -8392,17 +8094,6 @@ function get_scene_data_pbtso() {
 				324,
 				554,
 				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				275,
-				554,
-				324,
-				554,
-				12,
 				1
 			],
 			[
@@ -8425,17 +8116,6 @@ function get_scene_data_pbtso() {
 				326,
 				483,
 				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				278,
-				483,
-				326,
-				483,
-				12,
 				1
 			],
 			[
@@ -8463,17 +8143,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				406,
-				336,
-				406,
-				284,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				407,
 				201,
@@ -8491,17 +8160,6 @@ function get_scene_data_pbtso() {
 				407,
 				336,
 				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				407,
-				336,
-				407,
-				284,
-				12,
 				1
 			],
 			[
@@ -8529,17 +8187,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				689,
-				274,
-				689,
-				204,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				689,
 				200,
@@ -8562,17 +8209,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				689,
-				274,
-				689,
-				204,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				757,
 				200,
@@ -8590,17 +8226,6 @@ function get_scene_data_pbtso() {
 				757,
 				417,
 				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				757,
-				417,
-				757,
-				346,
-				12,
 				1
 			],
 			[
@@ -8628,45 +8253,12 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				759,
-				417,
-				759,
-				346,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0 ,1)",
-				1102,
-				198,
-				1102,
-				202,
-				6,
-				1
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				1102,
 				413,
 				1102,
 				274,
 				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1102,
-				274,
-				1102,
-				202,
-				12,
 				1
 			],
 			[
@@ -8689,17 +8281,6 @@ function get_scene_data_pbtso() {
 				1178,
 				267,
 				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1178,
-				267,
-				1178,
-				216,
-				12,
 				1
 			],
 			[
@@ -8727,17 +8308,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				1179,
-				267,
-				1179,
-				216,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				1102,
 				413,
@@ -8760,17 +8330,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				1119,
-				413,
-				1168,
-				413,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				1102,
 				413,
@@ -8788,17 +8347,6 @@ function get_scene_data_pbtso() {
 				1168,
 				413,
 				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1119,
-				413,
-				1168,
-				413,
-				12,
 				1
 			],
 			[
@@ -8826,17 +8374,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				1392,
-				481,
-				1392,
-				428,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				1391,
 				413,
@@ -8854,39 +8391,6 @@ function get_scene_data_pbtso() {
 				1391,
 				481,
 				6,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1391,
-				481,
-				1391,
-				428,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1473,
-				342,
-				1524,
-				342,
-				12,
-				1
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1473,
-				557,
-				1523,
-				557,
-				12,
 				1
 			],
 			[
@@ -9427,9 +8931,370 @@ function get_scene_data_pbtso() {
 				558,
 				12,
 				1
+			],
+			[
+				"line",
+				"wall",
+				"rgba(0, 255, 0, 1)",
+				1611,
+				906,
+				1397,
+				906,
+				6,
+				1,
+				0,
+				null,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(0, 255, 0, 1)",
+				1391,
+				1052,
+				1393,
+				1258,
+				6,
+				1,
+				null,
+				"",
+				""
+			],
+			[
+				"line",
+				"wall",
+				"rgba(0, 255, 0, 1)",
+				1394,
+				918,
+				1394,
+				918,
+				6,
+				1,
+				null,
+				"",
+				""
+			],
+			[
+				"line",
+				"wall",
+				"rgba(0, 255, 0, 1)",
+				1398,
+				904,
+				1392,
+				978,
+				6,
+				1,
+				null,
+				"",
+				""
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1392,
+				977,
+				1392,
+				1053,
+				12,
+				1,
+				false
+			],
+			[
+				"line",
+				"wall",
+				"rgba(0, 255, 0, 1)",
+				1038,
+				200,
+				1178,
+				200,
+				6,
+				1,
+				null,
+				"",
+				""
+			],
+			[
+				"line",
+				"wall",
+				"rgba(100, 0, 255, 1)",
+				1104,
+				201,
+				1103,
+				273,
+				12,
+				1,
+				false
+			],
+			[
+				"line",
+				"wall",
+				"rgba(150, 50, 150, 1)",
+				1178,
+				214,
+				1179,
+				269,
+				12,
+				1,
+				false
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 0.5)",
+				1119,
+				413,
+				1168,
+				413,
+				12,
+				1,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1119,
+				413,
+				1168,
+				413,
+				12,
+				1,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				207,
+				910,
+				254,
+				910,
+				12,
+				1,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				205,
+				1121.2341597796144,
+				254,
+				1121.3691460055097,
+				12,
+				1,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(0, 255, 0, 1)",
+				1030,
+				1195,
+				1031,
+				1343,
+				6,
+				1,
+				null,
+				"",
+				""
+			],
+			[
+				"line",
+				"wall",
+				"rgba(0, 255, 0, 1)",
+				1379,
+				1337,
+				1379,
+				1336,
+				6,
+				1,
+				null,
+				"",
+				""
+			],
+			[
+				"line",
+				"wall",
+				"rgba(0, 255, 0, 1)",
+				1396,
+				1341,
+				1030,
+				1341,
+				6,
+				1,
+				null,
+				"",
+				""
+			],
+			[
+				"line",
+				"wall",
+				"rgba(100, 0, 255, 1)",
+				1390,
+				1255,
+				1391,
+				1343,
+				12,
+				1,
+				false
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1390,
+				768,
+				1391,
+				820,
+				12,
+				1,
+				false
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1390,
+				721,
+				1390,
+				769,
+				12,
+				1,
+				false
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1473,
+				342,
+				1524,
+				342,
+				12,
+				1,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1473,
+				557,
+				1523,
+				557,
+				12,
+				1,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1390,
+				427,
+				1391,
+				482,
+				12,
+				1,
+				false
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				405,
+				282,
+				406,
+				337,
+				12,
+				1,
+				false
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1951,
+				1112,
+				1951,
+				1061,
+				12,
+				1,
+				null
+			],
+			[
+				"eraser",
+				"filled",
+				"#e66465",
+				132,
+				30,
+				-209,
+				-77,
+				"6",
+				1
+			],
+			[
+				"eraser",
+				"filled",
+				"#e66465",
+				124,
+				58,
+				-218,
+				-160,
+				"6",
+				1
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				278,
+				483,
+				326,
+				483,
+				12,
+				1,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				275,
+				554,
+				324,
+				554,
+				12,
+				1,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(100, 0, 255, 1)",
+				686,
+				203,
+				686,
+				274,
+				12,
+				1,
+				false
+			],
+			[
+				"line",
+				"wall",
+				"rgba(100, 0, 255, 1)",
+				756,
+				346,
+				757,
+				417,
+				12,
+				1,
+				false
 			]
 		],
-		"fpsq": "5",
 		"tokens": {
 			"021f7957-1a1a-42e2-8404-1c48ddad4983": {
 				"sizeId": 4,
@@ -9496,7 +9361,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			},
 			"0582ed52-727a-4017-98a7-b01d02e36a50": {
 				"sizeId": 4,
@@ -9563,7 +9430,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"087613dc-34bf-4a5d-a6e3-70562ffe9b5a": {
 				"sizeId": 4,
@@ -9630,7 +9498,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"08cf95e5-0e91-432f-aa4e-3ec7b38bbd10": {
 				"sizeId": 4,
@@ -9696,7 +9565,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"0c9ed1d7-fdb8-4c36-afb2-cb2ba0a81e2d": {
 				"sizeId": 4,
@@ -9763,7 +9633,128 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
+			},
+			"110420111032739966d9ec-298a-4658-bcf9-7640fa1b6bd6": {
+				"aura2": {
+					"color": "rgba(255, 255, 0, 0.1)",
+					"feet": "0"
+				},
+				"aura1": {
+					"color": "rgba(255, 129, 0, 0.3)",
+					"feet": "0"
+				},
+				"color": "#0000C0",
+				"hitPointInfo": {
+					"maximum": 0,
+					"current": 0,
+					"temp": 0
+				},
+				"custom_conditions": [],
+				"type": "door",
+				"scaleCreated": 1,
+				"vision": {
+					"color": "rgba(0, 0, 0, 0)",
+					"feet": 0
+				},
+				"top": "212px",
+				"size": 50,
+				"armorClass": 0,
+				"left": "1078px",
+				"name": "",
+				"light1": {
+					"color": "rgba(255, 255, 255, 1)",
+					"feet": "0"
+				},
+				"id": "110420111032739966d9ec-298a-4658-bcf9-7640fa1b6bd6",
+				"auraislight": true,
+				"conditions": [],
+				"imgsrc": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+				"light2": {
+					"color": "rgba(142, 142, 142, 1)",
+					"feet": "0"
+				}
+			},
+			"117821411792699966d9ec-298a-4658-bcf9-7640fa1b6bd6": {
+				"aura2": {
+					"color": "rgba(255, 255, 0, 0.1)",
+					"feet": "0"
+				},
+				"aura1": {
+					"color": "rgba(255, 129, 0, 0.3)",
+					"feet": "0"
+				},
+				"color": "#400000",
+				"hitPointInfo": {
+					"maximum": 0,
+					"current": 0,
+					"temp": 0
+				},
+				"custom_conditions": [],
+				"type": "door",
+				"scaleCreated": 1,
+				"vision": {
+					"color": "rgba(0, 0, 0, 0)",
+					"feet": 0
+				},
+				"top": "216px",
+				"size": 50,
+				"armorClass": 0,
+				"left": "1153px",
+				"name": "",
+				"light1": {
+					"color": "rgba(255, 255, 255, 1)",
+					"feet": "0"
+				},
+				"id": "117821411792699966d9ec-298a-4658-bcf9-7640fa1b6bd6",
+				"auraislight": true,
+				"conditions": [],
+				"imgsrc": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+				"light2": {
+					"color": "rgba(142, 142, 142, 1)",
+					"feet": "0"
+				}
+			},
+			"13901255139113439966d9ec-298a-4658-bcf9-7640fa1b6bd6": {
+				"aura2": {
+					"color": "rgba(255, 255, 0, 0.1)",
+					"feet": "0"
+				},
+				"aura1": {
+					"color": "rgba(255, 129, 0, 0.3)",
+					"feet": "0"
+				},
+				"color": "#A0A000",
+				"hitPointInfo": {
+					"maximum": 0,
+					"current": 0,
+					"temp": 0
+				},
+				"custom_conditions": [],
+				"type": "door",
+				"scaleCreated": 1,
+				"vision": {
+					"color": "rgba(0, 0, 0, 0)",
+					"feet": 0
+				},
+				"top": "1274px",
+				"size": 50,
+				"armorClass": 0,
+				"left": "1365px",
+				"name": "",
+				"light1": {
+					"color": "rgba(255, 255, 255, 1)",
+					"feet": "0"
+				},
+				"id": "13901255139113439966d9ec-298a-4658-bcf9-7640fa1b6bd6",
+				"auraislight": true,
+				"conditions": [],
+				"imgsrc": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+				"light2": {
+					"color": "rgba(142, 142, 142, 1)",
+					"feet": "0"
+				}
 			},
 			"142097ad-3a4e-4f8a-82cd-4bd5944d5fb7": {
 				"sizeId": 3,
@@ -9833,7 +9824,9 @@ function get_scene_data_pbtso() {
 					}
 				],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			},
 			"1669494b-9348-4d48-8167-51b3d12fbfdb": {
 				"sizeId": 4,
@@ -9900,7 +9893,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"1c30684f-e06e-46c6-8395-be8e55bc61c9": {
 				"sizeId": 4,
@@ -9967,7 +9961,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			},
 			"235afd07-d32f-4b91-a60c-2258152d048d": {
 				"sizeId": 4,
@@ -10035,7 +10031,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			},
 			"32eceea0-53a6-4f0c-8096-170d84dc583a": {
 				"sizeId": 4,
@@ -10101,7 +10099,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"43485472-1e87-4843-9ee8-afabae16c431": {
 				"sizeId": 4,
@@ -10168,7 +10167,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"4831e757-ef78-4827-b6dd-66dfac971a36": {
 				"sizeId": 4,
@@ -10236,7 +10236,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			},
 			"4f32ec98-988f-4218-b898-d3a76e95c535": {
 				"sizeId": 4,
@@ -10303,7 +10305,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"516f7db6-f1f2-428a-886c-225a40b1ca46": {
 				"sizeId": 3,
@@ -10370,7 +10373,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			},
 			"55f0266c-b448-4d34-a6dd-48fcb340380f": {
 				"sizeId": 4,
@@ -10436,7 +10441,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			},
 			"581fde08-165c-41b1-b74b-d88b7f9469e0": {
 				"sizeId": 4,
@@ -10502,7 +10509,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			},
 			"5c434557-bb85-44c6-8f23-fe78bd9d11c5": {
 				"sizeId": 4,
@@ -10569,7 +10578,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"63fc2399-80a9-4cc9-a4a0-7007d9c6a2e3": {
 				"sizeId": 4,
@@ -10636,7 +10646,49 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
+			},
+			"6862036862749966d9ec-298a-4658-bcf9-7640fa1b6bd6": {
+				"aura2": {
+					"color": "rgba(255, 255, 0, 0.1)",
+					"feet": "0"
+				},
+				"aura1": {
+					"color": "rgba(255, 129, 0, 0.3)",
+					"feet": "0"
+				},
+				"color": "#202000",
+				"hitPointInfo": {
+					"maximum": 0,
+					"current": 0,
+					"temp": 0
+				},
+				"custom_conditions": [],
+				"type": "door",
+				"scaleCreated": 1,
+				"vision": {
+					"color": "rgba(0, 0, 0, 0)",
+					"feet": 0
+				},
+				"top": "213px",
+				"size": 50,
+				"armorClass": 0,
+				"left": "661px",
+				"name": "",
+				"light1": {
+					"color": "rgba(255, 255, 255, 1)",
+					"feet": "0"
+				},
+				"id": "6862036862749966d9ec-298a-4658-bcf9-7640fa1b6bd6",
+				"auraislight": true,
+				"conditions": [],
+				"imgsrc": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+				"light2": {
+					"color": "rgba(142, 142, 142, 1)",
+					"feet": "0"
+				}
 			},
 			"7523ddce-f711-42f2-b4cf-d2a40d3b57f3": {
 				"sizeId": 4,
@@ -10704,7 +10756,49 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
+			},
+			"7563467574179966d9ec-298a-4658-bcf9-7640fa1b6bd6": {
+				"aura2": {
+					"color": "rgba(255, 255, 0, 0.1)",
+					"feet": "0"
+				},
+				"aura1": {
+					"color": "rgba(255, 129, 0, 0.3)",
+					"feet": "0"
+				},
+				"color": "#404040",
+				"hitPointInfo": {
+					"maximum": 0,
+					"current": 0,
+					"temp": 0
+				},
+				"custom_conditions": [],
+				"type": "door",
+				"scaleCreated": 1,
+				"vision": {
+					"color": "rgba(0, 0, 0, 0)",
+					"feet": 0
+				},
+				"top": "356px",
+				"size": 50,
+				"armorClass": 0,
+				"left": "731px",
+				"name": "",
+				"light1": {
+					"color": "rgba(255, 255, 255, 1)",
+					"feet": "0"
+				},
+				"id": "7563467574179966d9ec-298a-4658-bcf9-7640fa1b6bd6",
+				"auraislight": true,
+				"conditions": [],
+				"imgsrc": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+				"light2": {
+					"color": "rgba(142, 142, 142, 1)",
+					"feet": "0"
+				}
 			},
 			"7d20d598-9981-4fe3-a6e1-59fe1123017f": {
 				"sizeId": 4,
@@ -10772,7 +10866,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			},
 			"84c0db09-2c8d-4fb2-906e-d903f9676d54": {
 				"sizeId": 4,
@@ -10838,7 +10934,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"8e8c7dfc-423e-4938-810d-47c0b6d224be": {
 				"sizeId": 4,
@@ -10905,7 +11002,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"ac2b00d0-f637-4498-bce8-6ea183dc405e": {
 				"sizeId": 4,
@@ -10972,7 +11070,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			},
 			"c03c75f4-ea3c-4474-b143-617b5010e7a9": {
 				"sizeId": 2,
@@ -11038,7 +11138,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			},
 			"c51e1fd5-f11c-4c6b-be51-c9532c8c3e85": {
 				"sizeId": 4,
@@ -11106,7 +11208,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"d15a67f7-554c-4791-8e73-15c0bec0671b": {
 				"sizeId": 4,
@@ -11173,7 +11276,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"dc8e282b-b902-47be-94f2-f35e6fd550ce": {
 				"sizeId": 4,
@@ -11240,7 +11344,8 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1"
 			},
 			"e1265c95-810f-4a5a-8d39-c9feff1bd994": {
 				"sizeId": 3,
@@ -11307,7 +11412,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			},
 			"e5e0dc89-b1cd-4aca-a3a0-a8d638a9d304": {
 				"sizeId": 4,
@@ -11375,29 +11482,16 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": "1",
+				"mapElev": 0
 			}
 		},
 		"darkness_filter": "100",
-		"grid_line_width": "0.5",
-		"grid_subdivided": "0",
-		"scale_factor": 1,
 		"offsetx": 54.66666666666674,
 		"dm_map_usable": "1",
 		"offsety": 65,
-		"dm_map_is_video": "0",
-		"grid": "0",
-		"scale_check": true,
-		
-		"player_map_is_video": "0",
 		"hpps": 70.33333333333333,
-		"disableSceneVision": "0",
-		"grid_color": "rgba(0, 0, 0, 0.5)",
-		"snap": "1",
-		"map": "https://media.dndbeyond.com/compendium-images/pbtso/3WCYZRRvYTovFYbD/map-2.02-Redbrand-Hideout.png",
-		"conversion": 1,
-		"width": 2059,
-		"height": 1466
 	},
 	"pbtso/the-spiders-web/Map301OldOwlWell": {
 		
@@ -12469,35 +12563,13 @@ function get_scene_data_pbtso() {
 		"disableSceneVision": "0",
 		"grid_color": "rgba(0, 0, 0, 0.5)",
 		"snap": "1",
-		"map": "https://media.dndbeyond.com/compendium-images/pbtso/3WCYZRRvYTovFYbD/03-003.Map301-Old-Owl-Well.png",
 		"conversion": 1,
 		"width": 1002,
 		"height": 1369
 	},
 	"pbtso/the-spiders-web/Map302RuinsofThundertree": {
-		
-		"reveals": [
-			[
-				0,
-				0,
-				0,
-				0,
-				2,
-				0,
-				1
-			]
-		],
-		"gridStrokeNumberInput": "0.5",
-		"scale": 100,
 		"vpps": 35,
-		"darkness_filter_number": "0",
 		"title": "Map 3.2: Ruins of Thundertree ",
-		"fog_of_war": "1",
-		
-		"upsq": "ft",
-		"scaleX": 1,
-		"scaleY": 1,
-		"gridType": "1",
 		"drawings": [
 			[
 				"line",
@@ -12766,17 +12838,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				1127,
-				262,
-				1184,
-				262,
-				12,
-				2
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				1204,
 				260,
@@ -12821,17 +12882,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				1222,
-				538,
-				1282,
-				538,
-				12,
-				2
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0, 1)",
 				1909,
 				264,
@@ -12865,17 +12915,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				2051,
-				264,
-				2112,
-				264,
-				12,
-				2
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				1909,
 				535,
@@ -12898,17 +12937,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				1979,
-				535,
-				2040,
-				535,
-				12,
-				2
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				2188,
 				264,
@@ -12926,17 +12954,6 @@ function get_scene_data_pbtso() {
 				2188,
 				474,
 				6,
-				2
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				2188,
-				474,
-				2188,
-				414,
-				12,
 				2
 			],
 			[
@@ -13294,17 +13311,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				3365,
-				541,
-				3425,
-				541,
-				12,
-				2
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				3443,
 				541,
@@ -13344,17 +13350,6 @@ function get_scene_data_pbtso() {
 				3713,
 				541,
 				6,
-				2
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				3654,
-				541,
-				3713,
-				541,
-				12,
 				2
 			],
 			[
@@ -13404,44 +13399,11 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(0, 255, 0 ,1)",
-				3301,
-				256,
-				3656,
-				256,
-				6,
-				2
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0, 1)",
 				3731,
 				256,
 				3713,
 				256,
-				6,
-				2
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				3656,
-				256,
-				3713,
-				256,
-				12,
-				2
-			],
-			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0 ,1)",
-				3443,
-				255,
-				3656,
-				255,
 				6,
 				2
 			],
@@ -13454,17 +13416,6 @@ function get_scene_data_pbtso() {
 				3713,
 				255,
 				6,
-				2
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				3656,
-				255,
-				3713,
-				255,
-				12,
 				2
 			],
 			[
@@ -14075,17 +14026,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				3741,
-				2220,
-				3799,
-				2220,
-				12,
-				2
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				3583,
 				2503,
@@ -14136,17 +14076,6 @@ function get_scene_data_pbtso() {
 				3721,
 				2072,
 				6,
-				2
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				3721,
-				2072,
-				3721,
-				2018,
-				12,
 				2
 			],
 			[
@@ -14218,17 +14147,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				2317,
-				2299,
-				2317,
-				2242,
-				12,
-				2
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				2604,
 				2347,
@@ -14246,17 +14164,6 @@ function get_scene_data_pbtso() {
 				2604,
 				2442,
 				6,
-				2
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				2604,
-				2442,
-				2604,
-				2383,
-				12,
 				2
 			],
 			[
@@ -14482,17 +14389,6 @@ function get_scene_data_pbtso() {
 			[
 				"line",
 				"wall",
-				"rgba(255, 100, 255, 1)",
-				944,
-				1799,
-				1007,
-				1799,
-				12,
-				2
-			],
-			[
-				"line",
-				"wall",
 				"rgba(0, 255, 0 ,1)",
 				1207,
 				1868,
@@ -14510,17 +14406,6 @@ function get_scene_data_pbtso() {
 				1207,
 				2017,
 				6,
-				2
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 1)",
-				1207,
-				2017,
-				1207,
-				1959,
-				12,
 				2
 			],
 			[
@@ -14692,43 +14577,10 @@ function get_scene_data_pbtso() {
 				"line",
 				"wall",
 				"rgba(255, 100, 255, 0.5)",
-				1202.5214285714285,
-				398,
-				1203.2071428571428,
-				334,
-				12,
-				2
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 0.5)",
 				3654,
 				400,
 				3712,
 				400,
-				12,
-				2
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 0.5)",
-				3654,
-				541,
-				3713,
-				541,
-				12,
-				2
-			],
-			[
-				"line",
-				"wall",
-				"rgba(255, 100, 255, 0.5)",
-				3741,
-				2220,
-				3799,
-				2220,
 				12,
 				2
 			],
@@ -14764,11 +14616,216 @@ function get_scene_data_pbtso() {
 				650.5473684210526,
 				12,
 				2
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1222,
+				538,
+				1282,
+				538,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1202.5214285714285,
+				398,
+				1203.2071428571428,
+				334,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1127,
+				262,
+				1184,
+				262,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				944,
+				1799,
+				1007,
+				1799,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1207,
+				2017,
+				1207,
+				1959,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				2317,
+				2299,
+				2317,
+				2242,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				2604,
+				2442,
+				2604,
+				2383,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 0.5)",
+				3741,
+				2220,
+				3799,
+				2220,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				3741,
+				2220,
+				3799,
+				2220,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				3721,
+				2072,
+				3721,
+				2018,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 0.5)",
+				3365,
+				541,
+				3425,
+				541,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(0, 255, 0, 1)",
+				3300,
+				255,
+				3645,
+				258,
+				6,
+				2,
+				null,
+				"",
+				""
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				3646,
+				258,
+				3716,
+				258,
+				12,
+				2,
+				false
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 0.5)",
+				3655,
+				537,
+				3715,
+				535,
+				12,
+				2,
+				false
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				2051,
+				264,
+				2112,
+				264,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				1979,
+				535,
+				2040,
+				535,
+				12,
+				2,
+				null
+			],
+			[
+				"line",
+				"wall",
+				"rgba(255, 100, 255, 1)",
+				2188,
+				474,
+				2188,
+				414,
+				12,
+				2,
+				null
 			]
 		],
-		"fpsq": "5",
-		"tokens": {
-			"003b8969-9714-4a11-b3d1-990bc837c190": {
+		"tokens": [
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#000080",
@@ -14835,7 +14892,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"00788055-9368-4ab1-b5cb-6893292ca3f9": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#911EB4",
@@ -14902,7 +14959,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"04ca8d7f-2888-4249-b42b-a55e1c5894bb": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#008080",
@@ -14969,7 +15026,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"12eb9d64-28fb-4c3d-bf7b-3d47606e4426": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#00E000",
@@ -15036,7 +15093,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"16285bb2-461c-42c4-9964-51a953887622": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#0000C0",
@@ -15103,7 +15160,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"229e25ea-e57b-4694-87ce-d7f9a5ed77ff": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#000000",
@@ -15169,7 +15226,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"22d7f7d5-4aec-4911-ac3b-701e200b57d7": {
+			{
 				"sizeId": 5,
 				"itemType": "monster",
 				"color": "#808000",
@@ -15235,7 +15292,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"24a65e31-304a-4063-824c-d44834b7ad56": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#00E5FF",
@@ -15302,7 +15359,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"2b4b835c-9f0f-4302-be1f-feae67eeda36": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#F032E6",
@@ -15369,7 +15426,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"2c45a033-9a14-4b10-8922-acb8446d1595": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#008000",
@@ -15436,7 +15493,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"2d4045b6-0a1f-4ff4-98eb-5d9ca7157109": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#00E5FF",
@@ -15502,7 +15559,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"2de292d5-a260-4f2b-b7fa-bc3b1552fb94": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#FF7433",
@@ -15568,7 +15625,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"2f5fa42e-d101-494c-9871-e699e52b9d74": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#5F0404",
@@ -15635,7 +15692,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"30e5a59c-5170-461f-a94c-1e8f67e3f292": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#884DFF",
@@ -15701,7 +15758,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"33999649-e83c-4415-ade2-5e89ad6983ad": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#EC8AFF",
@@ -15767,7 +15824,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"34eacb76-bc98-4f7f-93f3-b9394f8d42f9": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#FF7433",
@@ -15834,7 +15891,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"4131a0ec-7cce-47ae-83ce-aa05ee084828": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#000080",
@@ -15901,7 +15958,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"4c430d70-fdbc-48ea-ba6d-f85b961c7606": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#808000",
@@ -15968,7 +16025,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"4cea9019-4ee7-45b3-8947-26a3271c4646": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#FFD433",
@@ -16035,7 +16092,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"4e23095f-05eb-4e01-9726-c7ee0bbb7085": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#008000",
@@ -16102,7 +16159,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"4e4624cb-68c3-4cac-a029-7d445c0a0d9d": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#FF7433",
@@ -16169,7 +16226,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"50f242e3-d52a-46fe-b0a9-1d46eea9d6b0": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#5F0404",
@@ -16235,7 +16292,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"528e1d63-bec5-4dc2-8717-9cfd9829a34d": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#5F0404",
@@ -16246,6 +16303,7 @@ function get_scene_data_pbtso() {
 				"hp": 22,
 				"legacyaspectratio": true,
 				"max_hp": 22,
+				"mapElev": 0,
 				"restrictPlayerMove": false,
 				"listItemPath": "/Monsters/Ash Zombie",
 				"top": "474px",
@@ -16282,6 +16340,7 @@ function get_scene_data_pbtso() {
 				"player_owned": false,
 				"monster": 287872,
 				"tokenBaseStyleSelect": "default",
+				"scaleCreated": "2",
 				"itemId": 287872,
 				"square": false,
 				"vision": {
@@ -16290,7 +16349,7 @@ function get_scene_data_pbtso() {
 				},
 				"healthauratype": "aura",
 				"size": 70,
-				"left": "1274px",
+				"left": "1344px",
 				"name": "Ash Zombie 6",
 				"zindexdiff": 17,
 				"defaultmaxhptype": "average",
@@ -16301,7 +16360,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"56fbfea2-4c21-4b12-a9f5-af3438aa9692": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#F032E6",
@@ -16367,7 +16426,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"5e3f06fe-a21e-4d90-86aa-cf2591db8755": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#C00000",
@@ -16434,7 +16493,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"6f17cf46-e939-4abe-b91b-1c4f75b73ced": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#911EB4",
@@ -16501,7 +16560,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"725be511-8cc6-4813-825b-25dd8e0cc57d": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#FFD433",
@@ -16568,7 +16627,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"8790514a-0e5f-4f1d-a286-d18a55176190": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#FF7433",
@@ -16634,7 +16693,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"8aebef99-f077-407e-a3c7-3c231df65b60": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#EC8AFF",
@@ -16701,7 +16760,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"8cf78d7b-f3f8-4892-acc7-0aadcd664186": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#884DFF",
@@ -16768,7 +16827,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"8f18b7d2-d369-4ab9-8052-0db764466d96": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#FFD433",
@@ -16834,7 +16893,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"9028bd49-23f6-4d6e-9bb8-4e94d19fcd52": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#800000",
@@ -16901,7 +16960,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"93af82fc-df52-457d-8975-a64af6898264": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#1E50DC",
@@ -16968,7 +17027,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"9ce53f0e-b742-40f1-ad47-323427bb93ea": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#000000",
@@ -17035,7 +17094,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"9e8d3b07-8182-438a-a382-b69208b0c6b2": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#1E50DC",
@@ -17102,7 +17161,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"a377385f-7de0-4587-8c8c-c798fabb65c2": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#808000",
@@ -17169,7 +17228,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"a4253b4a-289b-40b0-918f-ce36de2c4ca9": {
+			{
 				"sizeId": 5,
 				"itemType": "monster",
 				"color": "#FF7433",
@@ -17236,7 +17295,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"a76b20df-8159-470f-93b9-cf8ee6026ab6": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#800000",
@@ -17303,7 +17362,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"afe00bb2-b58d-497b-9238-182fcea9504e": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#00C000",
@@ -17370,7 +17429,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"cfef7002-707c-479f-b837-bf8f6956d304": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#800080",
@@ -17437,7 +17496,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"d0f15efb-2931-4e0a-8fb8-eb1f646ebe95": {
+			{
 				"sizeId": 3,
 				"itemType": "monster",
 				"color": "#808080",
@@ -17504,7 +17563,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"da097284-ea0e-4774-893c-310c3649fd7b": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#FFD433",
@@ -17570,7 +17629,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"dd406b34-0614-464b-a22a-6e8db7c17d6f": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#000000",
@@ -17636,7 +17695,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"e34a634c-eb74-4940-be73-b931d0d8a0c5": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#1E50DC",
@@ -17702,7 +17761,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"e3e94480-a476-40e3-984e-f7a3b098e9d5": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#884DFF",
@@ -17768,7 +17827,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"e478b2bc-5451-498e-a12c-47480b1bff4d": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#800080",
@@ -17835,7 +17894,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"eb907749-48ef-41bb-a82f-990352d5969f": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#00C0C0",
@@ -17901,7 +17960,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"ecdf4ef8-ce79-4f74-8866-7d89c8d994f5": {
+			{
 				"sizeId": 4,
 				"itemType": "monster",
 				"color": "#1E50DC",
@@ -17967,7 +18026,7 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			},
-			"fe9432fd-7a75-4121-aac4-5924f13734af": {
+			{
 				"sizeId": 5,
 				"itemType": "monster",
 				"color": "#00E0E0",
@@ -18034,52 +18093,17 @@ function get_scene_data_pbtso() {
 				"enablepercenthpbar": false,
 				"revealInFog": false
 			}
-		},
-		"darkness_filter": "0",
-		"grid_line_width": "0.5",
-		"grid_subdivided": "0",
+		],
+		"darkness_filter": "100",
 		"scale_factor": 2,
 		"offsetx": 7,
 		"dm_map_usable": "1",
 		"offsety": 27,
-		"dm_map_is_video": "0",
-		"grid": "0",
-		"scale_check": true,
-		
-		"player_map_is_video": "0",
 		"hpps": 35,
-		"disableSceneVision": "0",
-		"grid_color": "rgba(0, 0, 0, 0.5)",
-		"snap": "1",
-		"map": "https://media.dndbeyond.com/compendium-images/pbtso/3WCYZRRvYTovFYbD/map-3.02-Ruins-of-Thundertree.png",
-		"conversion": 1,
-		"width": 2040,
-		"height": 1452
 	},
 	"pbtso/the-spiders-web/Map303WyvernTor": {
-		
-		"reveals": [
-			[
-				0,
-				0,
-				0,
-				0,
-				2,
-				0,
-				1
-			]
-		],
-		"gridStrokeNumberInput": "0.5",
-		"scale": 100,
 		"vpps": 52.666666666666664,
-		"darkness_filter_number": "100",
 		"title": "Map 3.3: Wyvern Tor",
-		"fog_of_war": "1",
-		
-		"upsq": "ft",
-		"scaleX": 1,
-		"scaleY": 1,
-		"gridType": "1",
 		"drawings": [
 			[
 				"line",
@@ -19479,17 +19503,6 @@ function get_scene_data_pbtso() {
 				1
 			],
 			[
-				"line",
-				"wall",
-				"rgba(0, 255, 0, 1)",
-				590,
-				369,
-				636,
-				266,
-				6,
-				1
-			],
-			[
 				"paint-bucket",
 				"light",
 				"white",
@@ -19666,7 +19679,6 @@ function get_scene_data_pbtso() {
 				1
 			]
 		],
-		"fpsq": "5",
 		"tokens": {
 			"023435a0-c3d3-4aff-abdf-7fd57c31e440": {
 				"sizeId": 4,
@@ -19732,7 +19744,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": 2,
+				"mapElev": 0
 			},
 			"08108cd0-570a-4d94-944f-09db23f3d9ea": {
 				"sizeId": 4,
@@ -19798,7 +19812,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": 2,
+				"mapElev": 0
 			},
 			"2e22bab1-e311-4bca-a00c-e5e1242eb71c": {
 				"sizeId": 4,
@@ -19864,7 +19880,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": 2,
+				"mapElev": 0
 			},
 			"4bde53e6-000e-4ccd-9bdb-b9b23983a81c": {
 				"sizeId": 4,
@@ -19930,7 +19948,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": 2,
+				"mapElev": 0
 			},
 			"8547493b-26d9-4602-ae81-a868a17f7e6a": {
 				"sizeId": 4,
@@ -19996,7 +20016,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": 2,
+				"mapElev": 0
 			},
 			"d557579e-7f20-409b-b804-c53c610a33ac": {
 				"sizeId": 4,
@@ -20061,7 +20083,9 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": 2,
+				"mapElev": 0
 			},
 			"d7483ad8-08c9-4a29-88a5-17a4ed7ee5ce": {
 				"sizeId": 5,
@@ -20127,29 +20151,16 @@ function get_scene_data_pbtso() {
 				"disableaura": false,
 				"conditions": [],
 				"enablepercenthpbar": false,
-				"revealInFog": false
+				"revealInFog": false,
+				"scaleCreated": 2,
+				"mapElev": 0
 			}
 		},
 		"darkness_filter": "100",
-		"grid_line_width": "0.5",
-		"grid_subdivided": "0",
 		"scale_factor": 2,
 		"offsetx": 33.00000000000002,
-		"dm_map_usable": "0",
 		"offsety": 27.00000000000003,
-		"dm_map_is_video": "0",
-		"grid": "0",
-		"scale_check": true,
-		"dm_map": "",
-		"player_map_is_video": "0",
 		"hpps": 52.666666666666664,
-		"disableSceneVision": "0",
-		"grid_color": "rgba(0, 0, 0, 0.5)",
-		"snap": "1",
-		"map": "https://media.dndbeyond.com/compendium-images/pbtso/3WCYZRRvYTovFYbD/03-008.Map303-Wyvern-Tor.png",
-		"conversion": 1,
-		"width": 1010,
-		"height": 1372
 	},
 	"pbtso/the-spiders-web/Map304CragmawCastle": {
 		
@@ -25313,7 +25324,6 @@ function get_scene_data_pbtso() {
 		"disableSceneVision": "0",
 		"grid_color": "rgba(0, 0, 0, 0.5)",
 		"snap": "1",
-		"map": "https://media.dndbeyond.com/compendium-images/pbtso/3WCYZRRvYTovFYbD/map-3.04-Cragmaw-Castle.png",
 		"conversion": 1,
 		"width": 2029,
 		"height": 1452,
@@ -37675,7 +37685,6 @@ function get_scene_data_pbtso() {
 		"disableSceneVision": "0",
 		"grid_color": "rgba(0, 0, 0, 0.5)",
 		"snap": "1",
-		"map": "https://media.dndbeyond.com/compendium-images/pbtso/3WCYZRRvYTovFYbD/map-4.01-Wave-Echo-Cave.png",
 		"conversion": 0.6891750783153499,
 		"width": 1518.941872607031,
 		"height": 1980.0000000000002

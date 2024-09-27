@@ -43,7 +43,7 @@ class DiceRoll {
         }
         try {
             let alteredRollType = newRollType.trim().toLowerCase().replace("-", " ");
-            const validRollTypes = ["to hit", "damage", "save", "check", "heal", "reroll", "initiative", "attack", "roll"];
+            const validRollTypes = ["to hit", "damage", "save", "check", "heal", "reroll", "initiative", "attack", "roll", "recharge"];
             if (validRollTypes.includes(alteredRollType)) {
                 this.#diceRollType = alteredRollType;
             } else {
@@ -402,9 +402,11 @@ class DiceRoller {
                   rollTitle: rollTitle,
                   result: roll.total,
                   playerId: window.PLAYER_ID,
-                  sendTo: window.sendToTab 
+                  sendTo: window.sendToTab,
+                  entityType: diceRoll.entityType,
+                  entityId: diceRoll.entityId
                 };
-                if(rollType == 'attack'){     
+                if(rollType == 'attack' || rollType == 'to hit' || rollType == 'tohit'){     
                     if(critSuccess == true){
                         this.#critAttackAction = rollTitle;     
                     }
@@ -441,7 +443,9 @@ class DiceRoller {
                   whisper: (diceRoll.sendToOverride == "DungeonMaster") ? "DungeonMaster" : ((gamelog_send_to_text() != "Everyone" && diceRoll.sendToOverride != "Everyone") || diceRoll.sendToOverride == "Self") ? window.PLAYER_NAME :  ``,
                   playerId: window.PLAYER_ID,
                   rollData: rollData,
-                  sendTo: window.sendToTab 
+                  sendTo: window.sendToTab,
+                  entityType: diceRoll.entityType,
+                  entityId: diceRoll.entityId
                 };
             }
 
@@ -504,7 +508,7 @@ class DiceRoller {
             return;
         }
         if(msg != undefined){
-            if(msg.data.rolls[0].rollType == 'attack'){
+            if(msg.data.rolls[0].rollType == 'attack' || msg.data.rolls[0].rollType == 'to hit' || msg.data.rolls[0].rollType == 'tohit' ){
                 let critSuccess = {};
                 let critFail = {};
 
@@ -652,7 +656,7 @@ class DiceRoller {
             if((this.#pendingSpellSave != undefined || this.#pendingDamageType != undefined) && message.eventType === "dice/roll/fulfilled"){
                 if(this.#pendingSpellSave != undefined )
                     ddbMessage.avttSpellSave = this.#pendingSpellSave;
-                if(this.#pendingDamageType != undefined )
+                if(this.#pendingDamageType != undefined && ddbMessage.data.rolls.some(d=> d.rollType.includes('damage')))
                     ddbMessage.avttDamageType = this.#pendingDamageType;
                 this.ddbDispatch(ddbMessage);
                 this.#resetVariables();
@@ -821,7 +825,8 @@ class DiceRoller {
             console.log("DiceRoll ddbMessage.avttExpression: ", ddbMessage.avttExpression);
         }
         ddbMessage.avttSpellSave = this.#pendingSpellSave;
-        ddbMessage.avttDamageType = this.#pendingDamageType;
+        if(ddbMessage.data.rolls.some(d=> d.rollType.includes('damage')))
+            ddbMessage.avttDamageType = this.#pendingDamageType;
 
         if (["character", "monster"].includes(this.#pendingDiceRoll.entityType)) {
             ddbMessage.entityType = this.#pendingDiceRoll.entityType;

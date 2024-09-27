@@ -187,21 +187,15 @@ function send_senses() {
 
 function read_conditions(container = $(document)) {
   let conditionsSet = [];
-  container.find(`.ct-condition-manage-pane__condition`).each(function () {
-    if ($(this).find(`.ddbc-toggle-field[aria-checked='true']`).length > 0) {
-      conditionsSet.push({
-        name: $(this).find('.ct-condition-manage-pane__condition-name').text(),
-        level: null
-      });
+  container.find('.ct-conditions-summary .ddbc-condition__name').each(function(){
+    let level = null;
+    if($(this).find('.ddbc-condition__level').length>0){
+      level = parseInt($(this).find('.ddbc-condition__level').text().replace(/\W|\D/gi, ''))
     }
-  });
-  container.find(`.ct-condition-manage-pane__condition--special`).each (function () {
-    if(container.find('.ddbc-number-bar__option--active').length > 0){
-      conditionsSet.push({
-        name: $(this).find('.ct-condition-manage-pane__condition-name').text(),
-        level: $(this).find('.ddbc-number-bar__option--implied').length
-      });
-    }
+    conditionsSet.push({
+      name: $(this).contents().not($(this).children()).text(),
+      level: level
+    });
   })
   return conditionsSet;
 }
@@ -331,12 +325,11 @@ function read_inspiration(container = $(document)) {
 }
 
 // Good canidate for service worker
-function init_characters_pages(container = $(document)) {
+async function init_characters_pages(container = $(document)) {
   // this is injected on Main.js when avtt is running. Make sure we set it when avtt is not running
   if (typeof window.EXTENSION_PATH !== "string" || window.EXTENSION_PATH.length <= 1) {
     window.EXTENSION_PATH = container.find("#extensionpath").attr('data-path');
   }
-
   // it's ok to call both of these, because they will do any clean up they might need and then return early
   init_character_sheet_page();
   init_character_list_page_without_avtt();
@@ -364,6 +357,7 @@ function init_characters_pages(container = $(document)) {
         $(`.integrated-dice__container:not('.above-aoe'):not(.avtt-roll-formula-button)`).off('contextmenu.rpg-roller')
         delete window.EXPERIMENTAL_SETTINGS['rpgRoller'];
         window.sendToTabRPGRoller = undefined;
+        window.sendToTab = undefined;
         setTimeout(function(){
           tabCommunicationChannel.postMessage({
            msgType: 'isAboveOpen'
@@ -374,11 +368,16 @@ function init_characters_pages(container = $(document)) {
       if(event.data.msgType =='disableSendToTab' && window.self == window.top){
         window.sendToTab = undefined;
       }
+
+
     })
     tabCommunicationChannel.postMessage({
       msgType: 'isAboveOpen'
     })
+
+
     window.diceRoller = new DiceRoller(); 
+    window.ddbConfigJson = await DDBApi.fetchConfigJson();
   }
 }
 
@@ -499,9 +498,9 @@ function getRollData(rollButton){
         rollType = 'heal'
       }
     } else if($(rollButton).parents(`[class*='__tohit']`).length > 0){
-      rollType = 'attack'
+      rollType = 'to hit'
     } 
-    if(rollType == 'damage' || rollType == 'attack' || rollType == 'heal'){
+    if(rollType == 'damage' || rollType == 'attack' || rollType == 'to hit' || rollType == 'heal'){
       if($(rollButton).parents(`.ddbc-combat-attack--spell`).length > 0){
         rollTitle = $(rollButton).closest(`.ddbc-combat-attack--spell`).find('[class*="styles_spellName"]').text();
       }
@@ -520,13 +519,18 @@ function getRollData(rollButton){
     }
     const modifier = (roll.rolls.length > 1 && expression.match(/[+-]\d*$/g, '')) ? `${roll.rolls[roll.rolls.length-2]}${roll.rolls[roll.rolls.length-1]}` : '';
 
+    const followingText = $(rollButton)[0].nextSibling?.textContent?.trim()?.split(' ')[0]
+    const damageType = followingText && window.ddbConfigJson.damageTypes.some(d => d.name.toLowerCase() == followingText.toLowerCase()) ? followingText : undefined     
+
+  
     return {
       roll: roll,
       expression: expression,
       rollType: rollType,
       rollTitle: rollTitle,
       modifier: modifier,
-      regExpression: regExpression
+      regExpression: regExpression,
+      damageType: damageType
     }
 }
 
@@ -691,56 +695,62 @@ function observe_character_sheet_changes(documentToObserve) {
       }
     }
 
+    if(is_abovevtt_page()){
+      const icons = documentToObserve.find(".ddbc-note-components__component--aoe-icon:not('.above-vtt-visited')");
+      if (icons.length > 0) {
+        icons.wrap(function() {
+          if(!window.top?.CURRENT_SCENE_DATA?.fpsq)
+            return;
 
-    const icons = documentToObserve.find(".ddbc-note-components__component--aoe-icon:not('.above-vtt-visited')");
-    if (icons.length > 0) {
-      icons.wrap(function() {
-        $(this).addClass("above-vtt-visited");
-        const button = $("<button class='above-aoe integrated-dice__container'></button>");
+          $(this).addClass("above-vtt-visited");
+          const button = $("<button class='above-aoe integrated-dice__container'></button>");
 
-        const spellContainer = $(this).closest('.ct-spells-spell')
-        const name = spellContainer.find(".ddbc-spell-name").first().text()
-        let color = "default"
-        const feet = $(this).prev().find("[class*='styles_numberDisplay'] span:first-of-type").text();
-        const dmgIcon = $(this).closest('.ct-spells-spell').find('.ddbc-damage-type-icon');
-        if (dmgIcon.length == 1){
-          color = dmgIcon.attr('class').split(' ').filter(d => d.startsWith('ddbc-damage-type-icon--'))[0].split('--')[1];
-        }
-        let shape = $(this).find('svg').first().attr('class').split(' ').filter(c => c.startsWith('ddbc-aoe-type-icon--'))[0].split('--')[1];
-        shape = window.top.sanitize_aoe_shape(shape)
-        button.attr("title", "Place area of effect token")
-        button.attr("data-shape", shape);
-        button.attr("data-style", color);
-        button.attr("data-size", Math.round(feet / window.top.CURRENT_SCENE_DATA.fpsq));
-        button.attr("data-name", name);
-
-        // Players need the token side panel for this to work for them.
-        // adjustments will be needed in enable_Draggable_token_creation when they do to make sure it works correctly
-        // set_full_path(button, `${RootFolder.Aoe.path}/${shape} AoE`)
-        // enable_draggable_token_creation(button);
-        button.css("border-width","1px");
-        button.click(function(e) {
-          e.stopPropagation();
-          // hide the sheet, and drop the token. Don't reopen the sheet because they probably  want to position the token right away
-         
-          window.top.hide_player_sheet();
-          window.top.minimize_player_sheet();
-
-          let options = window.top.build_aoe_token_options(color, shape, feet / window.top.CURRENT_SCENE_DATA.fpsq, name)
-          if(name == 'Darkness' || name == 'Maddening Darkness' ){
-            options = {
-              ...options,
-              darkness: true
-            }
+          const spellContainer = $(this).closest('.ct-spells-spell')
+          const name = spellContainer.find(".ddbc-spell-name").first().text()
+          let color = "default"
+          const feet = $(this).prev().find("[class*='styles_numberDisplay'] span:first-of-type").text();
+          const dmgIcon = $(this).closest('.ct-spells-spell').find('.ddbc-damage-type-icon');
+          if (dmgIcon.length == 1){
+            color = dmgIcon.attr('class').split(' ').filter(d => d.startsWith('ddbc-damage-type-icon--'))[0].split('--')[1];
           }
-          window.top.place_aoe_token_in_centre(options)
-          // place_token_in_center_of_view only works for the DM
-          // place_token_in_center_of_view(options)
+          let shape = $(this).find('svg').first().attr('class').split(' ').filter(c => c.startsWith('ddbc-aoe-type-icon--'))[0].split('--')[1];
+          shape = window.top.sanitize_aoe_shape(shape)
+          button.attr("title", "Place area of effect token")
+          button.attr("data-shape", shape);
+          button.attr("data-style", color);
+          button.attr("data-size", Math.round(feet / window.top.CURRENT_SCENE_DATA.fpsq));
+          button.attr("data-name", name);
+
+          // Players need the token side panel for this to work for them.
+          // adjustments will be needed in enable_Draggable_token_creation when they do to make sure it works correctly
+          // set_full_path(button, `${RootFolder.Aoe.path}/${shape} AoE`)
+          // enable_draggable_token_creation(button);
+          button.css("border-width","1px");
+          button.click(function(e) {
+            e.stopPropagation();
+            // hide the sheet, and drop the token. Don't reopen the sheet because they probably  want to position the token right away
+           
+            window.top.hide_player_sheet();
+            window.top.minimize_player_sheet();
+
+            let options = window.top.build_aoe_token_options(color, shape, feet / window.top.CURRENT_SCENE_DATA.fpsq, name)
+            if(name == 'Darkness' || name == 'Maddening Darkness' ){
+              options = {
+                ...options,
+                darkness: true
+              }
+            }
+            window.top.place_aoe_token_in_centre(options)
+            // place_token_in_center_of_view only works for the DM
+            // place_token_in_center_of_view(options)
+          });
+          
+          return button;
         });
-        return button;
-      });
-      console.log(`${icons.length} aoe spells discovered`);
+        console.log(`${icons.length} aoe spells discovered`);
+      }
     }
+   
 
 
     const spells = documentToObserve.find(".ct-spells-spell__action:not('.above-vtt-visited')") 
@@ -884,7 +894,7 @@ function observe_character_sheet_changes(documentToObserve) {
     const damageButtons = $(`.ddb-note-roll:not('.above-vtt-visited-damage'), .integrated-dice__container:not('.above-vtt-visited-damage')`)
     if(damageButtons.length > 0){
       $(damageButtons).addClass("above-vtt-visited-damage");
-      damageButtons.off('click.damageType').on('click.damageButtons', function(e){
+      damageButtons.off('click.damageType').on('click.damageType', function(e){
         window.diceRoller.getDamageType(this);
       })
     } 
@@ -1323,13 +1333,7 @@ function observe_character_sheet_changes(documentToObserve) {
 
         switch (mutation.type) {
           case "attributes":
-            if (
-              (mutationParent.hasClass('ct-condition-manage-pane__condition-toggle') && mutationTarget.hasClass('ddbc-toggle-field')) ||
-              (mutationTarget.hasClass('ddbc-number-bar__option--interactive') && mutationTarget.parents('.ct-condition-manage-pane__condition--special').length>0)
-            ) { // conditions update from sidebar
-              const conditionsSet = read_conditions(documentToObserve);
-              character_sheet_changed({conditions: conditionsSet});
-            } else if(
+            if(
               mutationTarget.hasClass("ct-health-summary__deathsaves-mark") ||
               mutationTarget.hasClass("ct-health-manager__input") ||
               mutationTarget.hasClass('ct-status-summary-mobile__deathsaves-mark')
@@ -1346,7 +1350,10 @@ function observe_character_sheet_changes(documentToObserve) {
             break;
           case "childList":
             const firstRemoved = $(mutation.removedNodes[0]);
-            if(firstRemoved.hasClass('ct-health-summary__hp-item') && firstRemoved.children('#ct-health-summary-max-label').length){ // this is to catch if the player just died look at the removed node to get value - to prevent 0/0 hp
+            if (mutationTarget.hasClass('ct-conditions-summary')) { // conditions update from sidebar
+              const conditionsSet = read_conditions(documentToObserve);
+              character_sheet_changed({conditions: conditionsSet});
+            } else if(firstRemoved.hasClass('ct-health-summary__hp-item') && firstRemoved.children('#ct-health-summary-max-label').length){ // this is to catch if the player just died look at the removed node to get value - to prevent 0/0 hp
               let maxhp = parseInt(firstRemoved.find(`.ct-health-summary__hp-number`).text());
               send_character_hp(maxhp);
             }else if (
