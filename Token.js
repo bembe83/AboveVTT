@@ -804,6 +804,9 @@ class Token {
 			} else if(this.options.healthauratype == "aura"){
 				this.options.disableaura = false;
 				this.options.enablepercenthpbar = false;
+			} else if(this.options.healthauratype && this.options.healthauratype.startsWith("aura-bloodied-")){
+				this.options.disableaura = false;
+				this.options.enablepercenthpbar = false;
 			}
 		}
 
@@ -811,7 +814,7 @@ class Token {
 			token.css('--hp-percentage', `${this.hpPercentage}%`);
 		}
 
-		const tokenHpAuraColor = token_health_aura(this.hpPercentage);
+		const tokenHpAuraColor = token_health_aura(this.hpPercentage, this.options.healthauratype);
 		let tokenWidth =  this.sizeWidth();
 		let tokenHeight = this.sizeHeight();
 		
@@ -2812,7 +2815,7 @@ class Token {
 
 							clear_temp_canvas();
 							WaypointManager.storeWaypoint(WaypointManager.currentWaypointIndex, window.BEGIN_MOUSEX/window.CURRENT_SCENE_DATA.scale_factor, window.BEGIN_MOUSEY/window.CURRENT_SCENE_DATA.scale_factor, tokenMidX/window.CURRENT_SCENE_DATA.scale_factor, tokenMidY/window.CURRENT_SCENE_DATA.scale_factor);
-							WaypointManager.draw(false, Math.round(tokenPosition.x + (self.sizeWidth() / 2))/window.CURRENT_SCENE_DATA.scale_factor, Math.round(tokenPosition.y + self.sizeHeight() + 10)/window.CURRENT_SCENE_DATA.scale_factor);
+							WaypointManager.draw(Math.round(tokenPosition.x + (self.sizeWidth() / 2))/window.CURRENT_SCENE_DATA.scale_factor, Math.round(tokenPosition.y + self.sizeHeight() + 10)/window.CURRENT_SCENE_DATA.scale_factor);
 						}
 						if (!self.options.hidden) {
 							sendTokenPositionToPeers(tokenPosition.x, tokenPosition.y, self.options.id, allowTokenMeasurement);
@@ -2871,7 +2874,7 @@ class Token {
 
 							for (let tok of window.dragSelectedTokens){
 								let id = $(tok).attr("data-id");
-								if ((id != self.options.id) && (!window.TOKEN_OBJECTS[id].options.locked || (window.DM && window.TOKEN_OBJECTS[id].options.restrictPlayerMove))) {
+								if ((id != self.options.id) && (!window.TOKEN_OBJECTS[id].options.locked || (window.DM && window.TOKEN_OBJECTS[id].options.restrictPlayerMove ||  $('#select_locked .ddbc-tab-options__header-heading').hasClass('ddbc-tab-options__header-heading--is-active')))) {
 
 
 									//console.log("sposto!");
@@ -3581,40 +3584,15 @@ function deselect_all_tokens() {
    	}
 }
 
-function token_health_aura(hpPercentage) {
-	//PERC TO RGB------------
-	const percentToHEX = function (percent) {
-		let HEX;
-		if (percent > 100) HEX = "#0000FF";
-		else {
-			if (percent === 100) percent = 99;
-			let r, g, b = 0;
-			if (percent < 50) {
-				g = Math.floor(255 * (percent / 50));
-				r = 255;
-			}
-			else {
-				g = 255;
-				r = Math.floor(255 * ((50 - percent % 50) / 50));
-			}
-			HEX = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-		}
-		return HEX;
-	}
-	//HEX TO RGB------------
-	const hexToRGB = function (hex) {
-		// Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
-		let shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
-		hex = hex.replace(shorthandRegex, function (m, r, g, b) {
-			return r + r + g + g + b + b;
-		});
-
-		const pHex = (n) => parseInt(n, 16);
-
-		let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-		return result ? `rgb(${pHex(result[1])} ${pHex(result[2])} ${pHex(result[3])} / 60%)` : null;
-	}
-	return hexToRGB(percentToHEX(hpPercentage));
+function token_health_aura(hpPercentage, auraType) {
+	const percentToCSSColor = function(p) {
+		if(p > 100) return "rgb(0 0 255 / 60%)";
+		if(p > 99) p = 99;
+		const r = p < 50 ? 255 : Math.floor(255 * ((50 - p % 50) / 50));
+		const g = p < 50 ? Math.floor(255 * (p / 50)) : 255;
+		return `rgb(${r} ${g} 0 / 60%)`;
+	};
+	return (auraType && auraType.startsWith('aura-bloodied-')) ? ((hpPercentage > parseInt(auraType.split('-')[2])) ? "rgb(0 0 0 / 0%)" : "rgb(255 0 0 / 60%)") : percentToCSSColor(hpPercentage);
 }
 
 function setTokenAudio(tokenOnMap, token){
@@ -4533,12 +4511,31 @@ function copy_selected_tokens() {
 	if (!window.DM) return;
 	window.TOKEN_PASTE_BUFFER = [];
 	let redrawBoundingBox = false;
+	let bounds = {
+		top: Infinity,
+		left: Infinity,
+		bottom: -Infinity,
+		right: -Infinity,
+		hpps: window.CURRENT_SCENE_DATA.hpps,
+		vpps: window.CURRENT_SCENE_DATA.vpps
+	};
 	for (let id in window.TOKEN_OBJECTS) {
 		let token = window.TOKEN_OBJECTS[id];
+
 		if (token.selected) { 
-			window.TOKEN_PASTE_BUFFER.push(id);
+			bounds = {
+				...bounds,
+				top: parseInt(token.options.top) < bounds.top ? parseInt(token.options.top) : bounds.top,
+				left: parseInt(token.options.left) < bounds.left ? parseInt(token.options.left) : bounds.left,
+				bottom: parseInt(token.options.top) > bounds.bottom ? parseInt(token.options.top) : bounds.bottom,
+				right: parseInt(token.options.left) > bounds.right ? parseInt(token.options.left) : bounds.right
+			}
+			window.TOKEN_PASTE_BUFFER.push({id: id, left: token.options.left, top: token.options.top});
 		}
 	}
+
+
+	window.TOKEN_PASTE_BOUNDS = bounds;
 	if (redrawBoundingBox) {
 		draw_selected_token_bounding_box();
 	}
@@ -4551,7 +4548,7 @@ function paste_selected_tokens(x, y) {
 	}
 	deselect_all_tokens();
 	for (let i = 0; i < window.TOKEN_PASTE_BUFFER.length; i++) {
-		let id = window.TOKEN_PASTE_BUFFER[i];
+		let id = window.TOKEN_PASTE_BUFFER[i]?.id;
 		let token = window.all_token_objects[id];
 		if(token == undefined || (token.isPlayer() && window.TOKEN_OBJECTS[id])) continue;
 		let options = $.extend(true, {}, token.options);
@@ -4564,8 +4561,14 @@ function paste_selected_tokens(x, y) {
 		options.selected = true;
 		let center = center_of_view(); 
 		let mapView = convert_point_from_view_to_map(x, y, false);
-		options.top = `${mapView.y - Math.round(token.sizeHeight() / 2)}px`;
-		options.left = `${mapView.x - Math.round(token.sizeWidth() / 2) + token.sizeWidth()  * i + 5 - (token.sizeWidth() * ((window.TOKEN_PASTE_BUFFER.length/2)-1))}px`;
+
+		let bounds = window.TOKEN_PASTE_BOUNDS;
+		let left = (parseInt(window.TOKEN_PASTE_BUFFER[i]?.left) - (bounds.right + bounds.left)/2)/bounds.hpps;
+		let top = (parseInt(window.TOKEN_PASTE_BUFFER[i]?.top) - (bounds.bottom + bounds.top)/2)/bounds.vpps;
+
+
+		options.top = `${mapView.y + top*window.CURRENT_SCENE_DATA.vpps}px`;
+		options.left = `${mapView.x + left*window.CURRENT_SCENE_DATA.hpps}px`;
 		window.ScenesHandler.create_update_token(options);
 		// deselect the old and select the new so the user can easily move the new tokens around after pasting them
 		if(typeof window.TOKEN_OBJECTS[id] !== "undefined"){
@@ -4593,8 +4596,7 @@ function paste_selected_tokens(x, y) {
 			findButton.empty().append(findSVG);
 		}
 	}
-	// copy the newly selected tokens in case they paste again, we want them pasted in reference to the newly created tokens
-	copy_selected_tokens();
+
 	draw_selected_token_bounding_box();
 }
 

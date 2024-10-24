@@ -1608,7 +1608,7 @@ class MessageBroker {
 		//Security logic to prevent content being sent which can execute JavaScript.
 		data.player = DOMPurify.sanitize( data.player,{ALLOWED_TAGS: []});
 		data.img = DOMPurify.sanitize( data.img,{ALLOWED_TAGS: []});
-		data.text = DOMPurify.sanitize( data.text,{ALLOWED_TAGS: ['video','img','div','p', 'b', 'button', 'span', 'style', 'path', 'svg', 'a', 'hr', 'ul', 'li', 'h3', 'h2', 'h4', 'h1'], ADD_ATTR: ['target']}); //This array needs to include all HTML elements the extension sends via chat.
+		data.text = DOMPurify.sanitize( data.text,{ALLOWED_TAGS: ['video','img','div','p', 'b', 'button', 'span', 'style', 'path', 'svg', 'a', 'hr', 'ul', 'li', 'h3', 'h2', 'h4', 'h1', 'table', 'tr', 'td', 'th'], ADD_ATTR: ['target']}); //This array needs to include all HTML elements the extension sends via chat.
 
 		if(data.dmonly && !(window.DM) && !local) // /dmroll only for DM of or the user who initiated it
 			return $("<div/>");
@@ -1621,7 +1621,24 @@ class MessageBroker {
 		let datetime = d.toISOString();
 		let timestamp = d.toLocaleTimeString();
 		let datestamp = d.toLocaleDateString();
-		
+
+		// hide message if PC doesn't speak this language
+		if (!window.DM && data.language != undefined) {
+			const knownLanguages = get_my_known_languages()
+			const messageLanguage = window.ddbConfigJson.languages.find(d => d.id == data.language)?.name;
+			if (!knownLanguages.includes(messageLanguage)) {
+				const container = $("<div>").html(data.text);
+				const elements = container.find("*").add(container);
+				const textNodes = elements.contents().not(elements);
+				textNodes.each(function () {
+					let newText = this.nodeValue.replaceAll(/[\w\d]/gi, (n) => String.fromCharCode(97 + Math.floor(Math.random() * 26)));
+					$(document.createTextNode(newText)).insertBefore(this);
+					$(this).remove();
+				});
+				data.text = container.html();
+			}
+		}
+
 		if (is_encounters_page() || is_characters_page() || is_campaign_page()) {
 			return $(`
 				<li class="tss-8-Other-ref tss-17y30t1-GameLogEntry-Other-Flex">
@@ -2226,7 +2243,24 @@ class MessageBroker {
 
 		const jsmessage=JSON.stringify(message);
 		if(jsmessage.length > (128000)){
-			alert("YOU REACHED THE MAXIMUM MESSAGE SIZE. You may have too many walls - try to be less detailed on curves, use x's instead of circling pillars, etc. You may have some tokens with embedded images (urls that start with 'data:') that take up too much space. Please reduce the number of walls/delete the tokens with 'data:' urls and refresh the scene");
+			console.warn('message too large', message)
+
+			let alertText = '';
+
+			if(message.eventType?.toLowerCase()?.includes('draw')){
+				alertText = `Drawings include - drawings, walls, elevation, light drawings and text.\n\n${window.DRAWINGS.filter(d=> d[1]=='wall').length > 200 ? `Try reducing the number of walls used around curves where possible - using X's on pillars etc. Longer straight walls will also perform better.\n\n` : ''}Number of drawings by type:\nDrawings: ${window.DRAWINGS.filter(d=> d[1]!='wall' && d[1]!='light' && d[0]!='text'&& d[1]!='elev' ).length}\nWalls: ${window.DRAWINGS.filter(d=> d[1]=='wall').length}\nElevation Drawings: ${window.DRAWINGS.filter(d=> d[1]=='elev').length}\nLight Drawings: ${window.DRAWINGS.filter(d=> d[1]=='light').length}\nText: ${window.DRAWINGS.filter(d=> d[0]=='text').length}\n\nCheck console warnings for more message data.`
+			}
+			else if(message.eventType?.toLowerCase()?.includes('note')){
+				alertText = `\n\n${Object.keys(message.data.notes).length == 1 ? `Sent 1 note with title: ${message.data.notes.find(d=>d.title).title} \n\nThis note may be over 128000 characters including html - check this using the source button in notes (looks like <>).\n\nCheck console warnings for more message data.` : `Sent ${Object.keys(message.data.notes).length} notes.`}\n\nCheck console warnings for more message data.`			
+			}
+			else if(message.eventType?.toLowerCase()?.includes('token')){
+				alertText = `You may have too many tokens on the map to send.\n\nNumber of Tokens: ${Object.keys(window.TOKEN_OBJECTS).length}\n\nCheck console warnings for more message data.`
+			}
+			else{
+				alertText = 'Check console warnings for more message data.'
+			}
+			
+			alert(`You reached the maximum message size for "${message.eventType.split('/')[message.eventType.split('/').length-1]}".\n\n${alertText}`);
 			return;
 		}
 

@@ -96,11 +96,18 @@ class WaypointManagerClass {
 		this.canvas=undefined;
 		this.ctx=undefined;
 		this.numWaypoints = 0;
+		
+		/**
+		* @type {{startX: number, startY: number, endX: number, endY: number, distance: number}[]}
+		*/
 		this.coords = [];
 		this.currentWaypointIndex = 0;
 		this.mouseDownCoords = { mousex: undefined, mousey: undefined };
 		this.timeout = undefined;
-		this.timerId = undefined;
+		/**
+		* @type {number | undefined}
+		*/
+		this.fadeoutAnimationId = undefined;
 		this.drawStyle = {
 			lineWidth: Math.max(25 * Math.max((1 - window.ZOOM), 0), 5),
 			color: window.color ? window.color : "#f2f2f2",
@@ -152,8 +159,13 @@ class WaypointManagerClass {
 		}
 	}
 
-	// Draw a nice circle
-	drawBobble(x, y, radius, playerId) {
+	/**
+	* Draw a nice circle
+	* @param x {number}
+	* @param y {number}
+	* @returns {string} <circle> tag
+	*/
+	makeBobble(x, y) {
 		/*
 		this.ctx.beginPath();
 		this.ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
@@ -163,10 +175,7 @@ class WaypointManagerClass {
 		this.ctx.fillStyle =  this.drawStyle.color
 		this.ctx.fill();
 		*/
-		let existingBobbles = $(`.ruler-svg-bobbles[data-player-id='${playerId}']`).html();
-	    let newBobble = `<circle cx='${x}' cy='${y}' fill='${this.drawStyle.color}' stroke='${this.drawStyle.outlineColor}'>`;
-	    $(`.ruler-svg-bobbles[data-player-id='${playerId}']`).html(existingBobbles + newBobble);
-
+	    return `<circle cx='${x}' cy='${y}' fill='${this.drawStyle.color}' stroke='${this.drawStyle.outlineColor}' />`;
 	}
 
 	// Increment the current index into the array of waypoints, and draw a small indicator
@@ -221,29 +230,99 @@ class WaypointManagerClass {
 		return { x: snapPointXStart, y: snapPointYStart }
 	}
 
-	// Draw the waypoints, note that we sum up the cumulative distance, midlineLabels is true for token drag
-	// as otherwise the token sits on the measurement label
-	draw(midlineLabels, labelX, labelY, alpha = 1, playerId=window.PLAYER_ID) {
-		$(`.ruler-svg-text[data-player-id='${playerId}'], .ruler-svg-line[data-player-id='${playerId}'], .ruler-svg-bobbles[data-player-id='${playerId}']`).remove();
-		
+	/**
+	* Find ruler container for this player or create it
+	* @param playerId {string | boolean}
+	*/
+	getOrCreateDrawingContainer(playerId) {
+		const rulerContainerId = `ruler-container-${playerId}`;
+
+		let rulerContainer = document.getElementById(rulerContainerId)
+		if (!rulerContainer) {
+			const rulerContainerDiv = document.createElement("div");
+			rulerContainerDiv.id = rulerContainerId;
+			document.getElementById("VTT").append(rulerContainerDiv);
+
+			// re-query to get created element
+			rulerContainer = document.getElementById(rulerContainerId);
+		}
+		return rulerContainer;
+	}
+
+	/**
+	* Empties ruler container for this player
+	* @param playerId
+	*/
+	clearWaypointDrawings(playerId) {
+		const rulerContainerId = `ruler-container-${playerId}`;
+
+		let rulerContainer = document.getElementById(rulerContainerId)
+		if (!rulerContainer) {
+			// it's empty then
+			return;
+		}
+
+		rulerContainer.innerHTML = "";
+	}
+
+	/**
+	* @returns {{sceneHeight: number, sceneWidth: number}}
+	*/
+	getSceneMapSize() {
+		const sceneMap = document.getElementById("scene_map");
+		return { sceneHeight: Math.floor(sceneMap.offsetHeight), sceneWidth: Math.floor(sceneMap.offsetWidth) }
+	}
+
+	/**
+	* Draw the waypoints, note that we sum up the cumulative distance
+	* @param labelX {number | undefined} if provided, move last text of last waypoint there
+	* @param labelY {number | undefined} if provided, move last text of last waypoint there
+	* @param alpha {number | undefined} set alpha of drawings to this, 1 if unset
+	* @param playerId {string | false | undefined} `window.PLAYER_ID` if unset
+	*/
+	draw(labelX = undefined, labelY = undefined, alpha = 1, playerId=window.PLAYER_ID) {
+		const rulerContainer = this.getOrCreateDrawingContainer(playerId);
+
+		// update alpha for the entire container
+		rulerContainer.style.setProperty("--svg-text-alpha", alpha.toString());
+
+		const sceneMapSize = this.getSceneMapSize();
+
 		let cumulativeDistance = 0;
 		this.numberOfDiagonals = 0;
+		let elementsToDraw = "";
+		const { sceneWidth, sceneHeight } = sceneMapSize;
+		const bobbles = $(`<svg viewbox='0 0 ${sceneWidth} ${sceneHeight}' width='${sceneWidth}' height='${sceneHeight}' class='ruler-svg-bobbles' style='top:0px; left:0px;'></svg>`);
+		const lines = $(`<svg viewbox='0 0 ${sceneWidth} ${sceneHeight}' width='${sceneWidth}' height='${sceneHeight}' class='ruler-svg-line' style='top:0px; left:0px;'></svg>`);
+
+
 		for (let i = 0; i < this.coords.length; i++) {
 			// We do the beginPath here because otherwise the lines on subsequent waypoints get
 			// drawn over the labels...
 			this.ctx.beginPath();
 			if (i < this.coords.length - 1) {
-				this.drawWaypointSegment(this.coords[i], cumulativeDistance, midlineLabels, undefined, undefined, playerId), alpha;
+				elementsToDraw += this.makeWaypointSegment(this.coords[i], cumulativeDistance, undefined, undefined, sceneMapSize, bobbles, lines);
 			} else {
-				this.drawWaypointSegment(this.coords[i], cumulativeDistance, midlineLabels, labelX, labelY, playerId, alpha);
+				elementsToDraw += this.makeWaypointSegment(this.coords[i], cumulativeDistance, labelX, labelY, sceneMapSize, bobbles, lines);
 			}
-			cumulativeDistance += this.coords[i].distance;
+
+			cumulativeDistance += this.coords[i].distance
 		}
+		elementsToDraw = `${lines[0].outerHTML}${elementsToDraw}${bobbles[0].outerHTML}`
+
+		rulerContainer.innerHTML = elementsToDraw;
 	}
 
-	// Draw a waypoint segment with all the lines and labels etc.
-	drawWaypointSegment(coord, cumulativeDistance, midlineLabels, labelX, labelY, playerId, alpha) {
-
+	/**
+	* Make a waypoint segment SVGs with all the lines and labels etc.
+	* @param coord {{startX: number, startY: number, endX: number, endY: number, distance: number}}
+	* @param cumulativeDistance {number}
+	* @param labelX {number}
+	* @param labelY {number}
+	* @param sceneMapSize {{sceneHeight: number, sceneWidth: number}}
+	* @returns {string} SVG elements for waypoint line and label
+	*/
+	makeWaypointSegment(coord, cumulativeDistance, labelX, labelY, sceneMapSize, bobbles, lines) {
 		// Snap to centre of current grid square
 		let gridSize =  window.CURRENT_SCENE_DATA.hpps/window.CURRENT_SCENE_DATA.scale_factor;
 		let snapPointXStart = coord.startX;
@@ -309,31 +388,10 @@ class WaypointManagerClass {
 		let text = `${totalDistance}${unitSymbol}`
 		let textMetrics = this.ctx.measureText(text);
 
-		// Calculate our positions and dmensions based on if we are measuring (midlineLabels == false) or
-		// token dragging (midlineLabels == true)
 		let contrastRect = { x: 0, y: 0, width: 0, height: 0 }
 		let textRect = { x: 0, y: 0, width: 0, height: 0 }
 
-		if (midlineLabels === true) {
-
-			// Calculate our coords and dimensions
-			textX = (snapPointXStart + snapPointXEnd) / 2;
-			textY = (snapPointYStart + snapPointYEnd) / 2;
-
-			contrastRect.x = textX - margin;
-			contrastRect.y = textY - margin;
-			contrastRect.width = textMetrics.width + (margin * 4);
-			contrastRect.height = heightOffset + (margin * 3);
-
-			textRect.x = textX;
-			textRect.y = textY;
-			textRect.width = textMetrics.width + (margin * 3);
-			textRect.height = heightOffset + margin;
-
-			// Knock the text down slightly
-			textY += (margin * 2);
-		} else if (labelX !== undefined && labelY !== undefined) {
-
+		if (labelX !== undefined && labelY !== undefined) {
 			// Calculate our coords and dimensions
 			contrastRect.x = labelX - margin + slopeModifier;
 			contrastRect.y = labelY - margin + slopeModifier;
@@ -393,39 +451,37 @@ class WaypointManagerClass {
 		this.ctx.fillStyle = this.drawStyle.textColor
 		this.ctx.textBaseline = 'top';
 		this.ctx.fillText(text, textX, textY);*/
-		let sceneWidth = Math.floor($('#scene_map').width());
-		let sceneHeight = Math.floor($('#scene_map').height());
 
+		const { sceneWidth, sceneHeight } = sceneMapSize;
 
-		let rulerLineSVG = $(`
-			<svg data-player-id='${playerId}' viewbox='0 0 ${sceneWidth} ${sceneHeight}' width='${sceneWidth}' height='${sceneHeight}' class='ruler-svg-line' style='top:0px; left:0px;'>
-			<line x1='${snapPointXStart}' y1='${snapPointYStart}' x2='${snapPointXEnd}' y2='${snapPointYEnd}' stroke="${this.drawStyle.outlineColor}"/>
-			<line x1='${snapPointXStart}' y1='${snapPointYStart}' x2='${snapPointXEnd}' y2='${snapPointYEnd}' stroke="${this.drawStyle.color}"/>
+		// add ruler line and text
 
-			</svg>
-		`)
+		const rulerLineSVG = `
+			<line x1='${snapPointXStart}' y1='${snapPointYStart}' x2='${snapPointXEnd}' y2='${snapPointYEnd}' stroke="${this.drawStyle.outlineColor}"></line>
+			<line x1='${snapPointXStart}' y1='${snapPointYStart}' x2='${snapPointXEnd}' y2='${snapPointYEnd}' stroke="${this.drawStyle.color}"></line>
+		`;
+		lines.append(rulerLineSVG);
 
-		let rulerBobbleSVG = $(`
-			<svg data-player-id='${playerId}' viewbox='0 0 ${sceneWidth} ${sceneHeight}' width='${sceneWidth}' height='${sceneHeight}' class='ruler-svg-bobbles' style='top:0px; left:0px;'>
-			</svg>
-		`)
+		
+		if(bobbles.children().length == 0){
+			const startBobble = this.makeBobble(snapPointXStart, snapPointYStart);
+			const endBobble = this.makeBobble(snapPointXEnd, snapPointYEnd)
+			bobbles.append(startBobble, endBobble);
+		}
+		else{
+			const endBobble = this.makeBobble(snapPointXEnd, snapPointYEnd)
+			bobbles.append(endBobble);
+		}
 
-
-		let textSVG = $(`
-			<svg data-player-id='${playerId}' class='ruler-svg-text' style='top:${textY*window.CURRENT_SCENE_DATA.scale_factor}px; left:${textX*window.CURRENT_SCENE_DATA.scale_factor}px; width:${textRect.width}px;'>
+		const textSVG = `
+			<svg class='ruler-svg-text' style='top:${textY*window.CURRENT_SCENE_DATA.scale_factor}px; left:${textX*window.CURRENT_SCENE_DATA.scale_factor}px; width:${textRect.width}px;'>
 				<text x="1" y="11">
 					${text}
 				</text>
-			</svg>`)
-		$('#VTT').append(rulerLineSVG)	
-		$('#VTT').append(textSVG)
-
-		if($(`.ruler-svg-bobbles[data-player-id='${playerId}]'`).length == 0){
-			$('#VTT').append(rulerBobbleSVG)
-		}
-		$(`svg[data-player-id='${playerId}']`).css('--svg-text-alpha', alpha);
-		this.drawBobble(snapPointXStart, snapPointYStart, undefined, playerId);
-		this.drawBobble(snapPointXEnd, snapPointYEnd, undefined, playerId);
+			</svg>
+		`;
+	
+		return `${textSVG}`;
 	}
 
 	/**
@@ -444,33 +500,48 @@ class WaypointManagerClass {
 		// only ever allow a single fadeout to occur
 		// this stops weird flashing behaviour with interacting
 		// interval function calls
-		if (this.timerId){
+		if (this.fadeoutAnimationId) {
 			return
 		}
-		this.timerId = setInterval(function(){ fadeout() }, 100);
 
-		function fadeout(){
+		let prevFrameTime, deltaTime;
+		/**
+		* This is a function expression to make sure `this` is available.
+		* @type {FrameRequestCallback}
+		*/
+		const fadeout = (time) =>{
+			if (prevFrameTime === undefined) {
+				deltaTime = 0;
+			} else {
+				deltaTime = time - prevFrameTime;
+			}
+			prevFrameTime = time;
+
 			self.ctx.clearRect(0,0, self.canvas.width, self.canvas.height);
 			self.ctx.globalAlpha = alpha;
-			self.draw(false, undefined, undefined, alpha, window.PLAYER_ID)
-			alpha = alpha - 0.08;
-			if (alpha <= 0.0){
-				self.cancelFadeout()
+			self.draw(undefined, undefined, alpha, window.PLAYER_ID)
+			alpha = alpha - (0.08 * deltaTime / 100); // 0.08 per 100 ms
+			if (alpha <= 0.0) {
 				self.clearWaypoints();
 				clear_temp_canvas(playerID)
+				return;
 			}
-		}
+
+			this.fadeoutAnimationId = requestAnimationFrame(fadeout)
+		};
+
+		this.fadeoutAnimationId = requestAnimationFrame(fadeout);
 	}
 
 	/**
 	 *
 	 */
 	cancelFadeout(){
-		if (this.timerId !== undefined){
-			clearInterval(this.timerId);
+		if (this.fadeoutAnimationId !== undefined) {
+			clear_temp_canvas();
+			cancelAnimationFrame(this.fadeoutAnimationId);
 			this.ctx.globalAlpha = 1.0
-			this.timerId = undefined
-
+			this.fadeoutAnimationId = undefined
 		}
 	}
 };
@@ -1141,7 +1212,7 @@ function reset_canvas(apply_zoom=true) {
 			$("#VTT").css("--scene-scale", 1)
 		}
 		else{
-			$("#VTT").css("--scene-scale", window.CURRENT_SCENE_DATA.scale_factor);
+			$("#VTT").css("--scene-scale", window.CURRENT_SCENE_DATA.scale_factor);		
 		}
 		canvas_grid.width = $("#scene_map").width();
 		canvas_grid.height = $("#scene_map").height();
@@ -2303,7 +2374,7 @@ function drawing_mousedown(e) {
 			window.MOUSEMOVEWAIT = false;
 		}
 	}
-	else{
+	else if(e.button !== 2 && !window.MOUSEDOWN && !WaypointManager.isMeasuring()){
 		window.BEGIN_MOUSEX = pointX
 		window.BEGIN_MOUSEY = pointY
 		window.MOUSEDOWN = true;
@@ -2423,7 +2494,7 @@ function drawing_mousemove(e) {
 					WaypointManager.cancelFadeout()
 					WaypointManager.registerMouseMove(mouseX, mouseY);
 					WaypointManager.storeWaypoint(WaypointManager.currentWaypointIndex, window.BEGIN_MOUSEX/window.CURRENT_SCENE_DATA.scale_factor, window.BEGIN_MOUSEY/window.CURRENT_SCENE_DATA.scale_factor, mouseX/window.CURRENT_SCENE_DATA.scale_factor, mouseY/window.CURRENT_SCENE_DATA.scale_factor);
-					WaypointManager.draw(false);
+					WaypointManager.draw();
 					window.temp_context.fillStyle = '#f50';
 					sendRulerPositionToPeers();
 				}
@@ -3463,6 +3534,7 @@ function handle_drawing_button_click() {
 		let menu
 		// FIND THE MENU
 		// button has a menu
+		window.WaypointManager?.clearWaypoints();
 		if ($(clicked).hasClass("menu-button")){
 			menu = clicked.id.replace("button", "menu" )
 			menu = "#" + menu
@@ -3895,7 +3967,7 @@ function calculateFourthPoint(point1, point2, point3) {
 }
 function clear_temp_canvas(playerId=window.PLAYER_ID){
 	window.temp_context.clearRect(0, 0, window.temp_canvas.width, window.temp_canvas.height); 
-	$(`.ruler-svg-text[data-player-id='${playerId}'], .ruler-svg-line[data-player-id='${playerId}'], .ruler-svg-bobbles[data-player-id='${playerId}']`).remove();
+	WaypointManager.clearWaypointDrawings(playerId)
 }
 
 function bucketFill(ctx, mouseX, mouseY, fogStyle = 'rgba(0,0,0,0)', fogType=0, islight=false, distance1=10000, distance2){
@@ -5708,7 +5780,7 @@ function redraw_light(){
 
 
 	context.drawImage(offscreenCanvasMask, 0, 0); // draw to visible canvas only once so we render this once
-	if(exploredIndexedDb != undefined && window.CURRENT_SCENE_DATA.visionTrail == '1' && !window.DM){
+	if(gameIndexedDb != undefined && window.CURRENT_SCENE_DATA.visionTrail == '1' && !window.DM){
 		let exploredCanvas = document.getElementById("exploredCanvas");
 		if($('#exploredCanvas').length == 0){
 			exploredCanvas =  document.createElement("canvas")
@@ -5722,7 +5794,7 @@ function redraw_light(){
 			$(exploredCanvas).attr('id', 'exploredCanvas');
 
 			$('#outer_light_container').append(exploredCanvas)	
-			exploredIndexedDb.transaction(["exploredData"])
+			gameIndexedDb.transaction(["exploredData"])
 			  .objectStore(`exploredData`)
 			  .get(`explore${window.gameId}${window.CURRENT_SCENE_DATA.id}`).onsuccess = (event) => {
 			 	if(event?.target?.result?.exploredData){
@@ -5746,7 +5818,7 @@ function redraw_light(){
 
 			let dataURI = exploredCanvas.toDataURL('image/jpg')
 
-			let storeImage = exploredIndexedDb.transaction([`exploredData`], "readwrite")
+			let storeImage = gameIndexedDb.transaction([`exploredData`], "readwrite")
 			let objectStore = storeImage.objectStore(`exploredData`)
 			let deleteRequest = objectStore.delete(`explore${window.gameId}${window.CURRENT_SCENE_DATA.id}`);
 			deleteRequest.onsuccess = (event) => {

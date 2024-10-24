@@ -173,6 +173,13 @@ function validateUrl(value) {
 const MAX_ZOOM = 5
 const MIN_ZOOM = 0.001
 
+
+const debounce_scroll_event = mydebounce(function(){
+		setTimeout(function(){
+			$(window).off('scroll.projectorMode').on("scroll.projectorMode", projector_scroll_event);
+		}, 200)	
+}, 200)
+
 /**
  * Changes the zoom level.
  * @param {Number} newZoom new zoom value
@@ -190,6 +197,10 @@ function change_zoom(newZoom, x, y, reset = false) {
 	window.ZOOM = newZoom;
 	let pageX = Math.round(centerX * window.ZOOM - zoomCenterX) + window.VTTMargin;
 	let pageY = Math.round(centerY * window.ZOOM - zoomCenterY) + window.VTTMargin;
+
+	if($('#projector_zoom_lock.enabled > [class*="is-active"]').length>0)
+		$(window).off('scroll.projectorMode')
+	
 
 
 	if(reset != true){
@@ -215,7 +226,9 @@ function change_zoom(newZoom, x, y, reset = false) {
 
 
 	$(".peerCursorPosition").css("transform", "scale(" + 1/window.ZOOM + ")");
-
+	if($('#projector_zoom_lock.enabled > [class*="is-active"]').length>0)
+		debounce_scroll_event()
+	
 	
 	console.groupEnd()
 }
@@ -730,7 +743,6 @@ function change_sidbar_tab(clickedTab, isCharacterSheetInfo = false) {
 		// Since the user clicked the tab, we need to show the gamelog instead of any detail info that was previously shown.
 		$("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last").click()
 	}
-
 }
 
 /**
@@ -1245,6 +1257,8 @@ function init_controls() {
 	b4.click(switch_control);
 	sidebarControls.append(b4);
 
+
+
 	/*b4 = $("<button id='switch_spell' class='tab-btn hasTooltip button-icon' data-name='Spells' data-target='#spells-panel'></button>").click(switch_control);
 	b4.append("<img src='"+window.EXTENSION_PATH + "assets/icons/magic-wand.svg' height='100%;'>");
 	sidebarControls.append(b4);*/
@@ -1354,8 +1368,6 @@ function init_splash() {
 	localStorage.setItem("AboveVttLastUsedVersion", window.AVTT_VERSION);
 
 	let cont = $("<div id='splash'></div>");
-	cont.css('background', "url('/content/1-0-1487-0/skins/waterdeep/images/mon-summary/paper-texture.png')");
-
 	cont.append(`<h1 style='margin-top:0px; padding-bottom:2px;margin-bottom:2px; text-align:center'><img width='250px' src='${window.EXTENSION_PATH}assets/logo.png'><div style='margin-left:20px; display:inline;vertical-align:bottom;'>${window.AVTT_VERSION}${AVTT_ENVIRONMENT.versionSuffix}</div></h1>`);
 	cont.append("<div style='font-style: italic;padding-left:80px;font-size:20px;margin-bottom:2px;margin-top:2px; margin-left:50px;'>Fine.. We'll do it ourselves..</div>");
 
@@ -1393,7 +1405,7 @@ function init_splash() {
 	ul.append("<li><a style='font-weight:bold;text-decoration: underline;' target='_blank' href='https://www.patreon.com/AboveVTT'>Patreon</a></li>");
 	cont.append(ul);*/
 	cont.append("");
-	cont.append("<div style='padding-top:10px'>Contributors: <b>SnailDice (Nadav),Stumpy, Palad1N, KuzKuz, Coryphon, Johnno, Hypergig, JoshBrodieNZ, Kudolpf, Koals, Mikedave, Jupi Taru, Limping Ninja, Turtle_stew, Etus12, Cyelis1224, Ellasar, DotterTrotter, Mosrael, Bain, Faardvark, Azmoria, Natemoonlife, Pensan, H2, CollinHerber, Josh-Archer, TachyonicSpace, TheRyanMC, j3f (jeffsenn)</b></div>");
+	cont.append("<div style='padding-top:10px'>Contributors: <b>SnailDice (Nadav),Stumpy, Palad1N, KuzKuz, Coryphon, Johnno, Hypergig, JoshBrodieNZ, Kudolpf, Koals, Mikedave, Jupi Taru, Limping Ninja, Turtle_stew, Etus12, Cyelis1224, Ellasar, DotterTrotter, Mosrael, Bain, Faardvark, Azmoria, Natemoonlife, Pensan, H2, CollinHerber, Josh-Archer, TachyonicSpace, TheRyanMC, j3f (jeffsenn), MonstraG</b></div>");
 
 	cont.append("<br>AboveVTT is an hobby opensource project. It's completely free (like in Free Speech). The resources needed to pay for the infrastructure are kindly donated by the supporters through <a style='font-weight:bold;text-decoration: underline;' target='_blank' href='https://www.patreon.com/AboveVTT'>Patreon</a> , what's left is used to buy wine for cyruzzo");
 
@@ -2088,6 +2100,21 @@ function inject_chat_buttons() {
 Advantage: 2d20kh1 (keep highest)&#xa;
 Disadvantage: 2d20kl1 (keep lowest)&#xa;&#xa;
 '/w [playername] a whisper to playername'"><input id='chat-text' autocomplete="off" placeholder='Chat, /r 1d20+4..'></div>`));
+	
+	const languageSelect= $(`<select id='chat-language'></select>`)
+	const ignoredLanguages = ['All'];
+
+	const knownLanguages = get_my_known_languages();
+	for (const language of window.ddbConfigJson.languages) {
+		if (ignoredLanguages.includes(language.name))
+			continue;
+		if (!window.DM && !knownLanguages.includes(language.name))
+			continue;
+		const option = $(`<option value='${language.id}'>${language.name}</option>`)
+		languageSelect.append(option);
+	}
+
+	$(".glc-game-log").append(languageSelect);
 
 	$(".glc-game-log").append($(`
 		<div class="dice-roller">
@@ -2829,10 +2856,32 @@ function init_zoom_buttons() {
 				window.ProjectorEnabled = false;
 			}
 		});
-		projector_toggle.append(`<div class="ddbc-tab-options__header-heading ddbc-tab-options__header-heading--is-active"><span style="font-size: 20px;" class="material-symbols-outlined">cast</span></div>`);
-		zoom_section.append(projector_toggle);
+		projector_toggle.append(`<div class="ddbc-tab-options__header-heading"><span style="font-size: 20px;" class="material-symbols-outlined">cast</span></div>`);
+		
+		const projector_zoom_lock = $(`<div id='projector_zoom_lock' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Quick toggle projector zoom lock'></div>`);
+		projector_zoom_lock.click(function (event) {
+			console.log("projector_toggle", event);
+			const iconWrapper = $(event.currentTarget).find(".ddbc-tab-options__header-heading");
+			if (iconWrapper.hasClass('ddbc-tab-options__header-heading--is-active')) {
+				iconWrapper.removeClass('ddbc-tab-options__header-heading--is-active');
+			} else {
+				iconWrapper.addClass('ddbc-tab-options__header-heading--is-active');
+			}
+		});
+		projector_zoom_lock.append(`<div class="ddbc-tab-options__header-heading" style='display: flex;align-content: center;align-items: center;justify-content: space-evenly;'>
+			<span class="material-symbols-outlined" style='font-size: 14px;padding: 3px;'>
+				lock
+			</span>
+			<span style="font-size: 38px;position: absolute;" class="material-symbols-outlined">
+				expand_content
+			</span>
+		</div>`);
+		
+
+		zoom_section.append(projector_zoom_lock, projector_toggle);
 		if (get_avtt_setting_value("projector")) {
 			projector_toggle.toggleClass('enabled', true);
+			projector_zoom_lock.toggleClass('enabled', true);
 		}
 
 		const cursor_ruler_toggle = $(`<div id='cursor_ruler_toggle' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Send Cursor/Ruler To Players'></div>`);
@@ -3590,14 +3639,14 @@ function is_player_sheet_open() {
  */
 function show_player_sheet() {
 	$("#character-tools-target").css({
-		"visibility": "visible",
+		"display": "",
 	});
 	$(".ct-character-sheet__inner").css({
-		"visibility": "visible",
+		"display": "",
 		"z-index": 110
 	});
 	$(".site-bar").css({
-		"visibility": "visible",
+		"display": "",
 		"z-index": 110
 	});
 	if (window.innerWidth > 1540) { // DDB resize point + sidebar width
@@ -3618,16 +3667,16 @@ function show_player_sheet() {
  */
 function hide_player_sheet() {
 	$("#character-tools-target").css({
-		"visibility": "hidden",
+		"display": "none",
 	});
 	$(".ct-character-sheet__inner").css({
-		"visibility": "hidden",
+		"display": "none",
 		"z-index": -1
 	});
 	if ($(".site-bar #lock_display").length == 0) {
 		// don't hide it if the DM is watching
 		$(".site-bar").css({
-			"visibility": "hidden",
+			"display": "none",
 			"z-index": -1
 		});
 	}
@@ -3858,7 +3907,7 @@ function is_sidebar_visible() {
  * This will show/hide the sidebar regardless of which page we are playing on.
  */
 function toggle_sidebar_visibility() {
-		if (is_sidebar_visible() || (window.innerWidth < 1024 && $(`[class*='styles_mobileNav']>div`).length==0)) {
+		if (is_sidebar_visible() || (!window.DM && window.innerWidth < 1024 && $(`[class*='styles_mobileNav']>div`).length==0)) {
 			hide_sidebar();
 		} else {
 			show_sidebar();
@@ -3908,6 +3957,11 @@ function addGamelogPopoutButton(){
 		// 	$(childWindows["Gamelog"].document).find("body").append(beholderIndicator);
 		// }, 1000)
 		childWindows["Gamelog"].addEventListener('load', popoutGamelogCleanup)
+		childWindows["Gamelog"].pcs = window.pcs;
+		childWindows["Gamelog"].TOKEN_OBJECTS = window.TOKEN_OBJECTS;
+		childWindows["Gamelog"].ddbConfigJson = window.ddbConfigJson
+		childWindows["Gamelog"].gameId = window.gameId;
+
 	});
 	$(`.glc-game-log>[class*='Container-Flex']>[class*='Title']`).append(gamelog_popout);
 }
@@ -3959,6 +4013,10 @@ function popoutGamelogCleanup(){
 		    top: 0 !important;
 		    height: 100% !important;
 		}
+		.body-rpgcampaign select#chat-language {
+	    bottom:0px;
+	    right: 20px;
+		}
 	</style>`);
 	$(childWindows["Gamelog"].document).find(".gamelog-button, button[class*='gamelog-button']").click();
 	removeFromPopoutWindow("Gamelog", ".dice-roller");
@@ -3973,6 +4031,11 @@ function popoutGamelogCleanup(){
 	removeFromPopoutWindow("Gamelog", "iframe");
 	$(childWindows["Gamelog"].document).find("body").append(gamelogMessageBroker);
 	$(childWindows["Gamelog"].document).find(".glc-game-log").append($(".chat-text-wrapper").clone(true, true));
+	$(childWindows["Gamelog"].document).find(".glc-game-log").append($("#chat-language").clone(true, true));
+
+	$(childWindows["Gamelog"].document).find("#chat-language").off('change.value').on('change.value', function(){
+		$("#chat-language").val($(this).val());
+	})
 	setTimeout(function(){removeFromPopoutWindow("Gamelog", "body>.sidebar-panel-loading-indicator")}, 200);
 }
 function updatePopoutWindow(name, cloneSelector){

@@ -16,8 +16,7 @@ $(function() {
   window.AVTT_VERSION = $("#avttversion").attr('data-version');
   $("head").append('<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons"></link>');
   $("head").append('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />');
-  // WORKAROUND FOR ANNOYING DDB BUG WITH COOKIES AND UPVOTING STUFF
-  document.cookie="Ratings=;path=/;domain=.dndbeyond.com;expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
   if (is_encounters_page()) {
     window.DM = true; // the DM plays from the encounters page
     dmAvatarUrl = $('#site-bar').attr('user-avatar');
@@ -130,27 +129,48 @@ function monitor_console_logs() {
     });
   }
 }
-function openDB() {
-  const DBOpenRequest = indexedDB.open(`AboveVTT-${window.gameId}`);
+async function openDB() {
+  const DBOpenRequest = await indexedDB.open(`AboveVTT-${window.gameId}`, 2); // version 2
+  
   DBOpenRequest.onsuccess = (e) => {
-    window.exploredIndexedDb = DBOpenRequest.result;
+    window.gameIndexedDb = DBOpenRequest.result;
   };
   DBOpenRequest.onerror = (e) => {
     console.warn(e);
   };
   DBOpenRequest.onupgradeneeded = (event) => {
       const db = event.target.result;
-
-      // Create an objectStore to hold information about our customers. We're
-      // going to use "ssn" as our key path because it's guaranteed to be
-      // unique - or at least that's what I was told during the kickoff meeting.
-      const objectStore = db.createObjectStore("exploredData", { keyPath: "exploredId" });
+      if(!db.objectStoreNames?.contains('exploredData')){
+        const objectStore = db.createObjectStore("exploredData", { keyPath: "exploredId" });
+      }
+      if(!db.objectStoreNames?.contains('journalData')){
+        const objectStore2 = db.createObjectStore("journalData", { keyPath: "journalId" });
+      }
+  };
+   
+  
+  const DBOpenRequest2 = await indexedDB.open(`AboveVTT-Global`);
+  
+  DBOpenRequest2.onsuccess = (e) => {
+    window.globalIndexedDB = DBOpenRequest2.result;
+  };
+  DBOpenRequest2.onerror = (e) => {
+    console.warn(e);
+  };
+  DBOpenRequest2.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if(!db.objectStoreNames?.contains('customizationData')){
+        const objectStore = db.createObjectStore("customizationData", { keyPath: "customizationId" });
+      }
+      if(!db.objectStoreNames?.contains('journalData')){
+        const objectStore2 = db.createObjectStore("journalData", { keyPath: "journalId" });
+      }
   };
 }
 function deleteDB(){
   let d = confirm("DELETE ALL LOCAL EXPLORE DATA (CANNOT BE UNDONE)");
   if (d === true) {
-    const objectStore = exploredIndexedDb.transaction([`exploredData`], "readwrite").objectStore('exploredData');
+    const objectStore = gameIndexedDb.transaction([`exploredData`], "readwrite").objectStore('exploredData');
     const objectStoreRequest = objectStore.clear();
     objectStoreRequest.onsuccess = function(event) {       
       exploredCanvas =  document.getElementById("exploredCanvas");
@@ -173,7 +193,7 @@ function deleteCurrentExploredScene(){
 }
 
 function deleteExploredScene(sceneId){
-    const deleteRequest = exploredIndexedDb
+    const deleteRequest = gameIndexedDb
      .transaction([`exploredData`], "readwrite")
      .objectStore('exploredData')
      .delete(`explore${window.gameId}${sceneId}`);
@@ -381,16 +401,23 @@ function showErrorMessage(error, ...extraInfo) {
   
   const extraStrings = extraInfo.map(ei => {
     if (typeof ei === "object") {
-      return JSON.stringify(ei).substr(0, 300) + "...";
+      if(JSON.stringify(ei).length>300)
+        return JSON.stringify(ei).substr(0, 300) + "...";
+      else
+        return JSON.stringify(ei)
     } else {
-      return ei?.toString().substr(0, 300) + "...";
+      if(ei?.toString().length>300)
+        return ei?.toString().substr(0, 300) + "...";
+      else
+        return ei?.toString()
     }
   }).join('<br />');
   if(typeof error.message == 'object'){
     error.message = JSON.strigify(error.message);
   }
   let container = $("#above-vtt-error-message");
-  error.message = error.message.substr(0, 300) + "...";
+  if(error.message.length > 300)
+    error.message = error.message.substr(0, 300) + "...";
   if (container.length === 0) {
 
     const container = $(`
@@ -612,6 +639,9 @@ function generic_pc_object(isDM) {
       {name: "int", save: 0, score: 10, label: "Intelligence", modifier: 0},
       {name: "wis", save: 0, score: 10, label: "Wisdom", modifier: 0},
       {name: "cha", save: 0, score: 10, label: "Charisma", modifier: 0}
+    ],
+    proficiencyGroups: [
+      {group: 'Languages', values: ''}
     ]
   };
   if (isDM) {
@@ -715,8 +745,19 @@ async function rebuild_window_pcs() {
   });
 }
 
+/**
+ * Returns known languages of player's PC
+ * @returns {string[]}
+ */
+function get_my_known_languages() {
+  const pc = find_pc_by_player_id(my_player_id())
+  const knownLanguages = pc?.proficiencyGroups.find(g => g.group === "Languages")?.values?.trim().split(/\s*,\s*/gi) ?? [];
+  knownLanguages?.push('Telepathy');
+  return knownLanguages;
+}
+
 async function rebuild_window_users() {
-  window.playerUsers = await DDBApi.fetchCampaignUserDetails(window.gameId);
+  window.playerUsers = await DDBApi.fetchCampaignCharacters(window.gameId);
   let playerUser = window.playerUsers.filter(d=> d.id == window.PLAYER_ID)[0]?.userId;
   window.myUser = playerUser ? playerUser : 'THE_DM'; 
 }
@@ -907,6 +948,31 @@ async function harvest_campaign_secret() {
 
 function set_campaign_secret(campaignSecret) {
   window.CAMPAIGN_SECRET = campaignSecret;
+}
+
+function projector_scroll_event(event){
+      event.stopImmediatePropagation();
+      if($('#projector_toggle.enabled > [class*="is-active"]').length>0){
+            let sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? 340 : 0);
+            let center = center_of_view(); 
+
+
+            let zoom = $('#projector_zoom_lock.enabled > [class*="is-active"]').length>0 ? false : window.ZOOM
+
+            tabCommunicationChannel.postMessage({
+              msgType: 'projectionScroll',
+              x: window.pageXOffset + window.innerWidth/2 - sidebarSize/2,
+              y: window.pageYOffset + window.innerHeight/2,
+              sceneId: window.CURRENT_SCENE_DATA.id,
+              innerHeight: window.innerHeight,
+              scrollPercentageY: (window.pageYOffset + window.innerHeight/2) / Math.max( document.body.scrollHeight, document.body.offsetHeight, 
+                   document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight ),
+              scrollPercentageX:  (window.pageXOffset + window.innerWidth/2 - sidebarSize/2) / Math.max( document.body.scrollWidth, document.body.offsetWidth, 
+                   document.documentElement.clientWidth, document.documentElement.scrollWidth, document.documentElement.offsetWidth ),
+              zoom: zoom,
+              mapPos: convert_point_from_view_to_map(center.x, center.y)
+            });
+      }
 }
 
 /** writes window.gameId and window.CAMPAIGN_SECRET to localStorage for faster retrieval in the future */
@@ -1218,7 +1284,7 @@ function inject_sidebar_send_to_gamelog_button(sidebarPaneContent) {
     // make sure the button grabs dynamically. Don't hold HTML in the button click block because clicking on items back to back will fuck that up
 
     let sidebar = sidebarPaneContent.closest(".ct-sidebar__portal");
-    let toInject = $(`<div></div>`);
+    let toInject = $(`<div style='width: 100%;'></div>`);
     toInject.attr("class", sidebarPaneContent.attr("class")); // set the class on our new element
     // required
     toInject.append(sidebar.find(".ct-sidebar__header").clone());

@@ -13,35 +13,135 @@ class JournalManager{
 	
 	constructor(gameid){
 		this.gameid=gameid;
+		let promises = [];
+
+		let objectStore = gameIndexedDb.transaction(["journalData"]).objectStore(`journalData`)
 		
-		if (window.DM && (localStorage.getItem('Journal' + gameid) != null)) {
-			this.notes = $.parseJSON(localStorage.getItem('Journal' + gameid));
-		}
-		else{
-			this.notes={};
-		}
-		if (window.DM && (localStorage.getItem('JournalChapters' + gameid) != null)) {
-			this.chapters = $.parseJSON(localStorage.getItem('JournalChapters' + gameid));
-		}
-		else{
-			this.chapters=[];
-		}
-		if(window.DM && (localStorage.getItem('JournalStatblocks') != null && localStorage.getItem('JournalStatblocks') != 'undefined')){
-			this.notes = {
-				...this.notes,
-				...$.parseJSON(localStorage.getItem('JournalStatblocks'))
+		
+	   	promises.push(new Promise((resolve) => { 
+		   	objectStore.get(`Journal`).onsuccess = (event) => {
+			 	if(event?.target?.result?.journalData){
+			 		this.notes = event?.target?.result?.journalData	
+				}
+				else {
+				  	if (window.DM && (localStorage.getItem('Journal' + gameid) != null)) {
+				  		this.notes = $.parseJSON(localStorage.getItem('Journal' + gameid));
+				  	}
+				  	else{
+				  		this.notes={};
+				  	}
+				}
+				let statBlockPromise = new Promise((resolve) => {
+					let globalObjectStore = globalIndexedDB.transaction(["journalData"]).objectStore(`journalData`)
+			  		globalObjectStore.get(`JournalStatblocks`).onsuccess = (event) => {
+					 	if(event?.target?.result?.journalData){
+						 	this.notes = {
+								...this.notes,
+								...event?.target?.result?.journalData
+							}			
+						}
+						else {
+							if(window.DM && (localStorage.getItem('JournalStatblocks') != null && localStorage.getItem('JournalStatblocks') != 'undefined')){
+						  		this.notes = {
+						  			...this.notes,
+						  			...$.parseJSON(localStorage.getItem('JournalStatblocks'))
+						  		}
+						  	}
+						}
+						resolve(true);
+					}
+				})
+
+				statBlockPromise.then(()=>{resolve(true)});
+				
 			}
-		}
+		}))
+
+		promises.push(new Promise((resolve) => {
+			objectStore.get(`JournalChapters`).onsuccess = (event) => {
+			 	if(event?.target?.result?.journalData){
+			 		this.chapters = event?.target?.result?.journalData; 		
+				}
+				else{
+				  	if (window.DM && (localStorage.getItem('JournalChapters' + gameid) != null)) {
+				  		this.chapters = $.parseJSON(localStorage.getItem('JournalChapters' + gameid));
+				  	}
+				  	else{
+				  		this.chapters=[];
+				  	}
+			   	}
+				resolve(true);
+			}
+		}))
+
+
+
+
+		Promise.all(promises).then(() => {
+		  if(is_abovevtt_page()){
+		  	this.build_journal();
+		  }
+		    if(window.DM && !is_gamelog_popout()){
+			  	// also sync the journal
+			    window.JOURNAL?.sync();
+			}
+		});
 	}
+
+	
 	
 	persist(){
 		if(window.DM){
 			if(!this.statBlocks)
 				this.statBlocks = Object.fromEntries(Object.entries(this.notes).filter(([key, value]) => this.notes[key].statBlock == true));
-			localStorage.setItem('JournalStatblocks', JSON.stringify(this.statBlocks));
-			localStorage.setItem('Journal' + this.gameid, JSON.stringify(Object.fromEntries(Object.entries(this.notes).filter(([key, value]) => this.notes[key].statBlock != true))));
-			localStorage.setItem('JournalChapters' + this.gameid, JSON.stringify(this.chapters));
+			
+			let statBlocks = this.statBlocks
+			let chapters = this.chapters
+			let journal = Object.fromEntries(Object.entries(this.notes).filter(([key, value]) => this.notes[key].statBlock != true))
+
+
+			let storeImage = gameIndexedDb.transaction([`journalData`], "readwrite")
+			let objectStore = storeImage.objectStore(`journalData`)
+
+			let globalObjectStore = globalIndexedDB.transaction(["journalData"], "readwrite").objectStore(`journalData`)
+
+
+			let deleteRequest = globalObjectStore.delete(`JournalStatblocks`);
+			deleteRequest.onsuccess = (event) => {
+			  const objectStoreRequest = globalObjectStore.add({journalId: `JournalStatblocks`, 'journalData': statBlocks});
+			};
+			deleteRequest.onerror = (event) => {
+			  const objectStoreRequest = globalObjectStore.add({journalId: `JournalStatblocks`, 'journalData': statBlocks});
+			};
+
+			let journalDeleteRequest = objectStore.delete(`Journal`);
+			journalDeleteRequest.onsuccess = (event) => {
+			  const objectStoreRequest = objectStore.add({journalId: `Journal`, 'journalData': journal});
+			};
+			journalDeleteRequest.onerror = (event) => {
+			  const objectStoreRequest = objectStore.add({journalId: `Journal`, 'journalData': journal});
+			};
+
+	
+			let chapterDeleteRequest = objectStore.delete(`JournalChapters`);
+			chapterDeleteRequest.onsuccess = (event) => {
+			  const objectStoreRequest = objectStore.add({journalId: `JournalChapters`, 'journalData': chapters});
+			};
+			journalDeleteRequest.onerror = (event) => {
+			  const objectStoreRequest = objectStore.add({journalId: `JournalChapters`, 'journalData': chapters});
+			};
+
+			try{
+				localStorage.setItem('JournalStatblocks', JSON.stringify(statBlocks));   //hold onto these until 1.27 then we can clear them.
+				localStorage.setItem('Journal' + this.gameid, JSON.stringify(journal));
+				localStorage.setItem('JournalChapters' + this.gameid, JSON.stringify(chapters));
+			}
+			catch(e){
+				console.warn('localStorage Journal Storage Failed', e)
+			}
+
 		}
+
 	}
 	
 	
@@ -91,7 +191,7 @@ class JournalManager{
 
 		
 		const row_add_chapter=$("<div class='row-add-chapter'></div>");
-		const input_add_chapter=$("<input type='text' placeholder='New chapter name' class='input-add-chapter'>");
+		const input_add_chapter=$("<input type='text' placeholder='New folder name' class='input-add-chapter'>");
 		
 		input_add_chapter.on('keypress',function(e){
 			if (e.which==13 && input_add_chapter.val() !== ""){
@@ -109,7 +209,7 @@ class JournalManager{
 			}
 		});
 
-		const btn_add_chapter=$("<button id='btn_add_chapter'>Add Chapter</button>");
+		const btn_add_chapter=$("<button id='btn_add_chapter'>Add Folder</button>");
 
 		btn_add_chapter.click(function() {
 			if (input_add_chapter.val() == "") {
@@ -120,7 +220,7 @@ class JournalManager{
 			self.chapters.push({
 				title: input_add_chapter.val(),
 				collapsed: false,
-				notes: [],
+				notes: []
 			});
 			self.persist();
 			self.build_journal();
@@ -281,53 +381,7 @@ class JournalManager{
 			let folderIcon = $(`<div class="sidebar-list-item-row-img"><img src="${window.EXTENSION_PATH}assets/folder.svg" class="token-image"></div>`)
 				
 			let row_chapter_title=$("<div class='row-chapter'></div>");
-			let btn_edit_chapter=$(`
-				<button style='height: 27px' class='token-row-button'>
-					<img  src='${window.EXTENSION_PATH}assets/icons/rename-icon.svg'>
-				</button>
-			`);
-
-			btn_edit_chapter.click(function(){
-				// Convert the chapter title to an input field and focus it
-				let input_chapter_title=$(`
-					<input type='text' class='input-add-chapter' value='${self.chapters[i].title}'>
-				`);
-				
-				input_chapter_title.keypress(function(e){
-					
-					if (e.which == 13 && input_chapter_title.val() !== "") {
-						self.chapters[i].title = input_chapter_title.val();
-						window.MB.sendMessage('custom/myVTT/JournalChapters',{
-							chapters: self.chapters
-						});
-						self.persist();
-						self.build_journal();
-					}
-
-					// If the user presses escape, cancel the edit
-					if (e.which == 27) {
-						self.build_journal();
-					}
-				});
-
-				input_chapter_title.blur(function(){		
-					let e = $.Event('keypress');
-				    e.which = 13;
-				    input_chapter_title.trigger(e);
-				});
-
-				row_chapter_title.empty();
-				row_chapter_title.append(btn_edit_chapter);
-				row_chapter_title.append(input_chapter_title);
-				input_chapter_title.focus();
-
-				// Convert the edit button to a save button
-				btn_edit_chapter.empty();
-				btn_edit_chapter.append(`
-					<img src='${window.EXTENSION_PATH}assets/icons/save.svg'>
-				`);
-				btn_edit_chapter.css('z-index', '5');
-			});
+			
 			
 			let chapter_title=$(`<div class='journal-chapter-title' title='${self.chapters[i].title}'/>`);
 			chapter_title.text(self.chapters[i].title);
@@ -342,42 +396,9 @@ class JournalManager{
 				});
 			});
 			
-			let btn_del_chapter=$("<button class='btn-chapter-icon btn-delete-chapter'><img height=10 src='"+window.EXTENSION_PATH+"assets/icons/delete.svg'></button>");
-			
-			btn_del_chapter.click(function(){
-				// TODO: Make this better but default dialog is good enough for now
-				if(confirm("Delete this chapter and all the contained notes?")){
+	
 
-					for(let k=0;k<self.chapters[i].notes.length;k++){
-						let nid=self.chapters[i].notes[k];
-						delete self.notes[nid];
-					}
-					
-					self.chapters = self.chapters.filter(d => d.id != self.chapters[i].id)
-					
-					$(this).closest('.folder').find('.folder').each(function(){
-						let folderId = $(this).attr('data-id');
-						let chapter = self.chapters.filter(d => d.id == folderId)[0];
-
-
-						for(let k=0;k<chapter.notes.length;k++){
-							let nid=chapter.notes[k];
-							delete self.notes[nid];
-						}
-
-						self.chapters = self.chapters.filter(d => d.id != folderId)
-
-					})
-					
-					window.MB.sendMessage('custom/myVTT/JournalChapters',{
-						chapters: self.chapters
-					});
-					self.persist();
-					self.build_journal();
-				}
-			});
-
-			let add_note_btn=$("<button class='token-row-button' ><img style='height: 20px' src='"+window.EXTENSION_PATH+"assets/icons/add_note.svg'></button>");
+			let add_note_btn=$("<button class='token-row-button' ><span class='material-symbols-outlined'>add_notes</span></button>");
 
 			add_note_btn.click(function(){
 				let new_noteid=uuid();
@@ -426,62 +447,76 @@ class JournalManager{
 
 				input_add_note.focus();
 			});
-				row_chapter_title.append(folderIcon);	
-				row_chapter_title.append(chapter_title);
-				if(window.DM) {
-					row_chapter_title.append(add_note_btn);
-					row_chapter_title.append(btn_edit_chapter);
-					row_chapter_title.append(btn_del_chapter);	
-				}	
+			let add_fold_btn=$("<button class='token-row-button'><span class='material-icons'>create_new_folder</span></button>");
+			add_fold_btn.click(function(){
 
+				self.chapters.push({
+					title: "New Folder",
+					collapsed: false,
+					notes: [],
+					parentID: $(this).closest('.folder[data-id]').attr('data-id')
+				});
+				self.persist();
+				self.build_journal();
+				window.MB.sendMessage('custom/myVTT/JournalChapters',{
+					chapters: self.chapters
+				});
+
+			});
+			row_chapter_title.append(folderIcon);	
+			row_chapter_title.append(chapter_title);
+			if(window.DM) {
+				row_chapter_title.append(add_note_btn, add_fold_btn);
+			}	
+
+			let containsPlayerNotes = false;
+			for(let n=0; n<self.chapters[i].notes.length;n++){
+				let note_id=self.chapters[i].notes[n];
+				if(self.notes[note_id]?.player == true || (self.notes[note_id]?.player instanceof Array && self.notes[note_id].player?.includes(`${window.myUser}`))){
+					containsPlayerNotes = true;
+				} 
+			}
+
+			if(window.DM || containsPlayerNotes) {
+				section_chapter.append(row_chapter_title);
+			} else {
+				section_chapter.append(row_chapter_title);
+				section_chapter.hide();
+			}
+
+			
+
+			if(!self.chapters[i].parentID){
+				chapter_list.append(section_chapter);
+			}
+			else{		
+				let parentFolder = chapter_list.find(`.folder[data-id='${self.chapters[i].parentID}']`);
+				let parentID = self.chapters[i]?.parentID
+				if(self.chapters[i].id == self.chapters.filter(d => d.id == parentID)[0].parentID){
+					delete self.chapters[i].parentID
+				}
+				if(parentFolder.length == 0){
+					self.chapters.splice(self.chapters.length-1, 0, self.chapters.splice(i, 1)[0]);
+					i -= 1; 
+					continue;
+				}	
 				let containsPlayerNotes = false;
 				for(let n=0; n<self.chapters[i].notes.length;n++){
 					let note_id=self.chapters[i].notes[n];
-					if(self.notes[note_id]?.player == true || (self.notes[note_id]?.player instanceof Array && self.notes[note_id].player?.includes(`${window.myUser}`))){
+					if(self.notes[note_id]?.player == true || (self.notes[note_id]?.player instanceof Array && self.notes[note_id]?.player.includes(`${window.myUser}`))){
 						containsPlayerNotes = true;
 					} 
 				}
 
 				if(window.DM || containsPlayerNotes) {
-					section_chapter.append(row_chapter_title);
+					parentFolder.append(section_chapter);
+					parentFolder.show();
+					parentFolder.parents().show();
 				} else {
-					section_chapter.append(row_chapter_title);
+					parentFolder.append(section_chapter);
 					section_chapter.hide();
 				}
-
-				
-
-				if(!self.chapters[i].parentID){
-					chapter_list.append(section_chapter);
-				}
-				else{		
-					let parentFolder = chapter_list.find(`.folder[data-id='${self.chapters[i].parentID}']`);
-					let parentID = self.chapters[i]?.parentID
-					if(self.chapters[i].id == self.chapters.filter(d => d.id == parentID)[0].parentID){
-						delete self.chapters[i].parentID
-					}
-					if(parentFolder.length == 0){
-						self.chapters.splice(self.chapters.length-1, 0, self.chapters.splice(i, 1)[0]);
-						i -= 1; 
-						continue;
-					}	
-					let containsPlayerNotes = false;
-					for(let n=0; n<self.chapters[i].notes.length;n++){
-						let note_id=self.chapters[i].notes[n];
-						if(self.notes[note_id]?.player == true || (self.notes[note_id]?.player instanceof Array && self.notes[note_id]?.player.includes(`${window.myUser}`))){
-							containsPlayerNotes = true;
-						} 
-					}
-
-					if(window.DM || containsPlayerNotes) {
-						parentFolder.append(section_chapter);
-						parentFolder.show();
-						parentFolder.parents().show();
-					} else {
-						parentFolder.append(section_chapter);
-						section_chapter.hide();
-					}
-				}
+			}
 
 			journalPanel.body.append(chapter_list);
 
@@ -523,9 +558,7 @@ class JournalManager{
 					input_note_title.keypress(function(e){
 						if (e.which == 13 && input_note_title.val() !== "") {
 							self.notes[note_id].title = input_note_title.val();
-							window.MB.sendMessage('custom/myVTT/JournalNotes',{
-								notes: self.notes
-							});
+							self.sendNotes([self.notes[note_id]]);
 							self.persist();
 							self.build_journal();
 						}
@@ -535,8 +568,10 @@ class JournalManager{
 							self.build_journal();
 						}
 					});
-
-					input_note_title.blur(function(){		
+					input_note_title.off('click').on('click', function(e){
+						e.stopPropagation();
+					})
+					input_note_title.blur(function(event){	
 						let e = $.Event('keypress');
 					    e.which = 13;
 					    input_note_title.trigger(e);
@@ -558,34 +593,20 @@ class JournalManager{
 
 
 
-				let edit_btn=$("<button class='token-row-button'><img src='"+window.EXTENSION_PATH+"assets/conditons/note.svg'></button>");
+				let edit_btn=$("<button class='token-row-button'><span class='material-symbols-outlined'>edit_note</span></button>");
 				edit_btn.click(function(){
 					window.JOURNAL.edit_note(note_id);	
 				});
 				let note_index=n;
-				let delete_btn=$("<button class='btn-chapter-icon'><img src='"+window.EXTENSION_PATH+"assets/icons/delete.svg'></button>");
-				delete_btn.click(function(){
-					if(confirm("Delete this note?")){
-						console.log("deleting note_index"+note_index);
-						self.chapters[i].notes.splice(note_index,1);
-						delete self.notes[note_id];
-						self.build_journal();
-						self.persist();
-						window.MB.sendMessage('custom/myVTT/JournalChapters', {
-							chapters: self.chapters
-						});
-					}
-				});
+
 								
 				entry.append(prependIcon);
 				entry.append(entry_title);
 
 				if(window.DM){
 					if(!self.notes[note_id].ddbsource){
-						entry.append(edit_btn);
-						entry.append(rename_btn);		
+						entry.append(edit_btn);	
 					}
-					entry.append(delete_btn);
 				}
 
 				note_list.append(entry);
@@ -629,14 +650,15 @@ class JournalManager{
 			chapterImport.append($(`<option value='/magic-items'>Magic Items</option>`));
 			chapterImport.append($(`<option value='/feats'>Feats</option>`));
 			chapterImport.append($(`<option value='/spells'>Spells</option>`));
-			window.ScenesHandler.build_adventures(function(){
-				for(let source in window.ScenesHandler.sources){
-					let sourcetitle = window.ScenesHandler.sources[source].title;
-					sourcetitle = sourcetitle.replaceAll(/\n.*\<span.*span>[\s]+?\n|[\n]|\s\s/gi, '');
-					window.ScenesHandler.sources[source].title = sourcetitle;
-					chapterImport.append($(`<option value='${source}'>${sourcetitle}</option>`));
-				}
-			});
+			
+			for(let source in window.ddbConfigJson.sources){
+				const currentSource = window.ddbConfigJson.sources[source]
+				const sourcetitle = currentSource.description;
+				const sourceValue = currentSource.sourceURL.replaceAll(/sources\//gi, '');
+				chapterImport.append($(`<option value='${sourceValue}'>${sourcetitle}</option>`));
+			}
+			
+			
 			chapterImport.on('change', function(){
 				let source = this.value;
 				
@@ -669,10 +691,11 @@ class JournalManager{
 				}
 				else{
 					self.chapters.push({
-						title: window.ScenesHandler.sources[source].title,
+						title: window.ddbConfigJson.sources[source].title,
 						collapsed: false,
 						notes: [],
 					});
+					source = source.sourceURL.replaceAll(/sources\//gi, '');
 					window.ScenesHandler.build_chapters(source, function(){
 						for(let chapter in window.ScenesHandler.sources[source].chapters){
 							let new_noteid=uuid();
@@ -693,6 +716,270 @@ class JournalManager{
 			})
 
 			$('#journal-panel .sidebar-panel-body').prepend(sort_button, chapterImport);
+
+			$.contextMenu({
+		        selector: "#journal-panel .row-chapter",
+		        build: function(element, e) {
+
+		            let menuItems = {};
+
+		           	let i = window.JOURNAL.chapters.findIndex(d=>d.id==$(element).closest('[data-id]').attr('data-id'))
+							
+
+		            menuItems["rename"] = {
+		                name: "Rename",
+		                callback: function(itemKey, opt, originalEvent) {
+		                    let input_chapter_title=$(`<input type='text' class='input-add-chapter' value='${self.chapters[i].title}'>`);
+	
+							input_chapter_title.keypress(function(e){
+								
+								if (e.which == 13 && input_chapter_title.val() !== "") {
+									self.chapters[i].title = input_chapter_title.val();
+									window.MB.sendMessage('custom/myVTT/JournalChapters',{
+										chapters: self.chapters
+									});
+									self.persist();
+									self.build_journal();
+								}
+
+								// If the user presses escape, cancel the edit
+								if (e.which == 27) {
+									self.build_journal();
+								}
+							});
+							input_chapter_title.off('click.prevent').on('click.prevent', function(e){
+								e.stopPropagation();
+							})
+							input_chapter_title.blur(function(){		
+								let e = $.Event('keypress');
+							    e.which = 13;
+							    input_chapter_title.trigger(e);
+							});
+							let row_chapter_title = $(element).find('.journal-chapter-title');
+							row_chapter_title.empty();
+							row_chapter_title.append(input_chapter_title);
+							input_chapter_title.focus();
+
+			            }   
+	            	};     
+	            	menuItems['export'] = {
+	                    name: "Export Folder",
+	                    callback: function (itemKey, opt, e) {
+	                        let folder_export = function(notes, chapters) {
+	                            build_import_loading_indicator('Preparing Export File');
+	                            let DataFile = {
+	                                version: 2,
+	                                scenes: [{}],
+	                                tokencustomizations: [],
+	                                notes: {},
+	                                journalchapters: [],
+	                                soundpads: {}
+	                            };
+	                            let currentdate = new Date(); 
+	                            let datetime = `${currentdate.getFullYear()}-${(currentdate.getMonth()+1)}-${currentdate.getDate()}`
+	                         
+	                            DataFile.notes = notes;
+	                            DataFile.journalchapters = chapters;
+	                            download(b64EncodeUnicode(JSON.stringify(DataFile,null,"\t")),`${window.CAMPAIGN_INFO.name}-${datetime}-note.abovevtt`,"text/plain");
+	                                
+	                            $(".import-loading-indicator").remove();        
+	                        }
+	                        let exportNoteChapters = function(chapterId, chaptertoExport){
+
+
+	                            for(let i = 0; i<self.chapters.length; i++){
+	                                if(self.chapters[i].parentID == chapterId){
+	                                   exportNoteChapters(self.chapters[i].id, chaptertoExport);
+	                                   chaptertoExport.push(self.chapters[i]);
+	                                }
+	                            }
+	                        };
+
+	                        let notesToExport = function(chapters, notes){
+	                        	for(let k in chapters){
+	                                for(let j in chapters[k].notes){
+	                                	let noteId = chapters[k].notes[j];
+	                                	notes[noteId] = self.notes[chapters[k].notes[j]];
+	                                }
+	                            }
+	                        }
+	                        let currentChapter = {...window.JOURNAL.chapters[i]};
+	                        delete currentChapter.parentID;
+	                        let chaptersArray = [currentChapter];
+	                        exportNoteChapters(window.JOURNAL.chapters[i].id, chaptersArray)
+	                       	
+	                        
+	                        let notesObject = {};
+	                        notesToExport(chaptersArray, notesObject);
+
+	                       
+
+	                        folder_export(notesObject, chaptersArray);
+	                      
+	                    }
+	                };
+	                
+	                menuItems["delete"] = {
+	                    name: "Delete",
+	                    callback: function(itemKey, opt, originalEvent) {
+                        	if(confirm("Delete this chapter and all the contained notes?")){
+                        		
+                        		for(let k=0;k<self.chapters[i].notes.length;k++){
+									let nid=self.chapters[i].notes[k];
+									delete self.notes[nid];
+								}
+								
+								self.chapters = self.chapters.filter(d => d.id != self.chapters[i].id)
+								
+								$(element).closest('.folder').find('.folder').each(function(){
+									let folderId = $(this).attr('data-id');
+									let chapter = self.chapters.filter(d => d.id == folderId)[0];
+
+
+									for(let k=0;k<chapter.notes.length;k++){
+										let nid=chapter.notes[k];
+										delete self.notes[nid];
+									}
+
+									self.chapters = self.chapters.filter(d => d.id != folderId)
+
+								})
+								
+								window.MB.sendMessage('custom/myVTT/JournalChapters',{
+									chapters: self.chapters
+								});
+								self.persist();
+								self.build_journal();
+							}
+	                    }
+	                };
+
+		            if (Object.keys(menuItems).length === 0) {
+		                menuItems["not-allowed"] = {
+		                    name: "You are not allowed to configure this item",
+		                    disabled: true
+		                };
+		            }
+		            return { items: menuItems };
+		        }
+		    });
+			$.contextMenu({
+		        selector: "#journal-panel .note-list .sidebar-list-item-row",
+		        build: function(element, e) {
+
+		            let menuItems = {};
+
+		           	let note_id = $(element).closest('[data-id]').attr('data-id');
+					let i = window.JOURNAL.chapters.findIndex(d=>d.id==$(element).closest('.folder[data-id]').attr('data-id'))
+					let note_index =window.JOURNAL.chapters[i].notes.indexOf(note_id)
+							
+
+		            menuItems["rename"] = {
+		                name: "Rename",
+		                callback: function(itemKey, opt, originalEvent) {
+		                    //Convert the note title to an input field and focus it
+		                    const input_note_title=$(`
+		                    	<input type='text' class='input-add-chapter' value='${self.notes[note_id].title}'>
+		                    `);
+
+		                    input_note_title.keypress(function(e){
+		                    	if (e.which == 13 && input_note_title.val() !== "") {
+		                    		self.notes[note_id].title = input_note_title.val();
+		                    		self.sendNotes([self.notes[note_id]]);
+		                    		self.persist();
+		                    		self.build_journal();
+		                    	}
+
+		                    	// If the user presses escape, cancel the edit
+		                    	if (e.which == 27) {
+		                    		self.build_journal();
+		                    	}
+		                    });
+		                    input_note_title.off('click').on('click', function(e){
+		                    	e.stopPropagation();
+		                    })
+		                    input_note_title.blur(function(event){	
+		                    	let e = $.Event('keypress');
+		                        e.which = 13;
+		                        input_note_title.trigger(e);
+		                    });
+		              
+		                    let entry_title = $(element).find('.sidebar-list-item-row-details-title');
+							
+		                    entry_title.append(input_note_title);
+		                    input_note_title.focus();
+
+			            }   
+	            	};   
+	            	menuItems["copyLink"] = {
+		                name: "Copy Note Link",
+		                callback: function(itemKey, opt, originalEvent) {
+		                	let copyLink = `[note]${note_id};${self.notes[note_id].title}[/note]`
+		                    navigator.clipboard.writeText(copyLink);
+			            }   
+	            	};   
+            		menuItems['export'] = {
+            	        name: "Export Note",
+            	        callback: function (itemKey, opt, e) {
+      
+            	            let note_export = function(notes, chapters) {
+            	                build_import_loading_indicator('Preparing Export File');
+            	                let DataFile = {
+            	                    version: 2,
+            	                    scenes: [{}],
+            	                    tokencustomizations: [],
+            	                    notes: {},
+            	                    journalchapters: [],
+            	                    soundpads: {}
+            	                };
+            	                let currentdate = new Date(); 
+            	                let datetime = `${currentdate.getFullYear()}-${(currentdate.getMonth()+1)}-${currentdate.getDate()}`
+            	             
+            	                DataFile.notes = notes;
+            	                DataFile.journalchapters = chapters;
+            	                download(b64EncodeUnicode(JSON.stringify(DataFile,null,"\t")),`${window.CAMPAIGN_INFO.name}-${datetime}-note.abovevtt`,"text/plain");
+            	                    
+            	                $(".import-loading-indicator").remove();        
+            	            }
+
+            	            let exportNote = {};
+            	            exportNote[note_id] = self.notes[note_id];
+
+            	            let currentChapter = {...window.JOURNAL.chapters[i]};
+	                        delete currentChapter.parentID;
+	                        let chapterToExport = [currentChapter];
+	                        
+
+            	            note_export(exportNote, chapterToExport);
+            	          
+            	        }
+            	    };
+	                
+	                menuItems["delete"] = {
+	                    name: "Delete",
+	                    callback: function(itemKey, opt, originalEvent) {
+                        	if(confirm("Delete this note?")){
+                        		console.log("deleting note_index"+note_index);
+                        		self.chapters[i].notes.splice(note_index,1);
+                        		delete self.notes[note_id];
+                        		self.build_journal();
+                        		self.persist();
+                        		window.MB.sendMessage('custom/myVTT/JournalChapters', {
+                        			chapters: self.chapters
+                        		});
+                        	}
+	                    }
+	                };
+
+		            if (Object.keys(menuItems).length === 0) {
+		                menuItems["not-allowed"] = {
+		                    name: "You are not allowed to configure this item",
+		                    disabled: true
+		                };
+		            }
+		            return { items: menuItems };
+		        }
+		    });
 		}
 	}
 	
@@ -832,10 +1119,19 @@ class JournalManager{
 		btn_popout.click(function(){	
 			let uiId = $(this).siblings(".note").attr("id");
 			let journal_text = $(`#${uiId}.note .note-text`)
-			popoutWindow(self.notes[id].title, note, journal_text.width(), journal_text.height());
-			removeFromPopoutWindow(self.notes[id].title, ".visibility-container");
-			removeFromPopoutWindow(self.notes[id].title, ".ui-resizable-handle");
-			$(window.childWindows[self.notes[id].title].document).find(".note").attr("style", "overflow:visible; max-height: none !important; height: auto; min-height: 100%;");
+			let title = self.notes[id].title.trim();
+			popoutWindow(title, note, journal_text.width(), journal_text.height());
+			removeFromPopoutWindow(title, ".visibility-container");
+			removeFromPopoutWindow(title, ".ui-resizable-handle");
+			$(window.childWindows[title].document).find("head").append(`<style id='noteStyles'>
+				body div.note[id^="ui-id"]{
+					height: 100% !important;
+				    max-height: 100% !important;
+				    overflow: auto !important;
+				}
+			</stlye>`);
+			
+			
 			$(this).siblings(".ui-dialog-titlebar").children(".ui-dialog-titlebar-close").click();
 		});
 		note.off('click').on('click', '.int_source_link', function(event){
@@ -847,6 +1143,113 @@ class JournalManager{
 	add_journal_tooltip_targets(target){
 		$(target).find('.tooltip-hover').each(function(){
 			let self = this;
+			if($(self).hasClass('note-tooltip')){
+					let noteId = $(self).attr('data-id');
+					if(noteId.replace(/[-+*&<>]/gi, '') == $(self).text().replace(/[-+*&<>\s]/gi, '')){
+						noteId = Object.values(window.JOURNAL.notes).filter(d=> d.title?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')?.includes($(self).text()?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')))[0]?.id
+					}
+					
+				$(self).off('click.openNote').on('click.openNote', function(event){
+					event.preventDefault();
+					event.stopPropagation();
+					if(noteId != undefined)
+						window.JOURNAL.display_note(noteId);		
+				})
+				if(window.JOURNAL.notes[noteId] != undefined){
+					let noteHover = `<div>
+						<div class="tooltip-header">
+				       	 	<div class="tooltip-header-icon">
+				            
+					        	</div>
+					        <div class="tooltip-header-text">
+					            ${window.JOURNAL.notes[noteId].title}
+					        </div>
+					        <div class="tooltip-header-identifier tooltip-header-identifier-condition">
+					           Note
+					        </div>
+			    		</div>
+				   		<div class="tooltip-body note-text">
+					        <div class="tooltip-body-description">
+					            <div class="tooltip-body-description-text note-text">
+					                ${window.JOURNAL.notes[noteId].text}
+					            </div>
+					        </div>
+					    </div>
+					</div>`
+
+			
+					let hoverNoteTimer;
+					$(self).on({
+						'mouseover': function(e){
+							hoverNoteTimer = setTimeout(function () {
+				            	build_and_display_sidebar_flyout(e.clientY, function (flyout) {
+						            flyout.addClass("prevent-sidebar-modal-close"); // clicking inside the tooltip should not close the sidebar modal that opened it
+						            flyout.addClass('note-flyout');
+						            const tooltipHtml = $(noteHover);
+									window.JOURNAL.translateHtmlAndBlocks(tooltipHtml);	
+									window.JOURNAL.add_journal_roll_buttons(tooltipHtml);
+									window.JOURNAL.add_journal_tooltip_targets(tooltipHtml);
+									add_stat_block_hover(tooltipHtml);
+						            flyout.append(tooltipHtml);
+						            let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
+						            sendToGamelogButton.css({ "float": "right" });
+						            sendToGamelogButton.on("click", function(ce) {
+						                ce.stopPropagation();
+						                ce.preventDefault();
+										
+						                send_html_to_gamelog(noteHover);
+						            });
+						            let flyoutLeft = e.clientX+20
+						            if(flyoutLeft + 400 > window.innerWidth){
+						            	flyoutLeft = window.innerWidth - 420
+						            }
+						            flyout.css({
+						            	left: flyoutLeft,
+						            	width: '400px'
+						            })
+
+						            const buttonFooter = $("<div></div>");
+						            buttonFooter.css({
+						                height: "40px",
+						                width: "100%",
+						                position: "relative",
+						                background: "#fff"
+						            });
+						            window.JOURNAL.block_send_to_buttons(flyout);
+						            flyout.append(buttonFooter);
+						            buttonFooter.append(sendToGamelogButton);
+						            flyout.find("a").attr("target","_blank");
+						      		flyout.off('click').on('click', '.int_source_link', function(event){
+										event.preventDefault();
+										render_source_chapter_in_iframe(event.target.href);
+									});
+									
+
+						            flyout.hover(function (hoverEvent) {
+						                if (hoverEvent.type === "mouseenter") {
+						                    clearTimeout(removeToolTipTimer);
+						                    removeToolTipTimer = undefined;
+						                } else {
+						                    remove_tooltip(500);
+						                }
+						            });
+
+						            flyout.css("background-color", "#fff");
+						        });
+				        	}, 500);		
+						
+						},
+						'mouseout': function(e){
+							clearTimeout(hoverNoteTimer)
+							remove_tooltip(500, false);
+						}
+				
+				    });
+				}
+				
+
+				return;	
+			}
 			if(!$(self).attr('data-tooltip-href'))
 			window.JOURNAL.getDataTooltip(self.href, function(url, typeClass){
 				$(self).attr('data-tooltip-href', url);
@@ -963,6 +1366,8 @@ class JournalManager{
 		// replace all "to hit" and "damage" rolls
 	
 		let currentElement = $(target).clone()
+		const dashToMinus = /([\s>])−(\d)/gi
+		
 
 		// apply most specific regex first matching all possible ways to write a dice notation
 		// to account for all the nuances of DNDB dice notation.
@@ -979,6 +1384,7 @@ class JournalManager{
 		const actionType = "roll"
 		const rollType = "AboveVTT"
 		const updated = currentElement.html()
+			.replaceAll(dashToMinus, `$1-$2`)
 			.replaceAll(damageRollRegexBracket, `<button data-exp='$3' data-mod='$4' data-rolltype='damage' data-actiontype='${actionType}' class='avtt-roll-button' title='${actionType}'> $1$2$5</button>`)
 			.replaceAll(damageRollRegex, `$1<button data-exp='$3' data-mod='$4' data-rolltype='damage' data-actiontype='${actionType}' class='avtt-roll-button' title='${actionType}'> $2</button>$5`)
 			.replaceAll(hitRollRegexBracket, `<button data-exp='1d20' data-mod='$2' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'> $1$2$3</button>`)
@@ -1252,6 +1658,7 @@ class JournalManager{
                 let parts = input.split(/:\s(?<!left:\s?)/g);
                 parts[1] = parts[1].split(/,\s(?![^(]*\))/gm);
                 for (let p in parts[1]) {
+                	parts[1][p] = parts[1][p].replace(/<(\/)?em>|<(\/)?b>|<(\/)?strong>/gi, '')
                 	let spellName = (parts[1][p].startsWith('<a')) ? $(parts[1][p]).text() : parts[1][p].replace(/<\/?p[a-zA-z'"0-9\s]+?>/g, '').replace(/\s?\[spell\]\s?|\s?\[\/spell\]\s?/g, '').replace('[/spell]', '').replace(/\s|&nbsp;/g, '');
 
                 	if(parts[1][p].startsWith('<') || parts[1][p].startsWith('[spell]') ){
@@ -1276,6 +1683,33 @@ class JournalManager{
                 }
             }
 
+            input = input.replace(/\[language=(.*?)\](.*?)\[\/language\]/g, function(m, language, languageText){
+            	languageText = languageText.replace(/<\/?p>/g, '');   	
+
+
+            	if (!window.DM && language != undefined) {
+					const knownLanguages = get_my_known_languages().map(language => language.toLowerCase())
+					if (!knownLanguages.includes(language.toLowerCase())) {
+						const container = $("<div>").html(languageText);
+						const elements = container.find("*").add(container);
+						const textNodes = elements.contents().not(elements);
+						textNodes.each(function () {
+							let newText = this.nodeValue.replaceAll(/[\w\d]/gi, (n) => String.fromCharCode(97 + Math.floor(Math.random() * 26)));
+							$(document.createTextNode(newText)).insertBefore(this);
+							$(this).remove();
+						});
+						languageText = container.html();
+					}
+				}
+
+                return `${languageText}`
+            })
+            input = input.replace(/\[note\](.*?)\[\/note\]/g, function(m){
+            	let note = m.replace(/<\/?p>/g, '').replace(/\s?\[note\]\s?|\s?\[\/note\]\s?/g, '').replace('[/note]', '');   	
+            	const noteId = note.replace(/\s/g, '-').split(';')[0];
+            	note = (note.split(';')[1]) ? note.split(';')[1] : note;
+                return `<a class="tooltip-hover note-tooltip" data-id=${noteId}>${note}</a>`
+            })
             input = input.replace(/\[spell\](.*?)\[\/spell\]/g, function(m){
             	let spell = m.replace(/<\/?p>/g, '').replace(/\s?\[spell\]\s?|\s?\[\/spell\]\s?/g, '').replace('[/spell]', '');   	
             	const spellUrl = spell.replace(/\s/g, '-').split(';')[0];;
@@ -2446,10 +2880,7 @@ function init_journal(gameid){
 	
 	
 	
-	window.JOURNAL=new JournalManager(gameid);
-
-	window.JOURNAL.build_journal();
-	
+	window.JOURNAL=new JournalManager(gameid);	
 	
 }
 

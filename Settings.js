@@ -37,6 +37,7 @@ function token_setting_options() {
 			type: 'dropdown',
 			options: [
 				{ value: "aura", label: "Aura", description: "Tokens will have a colored aura" },
+				{ value: "aura-bloodied-50", label: "Bloodied 50", description: "Tokens will have a red aura when bloodied" },				
 				{ value: "bar", label: "HP Meter", description: "How this meter is displayed depends on token type. Color blind alternative to auras." },
 				{ value: "none", label: "None", description: "Tokens will not have a health visual" }
 			],
@@ -511,7 +512,7 @@ function set_avtt_setting_value(name, newValue) {
 			local_peer_setting_changed(name, newValue);
 			break;
 		case "projector":
-			$('#projector_toggle').toggleClass('enabled', newValue);
+			$('#projector_toggle, #projector_zoom_lock').toggleClass('enabled', newValue);
 			break;
 		case "receiveCursorFromPeers":
 		case "receiveRulerFromPeers":

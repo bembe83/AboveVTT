@@ -26,17 +26,23 @@ class DDBApi {
     if (response.status < 400) {
       return response;
     }
-    // We have an error so let's try to parse it
-    console.debug("DDBApi.lookForErrors", response);
-    const responseJson = await response.json()
-      .catch(parsingError => console.error("DDBApi.lookForErrors Failed to parse json", response, parsingError));
-    const type = responseJson?.type || `Unknown Error ${response.status}`;
-    const messages = responseJson?.errors?.message?.join("; ") || "";
-    console.error(`DDB API Error: ${type} ${messages}`);
-    if(type == 'EncounterLimitException'){
-      alert("Encounter limit reached. AboveVTT needs 1 encounter slot free to join as DM. If you are on a free DDB account you are limited to 8 encounter slots. Please try deleting an encounter.")
+    if(response.status == 410){
+      showError(new Error(`DDB 410 Error`), `<b>Try clearing <div style="backdrop-filter: brightness(0.8);padding: 0px 3px;display: inline-block;border-radius: 5px;">${navigator.userAgent.indexOf("Firefox") != -1 ? `temporary cached files and pages` : `cached images and files`}</div> and restarting the browser.</b>`, `<br/><b>As long as you do <span style='color: #900;'>not</span> clear <div style="backdrop-filter: brightness(0.8);padding: 0px 3px;display: inline-block;border-radius: 5px;">cookies and other site data</div> this should not remove any AboveVTT data.`);
     }
-    throw new Error(`DDB API Error: ${type} ${messages}`);
+    else{
+      // We have an error so let's try to parse it
+      console.debug("DDBApi.lookForErrors", response);
+      const responseJson = await response.json()
+        .catch(parsingError => console.error("DDBApi.lookForErrors Failed to parse json", response, parsingError));
+      const type = responseJson?.type || `Unknown Error ${response.status}`;
+      const messages = responseJson?.errors?.message?.join("; ") || "";
+      console.error(`DDB API Error: ${type} ${messages}`);
+      if(type == 'EncounterLimitException'){
+        alert("Encounter limit reached. AboveVTT needs 1 encounter slot free to join as DM. If you are on a free DDB account you are limited to 8 encounter slots. Please try deleting an encounter.")
+      }
+      showError(new Error(`DDB API Error: ${type} ${messages}`));
+    }
+
   }
 
   static async fetchJsonWithToken(url, extraConfig = {}) {
@@ -46,7 +52,7 @@ class DDBApi {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       }
     }
     const request = await fetch(url, config).then(DDBApi.lookForErrors)
@@ -55,7 +61,7 @@ class DDBApi {
 
   static async fetchJsonWithCredentials(url, extraConfig = {}) {
     console.debug("DDBApi.fetchJsonWithCredentials url", url)
-    const request = await fetch(url, {...extraConfig, credentials: 'include' }).then(DDBApi.lookForErrors);
+    const request = await fetch(url, {...extraConfig, credentials: 'include'}).then(DDBApi.lookForErrors);
     console.debug("DDBApi.fetchJsonWithCredentials request", request);
     const response = await request.json();
     console.debug("DDBApi.fetchJsonWithCredentials response", response);
@@ -140,8 +146,8 @@ class DDBApi {
     const avttId = is_encounters_page() ? window.location.pathname.split("/").pop() : undefined;
     const avttEncounters = encounters.filter(e => e.id !== avttId && e.name === DEFAULT_AVTT_ENCOUNTER_DATA.name);
     console.debug(`DDBApi.deleteAboveVttEncounters avttId: ${avttId}, avttEncounters:`, avttEncounters);
-    const failedEncounters = localStorage.getItem('avttFailedDeleteEncounters');
-    let newFailed = (failedEncounters != null && failedEncounters != undefined) ? failedEncounters : [];
+    const failedEncounters = JSON.parse(localStorage.getItem('avttFailedDelete'));
+    let newFailed = (failedEncounters != null && failedEncounters != undefined && Array.isArray(failedEncounters)) ? failedEncounters : [];
     for (const encounter of avttEncounters) {
       if(newFailed.includes(encounter.id))
         continue;
@@ -150,7 +156,7 @@ class DDBApi {
       console.log("DDBApi.deleteAboveVttEncounters delete encounter response:", response.status);
       if(response.status == 401){
         newFailed.push(encounter.id)
-        localStorage.setItem('avttFailedDeleteEncounters', newFailed);
+        localStorage.setItem('avttFailedDelete', JSON.stringify(newFailed));
       }    
     }
   }
@@ -193,6 +199,8 @@ class DDBApi {
 
   static async fetchCampaignCharacters(campaignId) {
     // This is what the campaign page calls to fetch characters
+    if(window.playerUsers != undefined)
+      return window.playerUsers
     const url = `https://www.dndbeyond.com/api/campaign/stt/active-short-characters/${campaignId}`;
     const response = await DDBApi.fetchJsonWithToken(url);
     return response.data;
@@ -203,10 +211,7 @@ class DDBApi {
     return await DDBApi.fetchCharacterDetails(characterIds);
   }
 
-  static async fetchCampaignUserDetails(campaignId = window.gameId){
-    let request = await DDBApi.fetchJsonWithToken(`https://www.dndbeyond.com/api/campaign/stt/active-short-characters/${campaignId}`);
-    return request.data;
-  }
+
 
   static async fetchCharacterDetails(characterIds) {
     if (!Array.isArray(characterIds) || characterIds.length === 0) {
@@ -224,6 +229,8 @@ class DDBApi {
   }
 
   static async fetchConfigJson() {
+    if(window.ddbConfigJson != undefined)
+      return window.ddbConfigJson
     const url = "https://www.dndbeyond.com/api/config/json";
     return await DDBApi.fetchJsonWithToken(url);
   }
@@ -237,10 +244,15 @@ class DDBApi {
 
   static async fetchCampaignCharacterIds(campaignId) {
     let characterIds = [];
+    if(window.playerUsers){
+      characterIds = window.playerUsers.map(c => c.id);
+      return characterIds;
+    }
+
     try {
       // This is what the campaign page calls
-      const activeCharacters = await DDBApi.fetchActiveCharacters(campaignId);
-      characterIds = activeCharacters.map(c => c.id);
+      window.playerUsers = await DDBApi.fetchActiveCharacters(campaignId);
+      characterIds = window.playerUsers.map(c => c.id);
     } catch (error) {
       console.warn("fetchCampaignCharacterIds caught an error trying to collect ids from fetchActiveCharacters", error);
     }

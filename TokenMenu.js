@@ -706,11 +706,35 @@ function token_context_menu_expanded(tokenIds, e) {
 			groupCombatButton.addClass("add-to-ct");
 			groupCombatButton.html(addGroupButtonInternals);
 		}
+
+
+		let shiftClick = jQuery.Event("click");
+		shiftClick.shiftKey = true;
+		let ctrlClick = jQuery.Event("click");
+		ctrlClick.ctrlKey = true;
+
+		let roll_adv = $('<button title="Advantage to roll" id="adv" name="roll_mod" value="OFF" class="roll_mods_button icon-advantage markers-icon" />')
+		roll_adv.click(function(e){
+			e.stopPropagation();
+			$(this).parent().trigger(shiftClick);
+		});
+
+		roll_disadv = $('<button title="Disadvantage to roll" id="disadv" name="roll_mod" value="OFF" class="roll_mods_button icon-disadvantage markers-icon" />')
+
+		roll_disadv.click(function(e){
+			e.stopPropagation();
+			$(this).parent().trigger(ctrlClick);
+		});
+
+		combatButton.append(roll_adv, roll_disadv);
+
+
 		combatButton.on("click", function(clickEvent) {
 			let clickedButton = $(clickEvent.currentTarget);
 			if (clickedButton.hasClass("remove-from-ct")) {
 				clickedButton.removeClass("remove-from-ct").addClass("add-to-ct");
 				clickedButton.html(addButtonInternals);
+				clickedButton.append(roll_adv.clone(true, true), roll_disadv.clone(true, true));
 				tokens.forEach(t =>{
 					t.options.ct_show = undefined;
 					t.options.combatGroup = undefined;
@@ -722,7 +746,7 @@ function token_context_menu_expanded(tokenIds, e) {
 				clickedButton.html(removeButtonInternals);
 				tokens.forEach(t => {
 					t.options.combatGroup = undefined;
-					ct_add_token(t, false)
+					ct_add_token(t, false, undefined, clickEvent.shiftKey, clickEvent.ctrlKey)
 					t.update_and_sync();
 				});
 			}
@@ -736,6 +760,7 @@ function token_context_menu_expanded(tokenIds, e) {
 				combatButton.html(addButtonInternals);
 				clickedButton.removeClass("remove-from-ct").addClass("add-to-ct");
 				clickedButton.html(addGroupButtonInternals);
+				clickedButton.append(roll_adv.clone(true, true), roll_disadv.clone(true, true));
 				tokens.forEach(t =>{
 					if(t.options.combatGroup && window.TOKEN_OBJECTS[t.options.combatGroup]){
 						window.TOKEN_OBJECTS[t.options.combatGroup].delete()
@@ -760,7 +785,7 @@ function token_context_menu_expanded(tokenIds, e) {
 						allHidden = false
 					}
 					t.options.combatGroup = group;
-					ct_add_token(t, false);
+					ct_add_token(t, false, undefined, clickEvent.shiftKey,  clickEvent.ctrlKey);
 					t.update_and_sync();
 				});		
 				let t = new Token({
@@ -778,13 +803,15 @@ function token_context_menu_expanded(tokenIds, e) {
 					window.MB.sendMessage('custom/myVTT/token', t.options);
 				}, 10);
 				t.place_sync_persist();
-				ct_add_token(window.TOKEN_OBJECTS[group], false)
+				ct_add_token(window.TOKEN_OBJECTS[group], false, clickEvent.shiftKey, clickEvent.ctrlKey)
 			}
 		debounceCombatReorder();
 		});
-		
+
+
 		body.append(combatButton);
 		if(tokens.length >1){
+			groupCombatButton.append(roll_adv.clone(true,true), roll_disadv.clone(true,true));
 			body.append(groupCombatButton);
 		}
 	}
@@ -2533,19 +2560,25 @@ function build_notes_flyout_menu(tokenIds) {
 		let has_note=id in window.JOURNAL.notes;
 		if(has_note){
 			let viewNoteButton = $(`<button class="icon-view-note material-icons">View Note</button>`)		
+			let noteLinkButton = $(`<button class="icon-view-note material-icons">Copy Note Link</button>`)		
+			
 			let deleteNoteButton = $(`<button class="icon-note-delete material-icons">Delete Note</button>`)
+			
 			editNoteButton = $(`<button class="icon-note material-icons">Edit Note</button>`)
-			body.append(viewNoteButton);
-			body.append(editNoteButton);		
-			body.append(deleteNoteButton);	
+			body.append(viewNoteButton, noteLinkButton, editNoteButton, deleteNoteButton);	
 			viewNoteButton.off().on("click", function(){
 				window.JOURNAL.display_note(id);
+			});
+			noteLinkButton.off().on("click", function(){
+				let copyLink = `[note]${id};${window.JOURNAL.notes[id].title}[/note]`
+		        navigator.clipboard.writeText(copyLink);
 			});
 			deleteNoteButton.off().on("click", function(){
 				if(id in window.JOURNAL.notes){
 					delete window.JOURNAL.notes[id];
 					window.JOURNAL.persist();
-					window.TOKEN_OBJECTS[id].place();			
+					window.TOKEN_OBJECTS[id].place();	
+					build_notes_flyout_menu(tokenIds)		
 				}
 			});
 		}
@@ -2562,8 +2595,10 @@ function build_notes_flyout_menu(tokenIds) {
 					plain: '',
 					player: false
 				}
+				build_notes_flyout_menu(tokenIds)
 			}
 			window.JOURNAL.edit_note(id);
+
 		});		
 	}
 
