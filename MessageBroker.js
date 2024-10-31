@@ -371,7 +371,7 @@ class MessageBroker {
 								li.height(oldheight);
 								li.animate({ opacity: 1, height: neweight }, animationDuration, () => { li.height("") });
 								let output = $(`${current.data.injected_data.whisper == '' ? '' : `<div class='above-vtt-roll-whisper'>To: ${(current.data.injected_data.whisper == window.PLAYER_NAME && current.data.player_name == window.PLAYER_NAME) ? `Self` : current.data.injected_data.whisper}</div>`}<div class='above-vtt-container-roll-output'>${li.find('.abovevtt-roll-container').attr('title')}</div>`);
-								li.find('.abovevtt-roll-container').append(output);
+								li.find('.abovevtt-roll-container [class*="Result"]').append(output);
 								let img = li.find(".magnify");
 								for(let i=0; i<img.length; i++){
 									if($(img[i]).is('img')){
@@ -2255,6 +2255,9 @@ class MessageBroker {
 			}
 			else if(message.eventType?.toLowerCase()?.includes('token')){
 				alertText = `You may have too many tokens on the map to send.\n\nNumber of Tokens: ${Object.keys(window.TOKEN_OBJECTS).length}\n\nCheck console warnings for more message data.`
+			}
+			else if(message.eventType?.toLowerCase()?.includes('ct')){
+				alertText = `You may have too many tokens in the combat tracker.\n\nNumber of Tokens in CT: ${message.data.length-1}\n\nCheck console warnings for more message data.`
 			}
 			else{
 				alertText = 'Check console warnings for more message data.'

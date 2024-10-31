@@ -874,7 +874,7 @@ async function harvest_game_id() {
   }
 
   if (is_characters_page()) {
-    const campaignSummaryButton = $(".ddbc-campaign-summary");
+    const campaignSummaryButton = $(".ddbc-campaign-summary, [class*='styles_campaignSummary']");
     if (campaignSummaryButton.length > 0) {
       if ($(".ct-campaign-pane__name-link").length === 0) {
         campaignSummaryButton.click(); // campaign sidebar is closed. open it
@@ -970,7 +970,7 @@ function projector_scroll_event(event){
               scrollPercentageX:  (window.pageXOffset + window.innerWidth/2 - sidebarSize/2) / Math.max( document.body.scrollWidth, document.body.offsetWidth, 
                    document.documentElement.clientWidth, document.documentElement.scrollWidth, document.documentElement.offsetWidth ),
               zoom: zoom,
-              mapPos: convert_point_from_view_to_map(center.x, center.y)
+              mapPos: convert_point_from_view_to_map(center.x, center.y, true)
             });
       }
 }
@@ -1286,6 +1286,7 @@ function inject_sidebar_send_to_gamelog_button(sidebarPaneContent) {
     let sidebar = sidebarPaneContent.closest(".ct-sidebar__portal");
     let toInject = $(`<div style='width: 100%;'></div>`);
     toInject.attr("class", sidebarPaneContent.attr("class")); // set the class on our new element
+    toInject.toggleClass('abovevtt-sidebar-injected', true);
     // required
     toInject.append(sidebar.find(".ct-sidebar__header").clone());
 

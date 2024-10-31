@@ -476,7 +476,7 @@ class Token {
 			delete window.all_token_objects[id];
 			if (id in window.JOURNAL.notes) {
 				delete window.JOURNAL.notes[id];
-				localStorage.setItem('Journal' + window.gameId, JSON.stringify(window.JOURNAL.notes));
+				window.JOURNAL.persist();
 			}
 		}
 
@@ -2004,7 +2004,7 @@ class Token {
 							let thisSelected = !(parentToken.hasClass('tokenselected'));
 							let count = 0;
 							if (shiftHeld == false) {
-								deselect_all_tokens();
+								deselect_all_tokens(true);
 							}
 							if (thisSelected == true) {
 								parentToken.addClass('tokenselected');
@@ -2809,13 +2809,17 @@ class Token {
 						}
 
 						const allowTokenMeasurement = get_avtt_setting_value("allowTokenMeasurement")
+						
 						if (allowTokenMeasurement) {
-							const tokenMidX = tokenPosition.x + Math.round(self.sizeWidth() / 2);
-							const tokenMidY = tokenPosition.y + Math.round(self.sizeHeight() / 2);
+							requestAnimationFrame(function(){
+								const tokenMidX = tokenPosition.x + Math.round(self.sizeWidth() / 2);
+								const tokenMidY = tokenPosition.y + Math.round(self.sizeHeight() / 2);
 
-							clear_temp_canvas();
-							WaypointManager.storeWaypoint(WaypointManager.currentWaypointIndex, window.BEGIN_MOUSEX/window.CURRENT_SCENE_DATA.scale_factor, window.BEGIN_MOUSEY/window.CURRENT_SCENE_DATA.scale_factor, tokenMidX/window.CURRENT_SCENE_DATA.scale_factor, tokenMidY/window.CURRENT_SCENE_DATA.scale_factor);
-							WaypointManager.draw(Math.round(tokenPosition.x + (self.sizeWidth() / 2))/window.CURRENT_SCENE_DATA.scale_factor, Math.round(tokenPosition.y + self.sizeHeight() + 10)/window.CURRENT_SCENE_DATA.scale_factor);
+								clear_temp_canvas();
+								WaypointManager.storeWaypoint(WaypointManager.currentWaypointIndex, window.BEGIN_MOUSEX/window.CURRENT_SCENE_DATA.scale_factor, window.BEGIN_MOUSEY/window.CURRENT_SCENE_DATA.scale_factor, tokenMidX/window.CURRENT_SCENE_DATA.scale_factor, tokenMidY/window.CURRENT_SCENE_DATA.scale_factor);
+								WaypointManager.draw(Math.round(tokenPosition.x + (self.sizeWidth() / 2))/window.CURRENT_SCENE_DATA.scale_factor, Math.round(tokenPosition.y + self.sizeHeight() + 10)/window.CURRENT_SCENE_DATA.scale_factor);
+								
+							})
 						}
 						if (!self.options.hidden) {
 							sendTokenPositionToPeers(tokenPosition.x, tokenPosition.y, self.options.id, allowTokenMeasurement);
@@ -3042,7 +3046,7 @@ class Token {
 					let thisSelected = !(parentToken.hasClass('tokenselected'));
 					let count = 0;
 					if (shiftHeld == false) {
-						deselect_all_tokens();
+						deselect_all_tokens(true);
 					}
 					if (thisSelected == true) {
 						parentToken.addClass('tokenselected');
@@ -3551,7 +3555,7 @@ function token_menu() {
 		return;
 }
 
-function deselect_all_tokens() {
+function deselect_all_tokens(ignoreVisionUpdate = false) {
 	window.MULTIPLE_TOKEN_SELECTED = false;
 	for (let id in window.TOKEN_OBJECTS) {
 		let curr = window.TOKEN_OBJECTS[id];
@@ -3562,26 +3566,28 @@ function deselect_all_tokens() {
 	}
 	remove_selected_token_bounding_box();
 	window.CURRENTLY_SELECTED_TOKENS = [];
-	let darknessFilter = (window.CURRENT_SCENE_DATA.darkness_filter != undefined) ? window.CURRENT_SCENE_DATA.darkness_filter : 0;
-	let darknessPercent = window.DM ? Math.max(40, 100 - parseInt(darknessFilter)) : 100 - parseInt(darknessFilter); 	
+	if(ignoreVisionUpdate == false){
+		let darknessFilter = (window.CURRENT_SCENE_DATA.darkness_filter != undefined) ? window.CURRENT_SCENE_DATA.darkness_filter : 0;
+		let darknessPercent = window.DM ? Math.max(40, 100 - parseInt(darknessFilter)) : 100 - parseInt(darknessFilter); 	
 
- 	if(window.DM && darknessPercent < 40){
- 		darknessPercent = 40;
- 		$('#raycastingCanvas').css('opacity', '0');
- 	}
- 	else if(window.DM){
- 		$('#raycastingCanvas').css('opacity', '');
- 	}
-	$('#VTT').css('--darkness-filter', darknessPercent + "%");
-   	if(window.DM){
-   		$("#light_container [id^='light_']").css('visibility', "visible");
-   		$(`.token`).show();
-		$(`.door-button`).css('visibility', '');
-		$(`.aura-element`).show();
-   	}
-   	if($('#selected_token_vision .ddbc-tab-options__header-heading--is-active').length==0){
-   		window.SelectedTokenVision = false;
-   	}
+	 	if(window.DM && darknessPercent < 40){
+	 		darknessPercent = 40;
+	 		$('#raycastingCanvas').css('opacity', '0');
+	 	}
+	 	else if(window.DM){
+	 		$('#raycastingCanvas').css('opacity', '');
+	 	}
+		$('#VTT').css('--darkness-filter', darknessPercent + "%");
+	   	if(window.DM){
+	   		$("#light_container [id^='light_']").css('visibility', "visible");
+	   		$(`.token`).show();
+			$(`.door-button`).css('visibility', '');
+			$(`.aura-element`).show();
+	   	}
+	   	if($('#selected_token_vision .ddbc-tab-options__header-heading--is-active').length==0){
+	   		window.SelectedTokenVision = false;
+	   	}
+  	}
 }
 
 function token_health_aura(hpPercentage, auraType) {
@@ -4580,7 +4586,7 @@ function paste_selected_tokens(x, y) {
 			window.JOURNAL.notes[newId] = structuredClone(window.JOURNAL.notes[id]);
 			let copiedNote = window.JOURNAL.notes[newId];
 			copiedNote.title = window.TOKEN_OBJECTS[id].options.name;
-			localStorage.setItem('Journal' + window.gameId, JSON.stringify(window.JOURNAL.notes));
+			window.JOURNAL.persist();
 			window.MB.sendMessage('custom/myVTT/note',{
 				id: newId,
 				note:copiedNote

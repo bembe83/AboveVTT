@@ -125,7 +125,7 @@ class DiceRoll {
      * @param entityId {string|undefined} the id of the entity associated with this roll. If {entityType} is "character" this should be the id for that character. If {entityType} is "monster" this should be the id for that monster. If {entityType} is "user" this should be the id for that user.
      * @param sendToOverride {string|undefined} if undefined, the roll will go to whatever the gamelog is set to.
      */
-    constructor(expression, action = undefined, rollType = undefined, name = undefined, avatarUrl = undefined, entityType = undefined, entityId = undefined, sendToOverride = undefined) {
+    constructor(expression, action = undefined, rollType = undefined, name = undefined, avatarUrl = undefined, entityType = undefined, entityId = undefined, sendToOverride = undefined, damageType = undefined) {
 
         let parsedExpression = expression.replaceAll(/\s+/g, "").replaceAll(/^(d\d+)|([+-])(d\d+)/g, '$21$1$3');; // remove all spaces and 1's to d6 -> 1d6, d8 -> 1d8 etc.
 
@@ -173,6 +173,7 @@ class DiceRoll {
         this.action = action;
         this.rollType = rollType;
         this.sendToOverride = sendToOverride;
+        this.damageType = damageType;
         if (name) this.name = name;
         if (avatarUrl) this.avatarUrl = avatarUrl;
         if (entityType) this.entityType = entityType;
@@ -225,12 +226,18 @@ class DiceRoll {
         let action = modifiedSlashCommand.replace(diceRollCommandRegex, "").replace(allowedExpressionCharactersRegex, "");
         console.debug("DiceRoll.fromSlashCommand text: ", slashCommandText, ", slashCommand:", slashCommand, ", expression: ", expression, ", action: ", action);
         let rollType = undefined;
+        let damageType = undefined;
         if (slashCommand.startsWith("/r")) {
             // /r and /roll allow users to set both the action and the rollType by separating them with `:` so try to parse that out
             [action, rollType] = action.split(":") || [undefined, undefined];
+            const damageRegex = /([\s]+)?damage/gi;
+            if(rollType?.match(damageRegex)){
+                [damageType, rollType] = [rollType.replaceAll(damageRegex, ''), 'damage'];
+            }
         } else if (slashCommand.startsWith("/hit")) {
             rollType = "to hit";
         } else if (slashCommand.startsWith("/dmg")) {
+            [action, damageType] = action.split(":") || [action, undefined];
             rollType = "damage";
         } else if (slashCommand.startsWith("/skill")) {
             rollType = "check";
@@ -239,10 +246,105 @@ class DiceRoll {
         } else if (slashCommand.startsWith("/heal")) {
             rollType = "heal";
         }
-        return new DiceRoll(expression, action, rollType, name, avatarUrl, entityType, entityId, sendToOverride);
+        return new DiceRoll(expression, action, rollType, name, avatarUrl, entityType, entityId, sendToOverride, damageType);
     }
 }
+function getRollData(rollButton){
+    let expression = '';
+    let rollType = 'custom';
+    let rollTitle = 'AboveVTT';
+    let damageType = undefined;
+    if($(rollButton).find('.ddbc-damage__value').length>0){
+      expression = $(rollButton).find('.ddbc-damage__value').text().replace(/\s/g, '');
+    }
+    else if($(rollButton).find('.ddbc-signed-number').length>0){
+      expression = `1d20${$(rollButton).find('.ddbc-signed-number').attr('aria-label').replace(/\s/g, '')}`;
+    }
+    else if($(rollButton).find('.ddbc-healing-icon').length > 0){
+      expression = $(rollButton).text().replace(/\s/g, '');
+    }
+    else if($(rollButton).find('[class*="styles_numberDisplay"]').length > 0){
+      expression = `1d20${$(rollButton).text().replace(/\s/g, '')}`;
+    }
+    else if($(rollButton).hasClass('avtt-roll-button')){
+      expression = `${$(rollButton).attr('data-exp')}${$(rollButton).attr('data-mod')}`
+      rollTitle = $(rollButton).attr('data-actiontype');
+      rollType = $(rollButton).attr('data-rolltype');;
+    }
+    if($(rollButton).hasClass('avtt-roll-formula-button')){
+      let slashCommand = DiceRoll.fromSlashCommand($(rollButton).attr('data-slash-command'))
+      expression = slashCommand.expression;
+      damageType = slashCommand.damageType;
+      let title = $(rollButton).attr('title').split(':');
+      if(title != undefined && title[0] != undefined){
+        rollTitle = title[0];
+      }
+      if(title != undefined && title[1] != undefined){
+        rollType = title[1];
+      }  
+    }
+    if(expression == ''){
+      return {
+        expression: undefined,
+      }
+    }
 
+    let roll = new rpgDiceRoller.DiceRoll(expression); 
+    let regExpression = new RegExp(`${expression.replace(/[+-]/g, '\\$&')}:\\s`);
+
+    if($(rollButton).parents(`[class*='saving-throws-summary']`).length > 0){
+      rollType = 'save'
+      rollTitle = $(rollButton).closest(`.ddbc-saving-throws-summary__ability`).find('.ddbc-saving-throws-summary__ability-name abbr').text();
+    } else if($(rollButton).parents(`[class*='ability-summary']`).length > 0){
+      rollType = 'check'
+      rollTitle = $(rollButton).closest(`.ddbc-ability-summary`).find('.ddbc-ability-summary__abbr').text();
+    } else if($(rollButton).parents(`[class*='skills__col']`).length > 0){
+      rollType = 'check';
+      rollTitle = $(rollButton).closest(`.ct-skills__item`).find('.ct-skills__col--skill').text();
+    } else if($(rollButton).parents(`[class*='initiative-box']`).length > 0 || $(rollButton).parents(`.ct-combat__summary-group--initiative`).length > 0){
+      rollTitle = 'Initiative';
+      rollType = 'roll'
+    } else if($(rollButton).parents(`[class*='__damage']`).length > 0){
+      rollType = 'damage'
+      if($(rollButton).parents(`[class*='damage-effect__healing']`).length > 0){
+        rollType = 'heal'
+      }
+    } else if($(rollButton).parents(`[class*='__tohit']`).length > 0){
+      rollType = 'to hit'
+    } 
+    if(rollType == 'damage' || rollType == 'attack' || rollType == 'to hit' || rollType == 'heal'){
+      if($(rollButton).parents(`.ddbc-combat-attack--spell`).length > 0){
+        rollTitle = $(rollButton).closest(`.ddbc-combat-attack--spell`).find('[class*="styles_spellName"]').text();
+      }
+      else if($(rollButton).parents(`.ct-spells-spell`).length > 0){
+        rollTitle = $(rollButton).closest(`.ct-spells-spell`).find('[class*="styles_spellName"]').text();
+      }
+      else if($(rollButton).parents(`.ddbc-combat-action-attack-weapon`).length > 0){
+        rollTitle = $(rollButton).closest(`.ddbc-combat-action-attack-weapon`).find('.ddbc-action-name, [class*="styles_actionName"]').text();
+      }
+      else if($(rollButton).parents(`.ddbc-combat-attack--item`).length > 0){
+        rollTitle = $(rollButton).closest(`.ddbc-combat-attack--item`).find('.ddbc-item-name, [class*="styles_itemName"]').text();
+      }
+      else if($(rollButton).parents(`.ddbc-combat-action-attack-general`).length > 0){
+        rollTitle = $(rollButton).closest(`.ddbc-combat-action-attack-general`).find('.ddbc-action-name, [class*="styles_actionName"]').text();
+      }
+    }
+    const modifier = (roll.rolls.length > 1 && expression.match(/[+-]\d*$/g, '')) ? `${roll.rolls[roll.rolls.length-2]}${roll.rolls[roll.rolls.length-1]}` : '';
+
+    const followingText = $(rollButton)[0].nextSibling?.textContent?.trim()?.split(' ')[0]
+    damageType = followingText && window.ddbConfigJson.damageTypes.some(d => d.name.toLowerCase() == followingText.toLowerCase()) ? followingText : damageType;     
+
+  
+    return {
+      roll: roll,
+      expression: expression,
+      rollType: rollType,
+      rollTitle: rollTitle,
+      modifier: modifier,
+      regExpression: regExpression,
+      damageType: damageType
+    }
+}
 class DiceRoller {
 
     timeoutDuration = 10000; // 10 second timeout seems reasonable. If the message gets dropped we don't want to be stuck waiting forever.
@@ -305,6 +407,7 @@ class DiceRoller {
         window.diceRoller.setPendingDamageType(damageTypeText);
       return damageTypeText;
     }
+
     /**
      * Attempts to parse the expression, and roll DDB dice.
      * If dice are rolled, the results will be processed to make sure the expression is properly calculated.
@@ -380,15 +483,18 @@ class DiceRoller {
                 if(damageType == undefined && this.#pendingDamageType != undefined){
                     damageType = this.#pendingDamageType;
                 }
+                else if(damageType == undefined && diceRoll.damageType != undefined){
+                    damageType = diceRoll.damageType;
+                }
                 msgdata = {
                 player: diceRoll.name ? diceRoll.name : window.PLAYER_NAME,
                   img: diceRoll.avatarUrl ?  diceRoll.avatarUrl : window.PLAYER_IMG,
                   text: `<div class="tss-24rg5g-DiceResultContainer-Flex abovevtt-roll-container ${critClass}" title='${diceRoll.expression}<br>${roll.output.replace(regExpression, '')}'>
                             <div class="tss-kucurx-Result">
                                 <div class="tss-3-Other-ref tss-1o65fpw-Line-Title-Other">
-                                    <span class='aboveDiceOutput'>${rollTitle}: 
-                                        <span class='abovevtt-roll-${rollType.replace(' ', '-')}'>${damageType != undefined ? `${damageType} ` : ''}${rollType}</span>
-                                    </span>
+                                    <span class='aboveDiceOutput'>${rollTitle}</span>
+                                    :
+                                    <span class='abovevtt-roll-${rollType.replace(' ', '-')}'>${damageType != undefined ? `${damageType} ` : ''}${rollType}</span>
                                 </div>
                             </div>
                             <svg width="1" height="32" class="tss-10y9gcy-Divider"><path fill="currentColor" d="M0 0h1v32H0z"></path></svg>
@@ -429,6 +535,9 @@ class DiceRoller {
                 if(damageType == undefined && this.#pendingDamageType != undefined){
                     damageType = this.#pendingDamageType;
                     this.#pendingDamageType = undefined;
+                }
+                else if(damageType == undefined && diceRoll.damageType != undefined){
+                    damageType = diceRoll.damageType;
                 }
                 let rollData = {
                     roll: roll,
@@ -572,7 +681,7 @@ class DiceRoller {
                 let newExpression = `${diceRoll.expression}+${maxRoll}`;
                 this.roll(new DiceRoll(newExpression, diceRoll.action, diceRoll.rollType, diceRoll.name, diceRoll.avatarUrl, diceRoll.entityType, diceRoll.entityId), true, critRange, critType, undefined, damageType);
             }
-            else if(critType == 2){
+            else if(critType == 2 || critType == 3){
                 this.roll(new DiceRoll(diceRoll.expression, diceRoll.action, diceRoll.rollType, diceRoll.name, diceRoll.avatarUrl, diceRoll.entityType, diceRoll.entityId), true, critRange, critType, undefined, damageType);
             }
         }
@@ -781,10 +890,13 @@ class DiceRoller {
 
                 // now that we've replaced all the dice expressions with their results, we need to execute the expression to get the final result
                 let calculatedTotal = eval(replacedExpression);
+                if(this.#critAttackAction != undefined && this.#pendingCritType == 3){
+                    calculatedTotal = calculatedTotal * 2; 
+                }
                 console.log("pendingExpression: ", this.#pendingDiceRoll.expression, ", replacedExpression: ", replacedExpression, ", calculatedTotal:", calculatedTotal, ", replacedValues: ", replacedValues);
 
                 // we successfully processed the expression, now let's update the message object
-                r.diceNotationStr = this.#pendingDiceRoll.expression; // this doesn't appear to actually do anything
+                r.diceNotationStr = this.#pendingDiceRoll.expression; 
                 r.diceNotation.constant = this.#pendingDiceRoll.calculatedConstant;
                 r.result.constant = this.#pendingDiceRoll.calculatedConstant;
                 r.result.text = replacedExpression;
@@ -827,6 +939,10 @@ class DiceRoller {
             ddbMessage.avttExpression = this.#pendingDiceRoll.expression;
             ddbMessage.avttExpressionResult = this.#pendingDiceRoll.expressionResult;
             console.log("DiceRoll ddbMessage.avttExpression: ", ddbMessage.avttExpression);
+        }
+        if(this.#critAttackAction != undefined && this.#pendingCritType == 3){
+            ddbMessage.avttExpression = `2(${this.#pendingDiceRoll.expression})`;
+            ddbMessage.avttExpressionResult = `2(${this.#pendingDiceRoll.expressionResult})`;
         }
         ddbMessage.avttSpellSave = this.#pendingSpellSave;
         if(ddbMessage.data.rolls.some(d=> d.rollType.includes('damage')))

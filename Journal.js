@@ -653,8 +653,11 @@ class JournalManager{
 			
 			for(let source in window.ddbConfigJson.sources){
 				const currentSource = window.ddbConfigJson.sources[source]
+				if(currentSource.sourceURL == '')
+					continue;
 				const sourcetitle = currentSource.description;
 				const sourceValue = currentSource.sourceURL.replaceAll(/sources\//gi, '');
+
 				chapterImport.append($(`<option value='${sourceValue}'>${sourcetitle}</option>`));
 			}
 			
@@ -691,26 +694,28 @@ class JournalManager{
 				}
 				else{
 					self.chapters.push({
-						title: window.ddbConfigJson.sources[source].title,
+						title: window.ddbConfigJson.sources.find(d=> d.sourceURL.includes(source))?.description,
 						collapsed: false,
 						notes: [],
-					});
-					source = source.sourceURL.replaceAll(/sources\//gi, '');
-					window.ScenesHandler.build_chapters(source, function(){
-						for(let chapter in window.ScenesHandler.sources[source].chapters){
-							let new_noteid=uuid();
-							let new_note_title = window.ScenesHandler.sources[source].chapters[chapter].title;
-							self.notes[new_noteid]={
-								title: new_note_title,
-								text: "",
-								player: false,
-								plain: "",
-								ddbsource: window.ScenesHandler.sources[source].chapters[chapter].url
-							};
-							self.chapters[self.chapters.length-1].notes.push(new_noteid);
-						}
-						self.persist();
-						self.build_journal();
+					});	
+
+					window.ScenesHandler.build_adventures(function() {
+						window.ScenesHandler.build_chapters(source, function(){
+							for(let chapter in window.ScenesHandler.sources[source].chapters){
+								let new_noteid=uuid();
+								let new_note_title = window.ScenesHandler.sources[source].chapters[chapter].title;
+								self.notes[new_noteid]={
+									title: new_note_title,
+									text: "",
+									player: false,
+									plain: "",
+									ddbsource: window.ScenesHandler.sources[source].chapters[chapter].url
+								};
+								self.chapters[self.chapters.length-1].notes.push(new_noteid);
+							}
+							self.persist();
+							self.build_journal();
+						});
 					});
 				}
 			})
@@ -1146,7 +1151,7 @@ class JournalManager{
 			if($(self).hasClass('note-tooltip')){
 					let noteId = $(self).attr('data-id');
 					if(noteId.replace(/[-+*&<>]/gi, '') == $(self).text().replace(/[-+*&<>\s]/gi, '')){
-						noteId = Object.values(window.JOURNAL.notes).filter(d=> d.title?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')?.includes($(self).text()?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')))[0]?.id
+						noteId = Object.keys(window.JOURNAL.notes).filter(d=> window.JOURNAL.notes[d]?.title?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')?.includes($(self).text()?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')))[0]
 					}
 					
 				$(self).off('click.openNote').on('click.openNote', function(event){

@@ -198,7 +198,7 @@ function change_zoom(newZoom, x, y, reset = false) {
 	let pageX = Math.round(centerX * window.ZOOM - zoomCenterX) + window.VTTMargin;
 	let pageY = Math.round(centerY * window.ZOOM - zoomCenterY) + window.VTTMargin;
 
-	if($('#projector_zoom_lock.enabled > [class*="is-active"]').length>0)
+	if($('#projector_zoom_lock.enabled > [class*="is-active"]').length>0 && window.DM)
 		$(window).off('scroll.projectorMode')
 	
 
@@ -226,7 +226,7 @@ function change_zoom(newZoom, x, y, reset = false) {
 
 
 	$(".peerCursorPosition").css("transform", "scale(" + 1/window.ZOOM + ")");
-	if($('#projector_zoom_lock.enabled > [class*="is-active"]').length>0)
+	if($('#projector_zoom_lock.enabled > [class*="is-active"]').length>0 && window.DM)
 		debounce_scroll_event()
 	
 	
@@ -741,7 +741,11 @@ function change_sidbar_tab(clickedTab, isCharacterSheetInfo = false) {
 		// This only happens when `is_character_page() == true` and the user clicked the gamelog tab.
 		// This is an important distinction, because we switch to the gamelog tab when the user clicks info on their character sheet that causes details to be displayed instead of the gamelog.
 		// Since the user clicked the tab, we need to show the gamelog instead of any detail info that was previously shown.
-		$("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last").click()
+    let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button")
+    if(gameLogButton.length == 0){
+      gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
+    }
+    gameLogButton.click()
 	}
 }
 
@@ -1178,7 +1182,11 @@ function init_controls() {
 	$(".sidebar").css("height", "calc(100vh - 24px)");
 
 	$(".ct-sidebar__inner button[aria-label='Unlocked']").click(); // Click on the padlock icon  // This is safe to call multiple times
-	$("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last").click()
+	let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button")
+ 	if(gameLogButton.length == 0){
+   	gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
+ 	}
+ 	gameLogButton.click()
 
 	init_sidebar_tabs();
 	let sidebarControlsParent = is_characters_page() ? $(".ct-sidebar__inner>[class*='styles_controls']") : $(".sidebar__controls");
@@ -1986,7 +1994,11 @@ function init_character_page_sidebar() {
 	}
 
 	// Open the gamelog, and lock it open
-	$("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last").click()
+	let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button")
+	if(gameLogButton.length == 0){
+	  gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
+	}
+	gameLogButton.click()
 	$(".ct-sidebar__control--unlock").click();
 
 	$("#site-main").css({"display": "block", "visibility": "hidden"});
@@ -2064,8 +2076,11 @@ function init_character_page_sidebar() {
  * Any time they do that, we need to react to those changes.
  */
 function monitor_character_sidebar_changes() {
-
-	$("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last").click(function(event) {
+	let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button")
+	 if(gameLogButton.length == 0){
+	   gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
+	 }
+	gameLogButton.click(function(event) {
 		if (event.originalEvent !== undefined) {
 			// the user actually clicked the button. Make sure we switch tabs
 			$("#switch_gamelog").click();
@@ -2084,39 +2099,24 @@ function monitor_character_sidebar_changes() {
  * @returns
  */
 function inject_chat_buttons() {
-	if ($(".glc-game-log").find("#chat-text").length > 0) {
+	const gameLog = $(".glc-game-log");
+	if (gameLog.find("#chat-text").length > 0) {
 		// make sure we only ever inject these once. This gets called a lot on the character sheet which is intentional, but just in case we accidentally call it too many times, let's log it, and return
 		return;
 	}
-	// AGGIUNGI CHAT
-	// the text has to be up against the left for it to style correctly
-	$(".glc-game-log").append($(`<div class='chat-text-wrapper sidebar-hover-text' data-hover="Dice Rolling Format: /cmd diceNotation action  &#xa;
-'/r 1d20'&#xa;
-'/roll 1d4 punch:damage'&#xa;
-'/hit 2d20kh1+2 longsword ADV'&#xa;
-'/dmg 1d8-2 longsword'&#xa;
-'/save 2d20kl1 DEX DISADV'&#xa;
-'/skill 1d20+1d4 Thieves' Tools + Guidance'&#xa;
-Advantage: 2d20kh1 (keep highest)&#xa;
-Disadvantage: 2d20kl1 (keep lowest)&#xa;&#xa;
-'/w [playername] a whisper to playername'"><input id='chat-text' autocomplete="off" placeholder='Chat, /r 1d20+4..'></div>`));
-	
-	const languageSelect= $(`<select id='chat-language'></select>`)
-	const ignoredLanguages = ['All'];
 
-	const knownLanguages = get_my_known_languages();
-	for (const language of window.ddbConfigJson.languages) {
-		if (ignoredLanguages.includes(language.name))
-			continue;
-		if (!window.DM && !knownLanguages.includes(language.name))
-			continue;
-		const option = $(`<option value='${language.id}'>${language.name}</option>`)
-		languageSelect.append(option);
-	}
-
-	$(".glc-game-log").append(languageSelect);
-
-	$(".glc-game-log").append($(`
+	const chatTextWrapper = $(`<div class='chat-text-wrapper sidebar-hover-text' data-hover="Dice Rolling Format: /cmd diceNotation action  &#xa;
+		'/r 1d20'&#xa;
+		'/roll 1d4 punch:bludgeoning damage'&#xa;
+		'/hit 2d20kh1+2 longsword ADV'&#xa;
+		'/dmg 1d8-2 longsword:slashing'&#xa;
+		'/save 2d20kl1 DEX DISADV'&#xa;
+		'/skill 1d20+1d4 Thieves' Tools + Guidance'&#xa;
+		Advantage: 2d20kh1 (keep highest)&#xa;
+		Disadvantage: 2d20kl1 (keep lowest)&#xa;
+		'/w [playername] a whisper to playername'"><input id='chat-text' autocomplete="off" placeholder='Chat, /r 1d20+4..'></div>`
+	);
+  const diceRoller = $(`
 		<div class="dice-roller">
 			<div>
 				<img title="d4" alt="d4" height="40px" src="${window.EXTENSION_PATH + "assets/dice/d4.svg"}"/>
@@ -2140,7 +2140,21 @@ Disadvantage: 2d20kl1 (keep lowest)&#xa;&#xa;
 				<img title="d20" alt="d20" height="40px" src="${window.EXTENSION_PATH + "assets/dice/d20.svg"}"/>
 			</div>
 		</div>
-	`));
+	`)	
+	const languageSelect= $(`<select id='chat-language'></select>`)
+	const ignoredLanguages = ['All'];
+
+	const knownLanguages = get_my_known_languages();
+	for (const language of window.ddbConfigJson.languages) {
+		if (ignoredLanguages.includes(language.name))
+			continue;
+		if (!window.DM && !knownLanguages.includes(language.name))
+			continue;
+		const option = $(`<option value='${language.id}'>${language.name}</option>`)
+		languageSelect.append(option);
+	}
+
+	gameLog.append(chatTextWrapper, languageSelect, diceRoller);
 
 	$(".dice-roller > div img").on("click", function(e) {
 		if ($(".dice-toolbar__dropdown").length > 0 && !window.EXPERIMENTAL_SETTINGS['rpgRoller']) {
@@ -2667,7 +2681,11 @@ function init_ui() {
 	// Function separated so it can be dis/enabled
 	function mousemove(m) {
 		if (curDown) {
-			window.scrollBy(curXPos - m.pageX, curYPos - m.pageY)
+			let scrollOptions = {
+				left: window.scrollX + curXPos - m.pageX,
+				top: window.scrollY + curYPos - m.pageY
+			}
+			requestAnimationFrame(function(){window.scrollTo(scrollOptions)});
 		}
 	}
 

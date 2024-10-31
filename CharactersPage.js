@@ -440,99 +440,7 @@ function convertToRPGRoller(){
     });
 }
 
-function getRollData(rollButton){
-    let expression = '';
-    let rollType = 'custom';
-    let rollTitle = 'AboveVTT';
-    if($(rollButton).find('.ddbc-damage__value').length>0){
-      expression = $(rollButton).find('.ddbc-damage__value').text().replace(/\s/g, '');
-    }
-    else if($(rollButton).find('.ddbc-signed-number').length>0){
-      expression = `1d20${$(rollButton).find('.ddbc-signed-number').attr('aria-label').replace(/\s/g, '')}`;
-    }
-    else if($(rollButton).find('.ddbc-healing-icon').length > 0){
-      expression = $(rollButton).text().replace(/\s/g, '');
-    }
-    else if($(rollButton).find('[class*="styles_numberDisplay"]').length > 0){
-      expression = `1d20${$(rollButton).text().replace(/\s/g, '')}`;
-    }
-    else if($(rollButton).hasClass('avtt-roll-button')){
-      expression = `${$(rollButton).attr('data-exp')}${$(rollButton).attr('data-mod')}`
-      rollTitle = $(rollButton).attr('data-actiontype');
-      rollType = $(rollButton).attr('data-rolltype');;
-    }
-    if($(rollButton).hasClass('avtt-roll-formula-button')){
-      expression = DiceRoll.fromSlashCommand($(rollButton).attr('data-slash-command')).expression;
-      let title = $(rollButton).attr('title').split(':');
-      if(title != undefined && title[0] != undefined){
-        rollTitle = title[0];
-      }
-      if(title != undefined && title[1] != undefined){
-        rollType = title[1];
-      }  
-    }
-    if(expression == ''){
-      return {
-        expression: undefined,
-      }
-    }
 
-    let roll = new rpgDiceRoller.DiceRoll(expression); 
-    let regExpression = new RegExp(`${expression.replace(/[+-]/g, '\\$&')}:\\s`);
-
-    if($(rollButton).parents(`[class*='saving-throws-summary']`).length > 0){
-      rollType = 'save'
-      rollTitle = $(rollButton).closest(`.ddbc-saving-throws-summary__ability`).find('.ddbc-saving-throws-summary__ability-name abbr').text();
-    } else if($(rollButton).parents(`[class*='ability-summary']`).length > 0){
-      rollType = 'check'
-      rollTitle = $(rollButton).closest(`.ddbc-ability-summary`).find('.ddbc-ability-summary__abbr').text();
-    } else if($(rollButton).parents(`[class*='skills__col']`).length > 0){
-      rollType = 'check';
-      rollTitle = $(rollButton).closest(`.ct-skills__item`).find('.ct-skills__col--skill').text();
-    } else if($(rollButton).parents(`[class*='initiative-box']`).length > 0 || $(rollButton).parents(`.ct-combat__summary-group--initiative`).length > 0){
-      rollTitle = 'Initiative';
-      rollType = 'roll'
-    } else if($(rollButton).parents(`[class*='__damage']`).length > 0){
-      rollType = 'damage'
-      if($(rollButton).parents(`[class*='damage-effect__healing']`).length > 0){
-        rollType = 'heal'
-      }
-    } else if($(rollButton).parents(`[class*='__tohit']`).length > 0){
-      rollType = 'to hit'
-    } 
-    if(rollType == 'damage' || rollType == 'attack' || rollType == 'to hit' || rollType == 'heal'){
-      if($(rollButton).parents(`.ddbc-combat-attack--spell`).length > 0){
-        rollTitle = $(rollButton).closest(`.ddbc-combat-attack--spell`).find('[class*="styles_spellName"]').text();
-      }
-      else if($(rollButton).parents(`.ct-spells-spell`).length > 0){
-        rollTitle = $(rollButton).closest(`.ct-spells-spell`).find('.ct-spells-spell__label').text();
-      }
-      else if($(rollButton).parents(`.ddbc-combat-action-attack-weapon`).length > 0){
-        rollTitle = $(rollButton).closest(`.ddbc-combat-action-attack-weapon`).find('.ddbc-action-name').text();
-      }
-      else if($(rollButton).parents(`.ddbc-combat-attack--item`).length > 0){
-        rollTitle = $(rollButton).closest(`.ddbc-combat-attack--item`).find('.ddbc-item-name').text();
-      }
-      else if($(rollButton).parents(`.ddbc-combat-action-attack-general`).length > 0){
-        rollTitle = $(rollButton).closest(`.ddbc-combat-action-attack-general`).find('.ddbc-action-name').text();
-      }
-    }
-    const modifier = (roll.rolls.length > 1 && expression.match(/[+-]\d*$/g, '')) ? `${roll.rolls[roll.rolls.length-2]}${roll.rolls[roll.rolls.length-1]}` : '';
-
-    const followingText = $(rollButton)[0].nextSibling?.textContent?.trim()?.split(' ')[0]
-    const damageType = followingText && window.ddbConfigJson.damageTypes.some(d => d.name.toLowerCase() == followingText.toLowerCase()) ? followingText : undefined     
-
-  
-    return {
-      roll: roll,
-      expression: expression,
-      rollType: rollType,
-      rollTitle: rollTitle,
-      modifier: modifier,
-      regExpression: regExpression,
-      damageType: damageType
-    }
-}
 
 /** actions to take on the character sheet when AboveVTT is NOT running */
 function init_character_sheet_page() {
@@ -695,7 +603,7 @@ function observe_character_sheet_changes(documentToObserve) {
       }
     }
 
-    if(is_abovevtt_page()){
+    if(is_abovevtt_page() || window.self != window.top){
       const icons = documentToObserve.find(".ddbc-note-components__component--aoe-icon:not('.above-vtt-visited')");
       if (icons.length > 0) {
         icons.wrap(function() {
@@ -777,9 +685,10 @@ function observe_character_sheet_changes(documentToObserve) {
         $(this).toggleClass('disadvantageHover', false)
       })
       spells.off('click.multiroll').on('click.multiroll', function(e) {
-        e.stopPropagation();
-        $(this).closest('.ct-content-group').find(`.ct-slot-manager [aria-checked='false']`).first().click();
 
+        if($(this).children('button').length == 0){
+          e.stopPropagation();
+        }
         let rollButtons = $(this).parent().find(`.integrated-dice__container:not('.avtt-roll-formula-button'):not('.above-vtt-visited'):not('.above-vtt-dice-visited'):not('.above-aoe'), .integrated-dice__container.abovevtt-icon-roll`);  
         let spellSave = $(this).parent().find(`.ct-spells-spell__save`);   
         let spellSaveText;
@@ -930,6 +839,7 @@ function observe_character_sheet_changes(documentToObserve) {
               options:[
                 { value: "0", label: "Double damage dice", description: "Doubles damage dice for crits." },
                 { value: "1", label: "Perfect Crits", description: "Rolls the original dice and adds a max roll" },
+                { value: "3", label: "Double total damage", description: "Rolls the original dice adds modifier then doubles it" },
                 { value: "2", label: "Manual", description: "Rolls are not modified based on crit" },
                 ],
               defaultValue: "0"
@@ -1083,6 +993,7 @@ function observe_character_sheet_changes(documentToObserve) {
           
           let damageTypeText = window.diceRoller.getDamageType(rollButtons[i]);
           let diceRoll;
+
           if(data.expression != undefined){
             if (/^1d20[+-]([0-9]+)/g.test(data.expression)) {
                if(e.altKey){
@@ -1105,6 +1016,8 @@ function observe_character_sheet_changes(documentToObserve) {
             else{
               diceRoll = new DiceRoll(data.expression, data.rollTitle, data.rollType)
             }
+            if(damageTypeText == undefined && data.damageType != undefined)
+              damageTypeText = data.damageType
             window.diceRoller.roll(diceRoll, true, window.CHARACTER_AVTT_SETTINGS.critRange ? window.CHARACTER_AVTT_SETTINGS.critRange : 20, window.CHARACTER_AVTT_SETTINGS.crit ? window.CHARACTER_AVTT_SETTINGS.crit : 2, spellSaveText, damageTypeText);
           }
         }   
@@ -1274,7 +1187,11 @@ function observe_character_sheet_changes(documentToObserve) {
    
         if((mutationTarget.hasClass('.ajs-ok:not(.ajs-hidden)') || mutationTarget.find('.ajs-ok:not(.ajs-hidden)').length>0) && $('.alertify ~ div.alertify:not(.ajs-hidden):last-of-type').length>0 && !['Beyond 20 Settings', 'Beyond 20 Quick Settings', 'Beyond20 Hotkey'].includes($('.alertify ~ div.alertify:not(.ajs-hidden):last-of-type .ajs-header').text())){
            $('.alertify ~ div.alertify:not(.ajs-hidden):last-of-type .ajs-button.ajs-ok').click();
-           $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last").click()
+           let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button")
+            if(gameLogButton.length == 0){
+              gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
+            }
+            gameLogButton.click()
         }
         if (($(mutationTarget).hasClass('ct-sidebar__inner') || $(mutation.addedNodes[0]).hasClass('ct-creature-pane')) && mutationTarget.find('.ct-creature-pane').length>0) {
           scan_player_creature_pane(mutationTarget);
@@ -1286,7 +1203,7 @@ function observe_character_sheet_changes(documentToObserve) {
             if(mutationTarget.hasClass('ct-sidebar__pane-content')){
               inject_sidebar_send_to_gamelog_button(mutationTarget.children('div:first-of-type'));
             }else{
-              inject_sidebar_send_to_gamelog_button(mutationTarget.find('.ct-sidebar__inner [class*="styles_content"]>div:first-of-type'));
+              inject_sidebar_send_to_gamelog_button(mutationTarget.find('.ct-sidebar__inner [class*="styles_pane"]>[class*="styles_content"]>div:first-of-type'));
             }
             
           }
@@ -1494,7 +1411,7 @@ function set_window_name_and_image(callback) {
  * If AboveVTT is running, the button will be an exit button */
 function inject_join_exit_abovevtt_button() {
   if (!is_characters_page() || window.self != window.top) return; // wrong page, dude
-  if ($(".ddbc-campaign-summary").length === 0) return;     // we don't have any campaign data
+  if ($(".ddbc-campaign-summary, [class*='styles_campaignSummary']").length === 0) return;     // we don't have any campaign data
   if ($("#avtt-character-join-button").length > 0) return;  // we already injected a button
 
   const desktopPosition = $(".ct-character-sheet-desktop > .ct-character-header-desktop > .ct-character-header-desktop__group--gap");
