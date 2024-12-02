@@ -156,7 +156,12 @@ class DDBApi {
       console.log("DDBApi.deleteAboveVttEncounters delete encounter response:", response.status);
       if(response.status == 401){
         newFailed.push(encounter.id)
-        localStorage.setItem('avttFailedDelete', JSON.stringify(newFailed));
+        try{
+          localStorage.setItem('avttFailedDelete', JSON.stringify(newFailed));
+        }
+        catch(e){
+          console.warn('localStorage avttFailedDelete Failed', e)
+        }
       }    
     }
   }
@@ -257,8 +262,8 @@ class DDBApi {
       console.warn("fetchCampaignCharacterIds caught an error trying to collect ids from fetchActiveCharacters", error);
     }
     try {
-      const activeShortCharacters = await DDBApi.fetchCampaignCharacters(campaignId);
-      activeShortCharacters.forEach(c => {
+      window.playerUsers = await DDBApi.fetchCampaignCharacters(campaignId);
+      window.playerUsers.forEach(c => {
         if (!characterIds.includes(c.id)) {
           characterIds.push(c.id);
         }
@@ -266,6 +271,8 @@ class DDBApi {
     } catch (error) {
       console.warn("fetchCampaignCharacterIds caught an error trying to collect ids from fetchActiveCharacters", error);
     }
+    let playerUser = window.playerUsers.filter(d=> d.id == window.PLAYER_ID)[0]?.userId;
+    window.myUser = playerUser ? playerUser : 'THE_DM'; 
     return characterIds;
   }
 

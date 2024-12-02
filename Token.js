@@ -1421,6 +1421,13 @@ class Token {
 				const conditionContainer = $("<div class='dnd-condition condition-container' />");
 				const symbolImage = $("<img class='condition-img' src='/content/1-0-1449-0/skins/waterdeep/images/icons/conditions/" + conditionSymbolName + ".svg'/>");
 				const conditionDescription = isExhaustion ? CONDITIONS.Exhaustion : CONDITIONS[conditionName];
+
+				if(conditionDescription == undefined){ // in case someone selected a condition from a translated character sheet remove it from the conditions array.
+					this.options.conditions.splice(i, 1);
+					i = i != this.options.conditions.length-1 ? i-1: i;	
+					continue;
+				}
+
 				conditionContainer.css('width', symbolSize + "px");
 				conditionContainer.css("height", symbolSize + "px");
 				conditionContainer.css("position", "relative");
@@ -1701,7 +1708,7 @@ class Token {
 
 							
 				let flyoutLocation = convert_point_from_map_to_view(parseInt(this.options.left), parseInt(this.options.top))
-		
+				const noteId = this.options.id;
 				let hoverNoteTimer;
 				conditionContainer.on({
 					'mouseover': function(e){
@@ -1711,9 +1718,34 @@ class Token {
 					            flyout.addClass('note-flyout');
 					            const tooltipHtml = $(noteHover);
 								window.JOURNAL.translateHtmlAndBlocks(tooltipHtml);	
-								window.JOURNAL.add_journal_roll_buttons(tooltipHtml);
+								add_journal_roll_buttons(tooltipHtml);
 								window.JOURNAL.add_journal_tooltip_targets(tooltipHtml);
 								add_stat_block_hover(tooltipHtml);
+
+								$(tooltipHtml).find('.add-input').each(function(){
+								    let numberFound = $(this).attr('data-number');
+								    const spellName = $(this).attr('data-spell');
+								    const remainingText = $(this).hasClass('each') ? '' : `${spellName} slots remaining`
+								    const track_ability = function(key, updatedValue){	    	
+										if (window.JOURNAL.notes[noteId].abilityTracker === undefined) {
+											window.JOURNAL.notes[noteId].abilityTracker = {};
+										}
+										const asNumber = parseInt(updatedValue); 
+										window.JOURNAL.notes[noteId].abilityTracker[key] = asNumber;
+										window.JOURNAL.persist();
+										debounceSendNote(noteId, window.JOURNAL.notes[noteId])
+							    	}
+								    if (window.JOURNAL.notes[noteId].abilityTracker?.[spellName]>= 0){
+							    		numberFound = window.JOURNAL.notes[noteId].abilityTracker[spellName]
+							    	} 
+							    	else{
+								    	track_ability(spellName, numberFound)
+								    }
+
+								    let input = createCountTracker(window.JOURNAL.notes[noteId], spellName, numberFound, remainingText, "", track_ability);
+								    $(this).find('p').remove();
+								    $(this).after(input)
+							    })
 					            flyout.append(tooltipHtml);
 					            let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
 					            sendToGamelogButton.css({ "float": "right" });
@@ -1822,9 +1854,15 @@ class Token {
 
 			/* UPDATE COMBAT TRACKER */
 			this.update_combat_tracker()
-
-			let imageScale = (this.options.imageSize != undefined) ? this.options.imageSize : 1;
+			const underdarknessDivisor = this.options.underDarkness && !this.options.exampleToken ? parseInt(window.CURRENT_SCENE_DATA.scale_factor) : 1;
+			const imageScale = (this.options.imageSize != undefined) ? this.options.imageSize : 1;
+			const imageOffsetX = this.options.offset?.x;
+			const imageOffsetY = this.options.offset?.y;
+			const imageOpacity = (this.options.imageOpacity != undefined) ? this.options.imageOpacity : 1;
+			const imageZoom = this.options.imageZoom != undefined ? parseFloat(this.options.imageZoom): undefined;
+			const newInset = imageZoom != undefined ? 49.5 * imageZoom/100 : undefined;
 			let rotation = 0;
+			
 			if (this.options.rotation != undefined) {
 				rotation = this.options.rotation;
 			}
@@ -1873,8 +1911,16 @@ class Token {
 
 				old.find(".token-image").css("transition", "max-height 0.2s linear, max-width 0.2s linear, transform 0.2s linear")
 				old.find(".token-image").css("transform", "scale(var(--token-scale)) rotate(var(--token-rotation))");
-				old.css("--token-rotation", rotation+"deg");
-				old.css("--token-scale", imageScale);
+				old.css({
+					"--token-scale": imageScale,
+					"--token-rotation": `${rotation}deg`,
+					"--offsetX": imageOffsetX != undefined ? `${parseFloat(imageOffsetX) * this.options.gridSquares}px` : '0px',
+					"--offsetY": imageOffsetY != undefined ? `${parseFloat(imageOffsetY) * this.options.gridSquares}px` : '0px',
+					"--image-opacity": `${imageOpacity}`,
+					"--view-box": `inset(${newInset}% ${newInset}% ${newInset}% ${newInset}%)`, // will be used for object-view-box when supported in firefox
+					"--image-zoom": imageZoom == undefined ? ``: `${imageZoom+100}%` //adjust from viewbox to background-size property due to firefox not supporting it
+
+				});
 				$(`.isAoe[data-id='${this.options.id}']:not(.token)`).css({
 					'--token-rotation': `${rotation}deg`,
 					'--token-scale': imageScale
@@ -1977,7 +2023,7 @@ class Token {
 								video = true;
 							} 
 							else{
-								tokenImage = $("<img style='transform:scale(var(--token-scale)) rotate(var(--token-rotation))' class='"+imgClass+"'/>");
+								tokenImage = $("<div data-div-image='true' style='transform:scale(var(--token-scale)) rotate(var(--token-rotation))' class='"+imgClass+" div-token-image'/>");
 							}
 							oldImage = tokenImage;
 							old.append(tokenImage);
@@ -2172,7 +2218,12 @@ class Token {
 								'opacity': this.options.hidden ? '0.5' : '1',
 								'--hp-percentage': `${this.hpPercentage}%`,
 								"--token-border-width": tokenBorderWidth,
-								'border-width': old.find('.token-image').css('border-width')
+								'border-width': old.find('.token-image').css('border-width'),
+			    				"--offsetX": old.css('--offsetX'),
+			    				"--offsetY": old.css('--offsetY'),
+								"--image-opacity": old.css('--image-opacity'),
+								"--view-box": old.css('--view-box'),
+								"--image-zoom": old.css('--image-zoom')
 							})
 					        tokenClone.attr('data-notatoken', `notatoken_${this.options.id}`);
 					        tokenClone.children('div:not(.base):not(.token-image):not(.hpvisualbar):not(.dead)').remove();    
@@ -2199,7 +2250,12 @@ class Token {
 								'opacity': this.options.hidden ? '0.5' : '1',
 								'--hp-percentage': `${this.hpPercentage}%`,
 								"--token-border-width": tokenBorderWidth,
-								'border-width': old.find('.token-image').css('border-width')
+								'border-width': old.find('.token-image').css('border-width'),
+			    				"--offsetX": old.css('--offsetX'),
+			    				"--offsetY": old.css('--offsetY'),
+								"--image-opacity": old.css('--image-opacity'),
+								"--view-box": old.css('--view-box'),
+								"--image-zoom": old.css('--image-zoom')
 							})
 							copyToken.children('div:not(.base):not(.token-image):not(.hpvisualbar):not(.dead)').remove()
 							copyToken.toggleClass('lockedToken', this.options.locked==true)
@@ -2337,8 +2393,14 @@ class Token {
 					if(this.options.legacyaspectratio == false) {
 						imgClass = 'token-image preserve-aspect-ratio';
 					}
-					let rotation = (this.options.rotation != undefined) ? this.options.imageSize : 0;
-					let imageScale = (this.options.imageSize != undefined) ? this.options.imageSize : 1;
+					const underdarknessDivisor = this.options.underDarkness && !this.options.exampleToken ? parseInt(window.CURRENT_SCENE_DATA.scale_factor) : 1;
+					const rotation = (this.options.rotation != undefined) ? this.options.imageSize : 0;
+					const imageScale = (this.options.imageSize != undefined) ? this.options.imageSize : 1;
+					const imageOffsetX = this.options.offset?.x;
+					const imageOffsetY = this.options.offset?.y;
+					const imageOpacity = (this.options.imageOpacity != undefined) ? this.options.imageOpacity : 1;
+					const imageZoom = this.options.imageZoom != undefined ? parseFloat(this.options.imageZoom) : undefined;
+					const newInset = imageZoom != undefined ? 49.5 * imageZoom/100 : undefined;
 					this.options.imgsrc = update_old_discord_link(this.options.imgsrc) // this might be able to be removed in the future - it's to update maps with tokens already on them
 					let video = false;
 					if(this.options.videoToken == true || ['.mp4', '.webm','.m4v'].some(d => this.options.imgsrc.includes(d))){
@@ -2346,11 +2408,18 @@ class Token {
 						video = true;
 					} 
 					else{
-						tokenImage = $("<img style='transform:scale(var(--token-scale)) rotate(var(--token-rotation))' class='"+imgClass+"'/>");
+						tokenImage = $("<div style='transform:scale(var(--token-scale)) rotate(var(--token-rotation))' class='"+imgClass+" div-token-image'/>");
 					}
 					
-					tok.css("--token-scale", imageScale);
-					tok.css("--token-rotation", `${rotation}deg`);
+					tok.css({
+						"--token-scale": imageScale,
+						"--token-rotation": `${rotation}deg`,
+						"--offsetX": imageOffsetX != undefined ? `${parseFloat(imageOffsetX) * this.options.gridSquares}px` : '0px',
+						"--offsetY": imageOffsetY != undefined ? `${parseFloat(imageOffsetY) * this.options.gridSquares}px` : '0px',
+						"--image-opacity": `${imageOpacity}`,
+						"--view-box": `inset(${newInset}% ${newInset}% ${newInset}% ${newInset}%)`,
+						"--image-zoom": imageZoom == undefined ? ``: `${imageZoom+100}%` //adjust from viewbox to background-size property due to firefox not supporting it
+					});
 					if(!(this.options.square)){
 						tokenImage.addClass("token-round");
 					}
@@ -2373,8 +2442,11 @@ class Token {
 
 				} else {
 					tokenImage = build_aoe_token_image(this, imageScale, rotation)
-					tok.css("--token-scale", imageScale);
-					tok.css("--token-rotation", `${rotation}deg`);
+
+					tok.css({
+						"--token-scale": imageScale,
+						"--token-rotation": `${rotation}deg`,
+					});
 					tok.toggleClass("isAoe", true);
 					if(this.isLineAoe()){
 						tok.toggleClass('lineAoe', true)
@@ -3254,7 +3326,11 @@ function default_options() {
 		light2: {
 			feet: "0",
 			color: "rgba(142, 142, 142, 1)"
-		}		
+		},		
+		offset: {
+			x:0,
+			y:0
+		}
 	};
 }
 
@@ -3305,10 +3381,10 @@ function snap_point_to_grid(mapX, mapY, forceSnap = false, tinyToken = false) {
 	}
 }
 
-function convert_point_from_view_to_map(pageX, pageY, forceNoSnap = false) {
+function convert_point_from_view_to_map(pageX, pageY, forceNoSnap = false, ignoreOffset = false) {
 	// adjust for map offset and zoom
-	const startX = window.CURRENT_SCENE_DATA.offsetx;
-	const startY = window.CURRENT_SCENE_DATA.offsety;
+	const startX = ignoreOffset == false ? window.CURRENT_SCENE_DATA.offsetx : 0;
+	const startY = ignoreOffset == false ? window.CURRENT_SCENE_DATA.offsety : 0;
 	let mapX = ((pageX - window.VTTMargin) * (1.0 / window.ZOOM)) - startX;
 	let mapY = ((pageY - window.VTTMargin) * (1.0 / window.ZOOM)) - startY;
 	if (forceNoSnap === true) {
@@ -3728,10 +3804,11 @@ function setTokenAuras (token, options) {
 	const outerAuraSize = options.aura2.feet.length > 0 ? (options.aura2.feet / parseInt(window.CURRENT_SCENE_DATA.fpsq)) * window.CURRENT_SCENE_DATA.hpps/window.CURRENT_SCENE_DATA.scale_factor  : 0;
 	if ((innerAuraSize > 0 || outerAuraSize > 0) && options.auraVisible) {
 		// use sizeWidth and sizeHeight???
-		const totalAura = innerAuraSize + outerAuraSize;
+		
 		const auraRadius = innerAuraSize ? (innerAuraSize + (options.size/window.CURRENT_SCENE_DATA.scale_factor / 2)) : 0;
+		const totalAura = auraRadius + outerAuraSize;
 		const auraBg = `radial-gradient(${options.aura1.color} ${auraRadius}px, ${options.aura2.color} ${auraRadius}px ${totalAura}px);`;
-		const totalSize = parseInt(options.size)/window.CURRENT_SCENE_DATA.scale_factor+ (2 * totalAura);
+		const totalSize = (2 * totalAura);
 		const absPosOffset = (options.size/window.CURRENT_SCENE_DATA.scale_factor - totalSize) / 2;
 		const tokenId = options.id.replaceAll("/", "").replaceAll('.', '');
 		const showAura = (token.parent().parent().find("#aura_" + tokenId).length > 0) ? token.parent().parent().find("#aura_" + tokenId).css('display') : '';
@@ -3743,8 +3820,8 @@ function setTokenAuras (token, options) {
 		
 
 
-		const auraStyles = `width:${totalSize }px;
-							height:${totalSize }px;
+		const auraStyles = `width:${totalSize}px;
+							height:${totalSize}px;
 							left:${absPosOffset}px;
 							top:${absPosOffset}px;
 							background-image:${auraBg};
@@ -3836,10 +3913,11 @@ function setTokenLight (token, options) {
 		}
 
 		// use sizeWidth and sizeHeight???
-		const totallight = innerlightSize + outerlightSize;
+		
 		const lightRadius = innerlightSize ? (innerlightSize + (optionsSize / 2)) : 0;
+		const totallight = lightRadius + outerlightSize;
 		const lightBg = `radial-gradient(${options.light1.daylight ? 'var(--daylight-color)' : options.light1.color} ${lightRadius}px, ${options.light2.daylight ? 'var(--daylight-color)' : options.light2.color} ${lightRadius}px ${totallight}px);`;
-		const totalSize = (totallight == 0) ? 0 : optionsSize + (2 * totallight);
+		const totalSize = (totallight == 0) ? 0 : (2 * totallight);
 		const absPosOffset = (optionsSize - totalSize) / 2;
 		
 		const color1Values = options?.light1?.color ? options.light1.color.replace(/[a-zA-Z\(\)\s]/g, '').split(',').splice(0, 3).join() : '255, 255, 255';
@@ -4358,7 +4436,7 @@ async function do_draw_selected_token_bounding_box() {
 			grabber2.css('border-radius', `${Math.ceil(grabberSize / 2)}px`); // make it round
 			grabber2.css('padding', '2px');
 			grabber2.css('cursor', 'move');
-			if(window.CURRENTLY_SELECTED_TOKENS.length > 1)
+			if(window.CURRENTLY_SELECTED_TOKENS.length > 1 || (window.CURRENTLY_SELECTED_TOKENS.length == 1 && window.TOKEN_OBJECTS[window.CURRENTLY_SELECTED_TOKENS[0]].isAoe()))
 				$("#tokens").append(grabber2);
 
 			// handle eye grabber dragging
@@ -4427,16 +4505,25 @@ async function do_draw_selected_token_bounding_box() {
 
 
 					$('.tokenselected').wrap('<div class="grouprotate"></div>');
+
+					
+					
 					for (let i = 0; i < window.CURRENTLY_SELECTED_TOKENS.length; i++) {
 						let id = window.CURRENTLY_SELECTED_TOKENS[i];
 						let token = window.TOKEN_OBJECTS[id];
+						$(`#scene_map_container .token[data-id='${id}']`).remove();
+						
+					
+						let sceneToken = $(`div.token[data-id='${id}']`)
+
+
 						let tokenImageClientPosition = $(`div.token[data-id='${id}']>.token-image`)[0].getBoundingClientRect();
 						let tokenImagePosition = $(`div.token[data-id='${id}']>.token-image`).position();
 						let tokenImageWidth = (tokenImageClientPosition.width) / (window.ZOOM);
 						let tokenImageHeight = (tokenImageClientPosition.height) / (window.ZOOM);
-						let tokenTop = ($(`div.token[data-id='${id}']`).position().top + tokenImagePosition.top) / (window.ZOOM);
+						let tokenTop = (sceneToken.position().top + tokenImagePosition.top) / (window.ZOOM);
 						let tokenBottom = tokenTop + tokenImageHeight;
-						let tokenLeft = ($(`div.token[data-id='${id}']`).position().left  + tokenImagePosition.left) / (window.ZOOM);
+						let tokenLeft = (sceneToken.position().left  + tokenImagePosition.left) / (window.ZOOM);
 						let tokenRight = tokenLeft + tokenImageWidth;
 						
 						furthest_coord.top  = (furthest_coord.top  == undefined) ? tokenTop : Math.min(furthest_coord.top, tokenTop)
@@ -4446,8 +4533,29 @@ async function do_draw_selected_token_bounding_box() {
 						furthest_coord.bottom  = (furthest_coord.bottom  == undefined) ? tokenBottom : Math.max(furthest_coord.bottom , tokenBottom)
 					}
 
-					centerPointRotateOrigin.x = (furthest_coord.left + furthest_coord.right)/2;
-					centerPointRotateOrigin.y = (furthest_coord.top + furthest_coord.bottom)/2;
+					if(window.CURRENTLY_SELECTED_TOKENS.length == 1 && window.TOKEN_OBJECTS[window.CURRENTLY_SELECTED_TOKENS[0]].isAoe()){
+						let id = window.CURRENTLY_SELECTED_TOKENS[0];
+						let rayAngle = 90;
+						let ray = new Ray({x: (furthest_coord.left + furthest_coord.right)/2, y: (furthest_coord.top + furthest_coord.bottom)/2}, degreeToRadian(parseFloat($(`div.token[data-id='${id}']`).css('--token-rotation')) % 360 - rayAngle));	
+						let dir = ray.dir;
+						let tokenWidth = window.TOKEN_OBJECTS[id].sizeWidth();
+						let tokenHeight = window.TOKEN_OBJECTS[id].sizeHeight();
+						let widthAdded = tokenHeight;
+						
+						centerPointRotateOrigin.x = (furthest_coord.left + furthest_coord.right)/2 + (widthAdded*dir.x/2);
+						centerPointRotateOrigin.y = (furthest_coord.top + furthest_coord.bottom)/2 + (widthAdded*dir.y/2);
+					}
+					else{
+						centerPointRotateOrigin.x = (furthest_coord.left + furthest_coord.right)/2;
+						centerPointRotateOrigin.y = (furthest_coord.top + furthest_coord.bottom)/2;	
+					}
+						
+						
+
+					
+
+
+				
 					$('.grouprotate').css('transform-origin', `${centerPointRotateOrigin.x}px ${centerPointRotateOrigin.y}px` )
 
 					// the drag has started so remove the bounding boxes, but not the grabber
@@ -4466,6 +4574,10 @@ async function do_draw_selected_token_bounding_box() {
 					};
 
 					angle = rotation_towards_cursor_from_point(centerPointRotateOrigin.x, centerPointRotateOrigin.y, ui.position.left, ui.position.top, event.shiftKey)
+					if(window.CURRENTLY_SELECTED_TOKENS.length == 1 && window.TOKEN_OBJECTS[window.CURRENTLY_SELECTED_TOKENS[0]].isAoe()){
+						let id = window.CURRENTLY_SELECTED_TOKENS[0];
+						angle = angle-parseFloat($(`.token[data-id='${id}']`).css('--token-rotation')); // account for group rotation grabber being at corner
+					}
 					$(`.grouprotate`).css({
 						'rotate': `${angle}deg`		
 					});
@@ -4478,12 +4590,28 @@ async function do_draw_selected_token_bounding_box() {
 						let id = window.CURRENTLY_SELECTED_TOKENS[i];
 						let token = window.TOKEN_OBJECTS[id];
 
-						currentplace = $(`.token[data-id='${id}']`).offset();
+						let sceneToken = $(`#tokens .token[data-id='${id}']`)
 
-						newCoords = convert_point_from_view_to_map(currentplace.left, currentplace.top)
+						window.TOKEN_OBJECTS[id].options.rotation = angle + parseFloat(sceneToken.css('--token-rotation'))
+						
+						
+						if(window.CURRENTLY_SELECTED_TOKENS.length > 1){
+							sceneToken.css({
+								'rotate': `-${angle%360}deg`
+							});
+							currentplace = sceneToken.offset();
+						}
+						else{
+							sceneToken.css({
+								'rotate': `-${(angle+parseFloat(sceneToken.css('--token-rotation')))%360}deg`
+							});
+							currentplace = sceneToken.find('.token-image').offset();
+						}
+						
+						newCoords = convert_point_from_view_to_map(currentplace.left, currentplace.top, true, true)
 						window.TOKEN_OBJECTS[id].options.left = `${newCoords.x}px`;
 						window.TOKEN_OBJECTS[id].options.top = `${newCoords.y}px`;
-						window.TOKEN_OBJECTS[id].options.rotation = angle + parseInt($(`.token[data-id='${id}']`).css('--token-rotation'));
+						
 					
 					}
 
@@ -4491,9 +4619,9 @@ async function do_draw_selected_token_bounding_box() {
 					for (let i = 0; i < window.CURRENTLY_SELECTED_TOKENS.length; i++) {
 						let id = window.CURRENTLY_SELECTED_TOKENS[i];
 						let token = window.TOKEN_OBJECTS[id];
-						
+						token.selected = true;
 						token.place_sync_persist();
-						$(`.token[data-id='${id}']`).addClass('tokenselected')
+					
 						draw_selected_token_bounding_box();
 					}			
 				},

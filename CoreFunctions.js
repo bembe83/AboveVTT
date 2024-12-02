@@ -129,43 +129,50 @@ function monitor_console_logs() {
     });
   }
 }
-async function openDB() {
-  const DBOpenRequest = await indexedDB.open(`AboveVTT-${window.gameId}`, 2); // version 2
+function openDB() {
   
-  DBOpenRequest.onsuccess = (e) => {
-    window.gameIndexedDb = DBOpenRequest.result;
-  };
-  DBOpenRequest.onerror = (e) => {
-    console.warn(e);
-  };
-  DBOpenRequest.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if(!db.objectStoreNames?.contains('exploredData')){
-        const objectStore = db.createObjectStore("exploredData", { keyPath: "exploredId" });
-      }
-      if(!db.objectStoreNames?.contains('journalData')){
-        const objectStore2 = db.createObjectStore("journalData", { keyPath: "journalId" });
-      }
-  };
+  let promises =[];
+  promises.push(new Promise(async (resolve, reject) => {
+      const DBOpenRequest = await indexedDB.open(`AboveVTT-${window.gameId}`, 2); // version 2
+      DBOpenRequest.onsuccess = (e) => {       
+        resolve(DBOpenRequest.result);
+      };
+      DBOpenRequest.onerror = (e) => {
+        console.warn(e);
+      };
+      DBOpenRequest.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if(!db.objectStoreNames?.contains('exploredData')){
+            const objectStore = db.createObjectStore("exploredData", { keyPath: "exploredId" });
+          }
+          if(!db.objectStoreNames?.contains('journalData')){
+            const objectStore2 = db.createObjectStore("journalData", { keyPath: "journalId" });
+          }
+      };
+    })
+  );
    
-  
-  const DBOpenRequest2 = await indexedDB.open(`AboveVTT-Global`);
-  
-  DBOpenRequest2.onsuccess = (e) => {
-    window.globalIndexedDB = DBOpenRequest2.result;
-  };
-  DBOpenRequest2.onerror = (e) => {
-    console.warn(e);
-  };
-  DBOpenRequest2.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if(!db.objectStoreNames?.contains('customizationData')){
-        const objectStore = db.createObjectStore("customizationData", { keyPath: "customizationId" });
-      }
-      if(!db.objectStoreNames?.contains('journalData')){
-        const objectStore2 = db.createObjectStore("journalData", { keyPath: "journalId" });
-      }
-  };
+  promises.push(new Promise(async (resolve, reject) => {
+      const DBOpenRequest2 = await indexedDB.open(`AboveVTT-Global`, 2);
+      
+      DBOpenRequest2.onsuccess = (e) => {
+        resolve(DBOpenRequest2.result);
+      };
+      DBOpenRequest2.onerror = (e) => {
+        console.warn(e);
+      };
+      DBOpenRequest2.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if(!db.objectStoreNames?.contains('customizationData')){
+            const objectStore = db.createObjectStore("customizationData", { keyPath: "customizationId" });
+          }
+          if(!db.objectStoreNames?.contains('journalData')){
+            const objectStore2 = db.createObjectStore("journalData", { keyPath: "journalId" });
+          }
+      };
+    })
+  );
+  return Promise.all(promises);
 }
 function deleteDB(){
   let d = confirm("DELETE ALL LOCAL EXPLORE DATA (CANNOT BE UNDONE)");
@@ -210,6 +217,194 @@ function deleteExploredScene(sceneId){
         alert('Scene Explore Trail Data Cleared')
       }        
     };
+}
+
+function add_journal_roll_buttons(target, tokenId=undefined){
+  console.group("add_journal_roll_buttons")
+  
+  let pastedButtons = target.find('.avtt-roll-button').add(target.find('.integrated-dice__container'));
+
+  for(let i=0; i<pastedButtons.length; i++){
+    $(pastedButtons[i]).replaceWith($(pastedButtons[i]).text());
+  }
+
+  const rollImage = (tokenId) ? window.TOKEN_OBJECTS[tokenId].options.imgsrc : window.PLAYER_IMG
+  const rollName = (tokenId) ? window.TOKEN_OBJECTS[tokenId].options.revealname == true || window.TOKEN_OBJECTS[tokenId].options.player_owned ? window.TOKEN_OBJECTS[tokenId].options.name : '' : window.PLAYER_NAME
+
+  const clickHandler = function(clickEvent) {
+    clickEvent.stopPropagation();
+    roll_button_clicked(clickEvent, rollName, rollImage, tokenId ? "monster" : undefined, tokenId)
+  };
+
+  const rightClickHandler = function(contextmenuEvent) {
+    contextmenuEvent.stopPropagation();
+    roll_button_contextmenu_handler(contextmenuEvent, rollName, rollImage, tokenId ? "monster" : undefined, tokenId);
+  }
+
+  // replace all "to hit" and "damage" rolls
+
+  let currentElement = $(target).clone()
+  const dashToMinus = /([\s>])−(\d)/gi
+  
+
+  // apply most specific regex first matching all possible ways to write a dice notation
+  // to account for all the nuances of DNDB dice notation.
+  // numbers can be swapped for any number in the following comment
+  // matches "1d10", " 1d10 ", "1d10+1", " 1d10+1 ", "1d10 + 1" " 1d10 + 1 "
+  const damageRollRegexBracket = /(\()(([0-9]+d[0-9]+)\s?([+-]\s?[0-9]+)?)(\))/gi
+  const damageRollRegex = /([:\s>])(([0-9]+d[0-9]+)\s?([+-]\s?[0-9]+)?)([\.\):\s<,])/gi
+  // matches " +1 " or " + 1 "
+  const hitRollRegexBracket = /(?<![0-9]+d[0-9]+)(\()([+-]\s?[0-9]+)(\))/gi
+  const hitRollRegex = /(?<![0-9]+d[0-9]+)([:\s>])([+-]\s?[0-9]+)([:\s<,])/gi
+  const dRollRegex = /\s(\s?d[0-9]+)\s/gi
+  const tableNoSpaceRollRegex = />(\s?d[0-9]+\s?)</gi
+  const rechargeRegEx = /(Recharge [0-6]?\s?[–-]?\s?[0-6])/gi
+  const actionType = "roll"
+  const rollType = "AboveVTT"
+  const updated = currentElement.html()
+    .replaceAll(dashToMinus, `$1-$2`)
+    .replaceAll(damageRollRegexBracket, `<button data-exp='$3' data-mod='$4' data-rolltype='damage' data-actiontype='${actionType}' class='avtt-roll-button' title='${actionType}'> $1$2$5</button>`)
+    .replaceAll(damageRollRegex, `$1<button data-exp='$3' data-mod='$4' data-rolltype='damage' data-actiontype='${actionType}' class='avtt-roll-button' title='${actionType}'> $2</button>$5`)
+    .replaceAll(hitRollRegexBracket, `<button data-exp='1d20' data-mod='$2' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'> $1$2$3</button>`)
+    .replaceAll(hitRollRegex, `$1<button data-exp='1d20' data-mod='$2' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'> $2</button>$3`)
+    .replaceAll(dRollRegex, ` <button data-exp='1$1' data-mod='0' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'> $1</button> `)
+    .replaceAll(tableNoSpaceRollRegex, `><button data-exp='1$1' data-mod='0' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'> $1</button><`)
+    .replaceAll(rechargeRegEx, `<button data-exp='1d6' data-mod='' data-rolltype='recharge' data-actiontype='Recharge' class='avtt-roll-button' title='${actionType}'> $1</button>`)
+    
+  
+  let ignoreFormatting = $(currentElement).find('.ignore-abovevtt-formating');
+
+  let slashCommandElements = $(currentElement).find('.abovevtt-slash-command-journal')
+
+  let $newHTML = $(`<div></div>`).html(updated);
+    $newHTML.find('.ignore-abovevtt-formating').each(function(index){
+      $(this).empty().append(ignoreFormatting[index].innerHTML);
+    })
+
+    $newHTML.find('.abovevtt-slash-command-journal').each(function(index){      
+      const slashCommands = [...slashCommandElements[index].innerHTML.matchAll(multiDiceRollCommandRegex)];
+      if (slashCommands.length === 0) return;
+      console.debug("inject_dice_roll slashCommands", slashCommands);
+      let updatedInnerHtml = slashCommandElements[index].innerHTML;
+      try {
+        slashCommands[0][0] = slashCommands[0][0].replace(/\(|\)/ig, '');
+        const diceRoll = DiceRoll.fromSlashCommand(slashCommands[0][0], window.PLAYER_NAME, window.PLAYER_IMG, "character", window.PLAYER_ID); // TODO: add gamelog_send_to_text() once that's available on the characters page without avtt running
+        updatedInnerHtml = updatedInnerHtml.replace(updatedInnerHtml, `<button class='avtt-roll-formula-button integrated-dice__container' title="${diceRoll.action?.toUpperCase() ?? "CUSTOM"}: ${diceRoll.rollType?.toUpperCase() ?? "ROLL"}" data-slash-command="${slashCommands[0][0]}">${diceRoll.expression}</button>`);
+      } catch (error) {
+        console.warn("inject_dice_roll failed to parse slash command. Removing the command to avoid infinite loop", slashCommands, slashCommands[0][0]);
+        updatedInnerHtml = updatedInnerHtml.replace(updatedInnerHtml, '');
+      }
+      $(this).empty().append(updatedInnerHtml);
+    })
+
+  
+  
+  
+
+
+  $(target).html($newHTML[0].innerHTML);
+
+
+  
+  $(target).find('button.avtt-roll-button[data-rolltype]').each(function(){
+    let rollAction = $(this).prevUntil('em>strong').find('strong').last().text().replace('.', '');
+    rollAction = (rollAction == '') ? $(this).prev('strong').last().text().replace('.', '') : rollAction;
+    rollAction = (rollAction == '') ? $(this).prevUntil('strong').last().prev().text().replace('.', '') : rollAction;
+    rollAction = (rollAction == '') ? $(this).parent().prevUntil('em>strong').find('strong').last().text().replace('.', '') : rollAction;
+    let rollType = $(this).attr('data-rolltype')
+    let newStatBlockTables = $(this).closest('table').find('tbody tr:first th').text().toLowerCase();
+    if(newStatBlockTables.includes('str') || newStatBlockTables.includes('int')){
+      rollAction =  $(this).closest('tr').find('th').text();
+      rollType = $(this).closest('td').index() == 2 ? 'Check' : 'Save'
+    }
+    else if($(this).closest('table').find('tr:first').text().toLowerCase().includes('str')){
+      let statIndex = $(this).closest('table').find('tr button').index($(this));
+      let stats = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']
+      rollAction = stats[statIndex];
+      rollType = 'Check'
+    }
+
+    if(rollAction == ''){
+      rollAction = 'Roll';
+    } 
+    else if(rollAction.replace(' ', '').toLowerCase() == 'savingthrows'){ 
+      rollAction = $(this)[0].previousSibling.nodeValue.replace(/[\W]+/gi, '');
+      rollAction = (rollAction == '') ? $(this).prev().text().replace(/[\W]+/gi, '') : rollAction;
+      rollType = 'Save';  
+    }
+    else if(rollAction.replace(' ', '').toLowerCase() == 'skills'){
+      rollAction = $(this)[0].previousSibling.nodeValue.replace(/[\W]+/gi, '');
+      rollAction = (rollAction == '') ? $(this).prev().text().replace(/[\W]+/gi, '') : rollAction;
+      rollType = 'Check'; 
+    }
+    else if(rollAction.replace(' ', '').toLowerCase() == 'proficiencybonus'){
+      rollAction = 'Proficiency Bonus';
+      rollType = 'Roll';  
+    }
+    else if(rollAction.replace(' ', '').toLowerCase() == 'hp' || rollAction.replace(' ', '').toLowerCase() == 'hitpoints'){
+      rollAction = 'Hit Points';
+      rollType = 'Roll';  
+    }
+    else if(rollAction.replace(' ', '').toLowerCase() == 'initiative'){
+      rollType = 'Roll';
+    }
+    
+    $(this).attr('data-actiontype', rollAction);
+    $(this).attr('data-rolltype', rollType);
+
+    const followingText = $(this)[0].nextSibling?.textContent?.trim()?.split(' ')[0]
+    
+    const damageType = followingText && window.ddbConfigJson?.damageTypes?.some(d => d.name.toLowerCase() == followingText.toLowerCase()) ? followingText : undefined
+    if(damageType != undefined){
+      $(this).attr('data-damagetype', damageType);
+    }
+  })
+
+  const tokenName = window.TOKEN_OBJECTS && window.TOKEN_OBJECTS[tokenId]?.options?.name ? window.TOKEN_OBJECTS[tokenId]?.options?.name  : window.PLAYER_NAME
+  const tokenImage = window.TOKEN_OBJECTS && window.TOKEN_OBJECTS[tokenId]?.options?.imgsrc ? window.TOKEN_OBJECTS[tokenId]?.options?.imgsrc : window.PLAYER_IMG
+  const entityType = tokenId ? "monster" : "character";
+
+  // terminate the clones reference, overkill but rather be safe when it comes to memory
+  currentElement = null
+
+
+
+  $(target).find(".avtt-roll-button").click(clickHandler);
+  $(target).find(".avtt-roll-button").on("contextmenu", rightClickHandler);
+
+  $(target).find("button.avtt-roll-formula-button").off('click.avttRoll').on('click.avttRoll', function(clickEvent) {
+  clickEvent.stopPropagation();
+
+    const slashCommand = $(clickEvent.currentTarget).attr("data-slash-command");
+    const followingText = $(clickEvent.currentTarget)[0].nextSibling?.textContent?.trim()?.split(' ')[0]
+    const damageType = followingText && window.ddbConfigJson.damageTypes.some(d => d.name.toLowerCase() == followingText.toLowerCase()) ? followingText : undefined     
+    const diceRoll = DiceRoll.fromSlashCommand(slashCommand, tokenName, tokenImage, entityType, tokenId, damageType); // TODO: add gamelog_send_to_text() once that's available on the characters page without avtt running
+    window.diceRoller.roll(diceRoll, undefined, undefined, undefined, undefined, damageType);
+  });
+  $(target).find(`button.avtt-roll-formula-button`).off('contextmenu.rpg-roller').on('contextmenu.rpg-roller', function(e){
+    e.stopPropagation();
+    e.preventDefault();
+    let rollData = {}
+    if($(this).hasClass('avtt-roll-formula-button')){
+       rollData = DiceRoll.fromSlashCommand($(this).attr('data-slash-command'))
+       rollData.modifier = `${Math.sign(rollData.calculatedConstant) == 1 ? '+' : ''}${rollData.calculatedConstant}`
+    }
+    else{
+       rollData = getRollData(this)
+    }
+    
+    
+    if (rollData.rollType === "damage") {
+      damage_dice_context_menu(rollData.expression, rollData.modifier, rollData.rollTitle, rollData.rollType, tokenName, tokenImage, entityType, tokenId, damageType)
+        .present(e.clientY, e.clientX) // TODO: convert from iframe to main window
+    } else {
+      standard_dice_context_menu(rollData.expression, rollData.modifier, rollData.rollTitle, rollData.rollType, tokenName, tokenImage, entityType, tokenId)
+        .present(e.clientY, e.clientX) // TODO: convert from iframe to main window
+    }
+  })
+
+
+  console.groupEnd()
 }
 
 function process_monitored_logs() {
@@ -756,11 +951,6 @@ function get_my_known_languages() {
   return knownLanguages;
 }
 
-async function rebuild_window_users() {
-  window.playerUsers = await DDBApi.fetchCampaignCharacters(window.gameId);
-  let playerUser = window.playerUsers.filter(d=> d.id == window.PLAYER_ID)[0]?.userId;
-  window.myUser = playerUser ? playerUser : 'THE_DM'; 
-}
 
 function update_pc_with_data(playerId, data) {
   if (data.constructor !== Object) {
@@ -1080,6 +1270,7 @@ function updateTokenSrc(url, container, video=false){
   url = parse_img(url)
   if(video == true && url?.includes('onedrive')){
     container.attr('src', url.replace('embed?', 'download?'));
+    container.css('background', `url(${url.replace('embed?', 'download?')})`)
   }
   else if(url.includes("https://1drv.ms/"))
   {
@@ -1090,9 +1281,11 @@ function updateTokenSrc(url, container, video=false){
       url = "https://api.onedrive.com/v1.0/shares/u!" + btoa(url) + "/root/content";
     }
     container.attr('src', url);
+    container.css('background', `url(${url})`)
   }
   else{
     container.attr('src', url);
+    container.css('background', `url(${url})`)
   }
 }
 
@@ -1441,9 +1634,13 @@ function find_or_create_generic_draggable_window(id, titleBarText, addLoadingInd
         childWindows[name].onbeforeunload = function(){
           closePopout(name);
         }
-        setTimeout(function(){
-          childWindows[name].document.title = name
-        }, 1000);
+        function checkTitle() {
+          if(childWindows[name].document && childWindows[name].document?.title != name){    
+            childWindows[name].document.title = name; 
+            setTimeout(checkTitle, 1000); 
+          }
+        } 
+        checkTitle();
       }
       else{
         popoutWindow(titleBarText, $(popoutSelector), container.width(), container.height());

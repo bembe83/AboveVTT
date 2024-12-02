@@ -19,9 +19,11 @@ $(function() {
         window.gameIndexedDb = undefined;
         if(window.DM)
           window.globalIndexedDB = undefined;
-        openDB();
       })
-      .then(()=> {
+      .then(openDB)
+      .then((databases)=> {
+        window.gameIndexedDb = databases[0];
+        window.globalIndexedDB = databases[1];
         window.EXPERIMENTAL_SETTINGS = JSON.parse(localStorage.getItem(`ExperimentalSettings${window.gameId}`)) || {};
         if (is_release_build()) {
           // in case someone left this on during beta testing, we should not allow it here
@@ -152,7 +154,36 @@ $(function() {
               }   
             }
           }
-                           
+          if(event.data.msgType=='dropExtra' && (event.data.sendTo == window.PLAYER_ID || (window.DM && event.data.sendTo == false))){    
+            if(event.data.data.playerID != undefined){
+              let pc = find_pc_by_player_id(event.data.data.playerID, false)
+              const playerTokenID = pc ? pc.sheet : '';
+              let tokenPosition = (window.TOKEN_OBJECTS[playerTokenID]) ? 
+              {
+                x: parseFloat(window.TOKEN_OBJECTS[playerTokenID].options.left) + parseFloat(window.TOKEN_OBJECTS[playerTokenID].options.size)/2,
+                y: parseFloat(window.TOKEN_OBJECTS[playerTokenID].options.top) + parseFloat(window.TOKEN_OBJECTS[playerTokenID].options.size)/2
+              } : 
+              center_of_view();
+              if(!window.TOKEN_OBJECTS[playerTokenID])
+                tokenPosition = convert_point_from_view_to_map(tokenPosition.x, tokenPosition.y)
+              event.data.data.centerView = tokenPosition;
+              event.data.data.sceneId = window.CURRENT_SCENE_DATA.id;
+              const playerUser = window.playerUsers.filter(d=> d.id == event.data.data.playerID)[0]?.userId     
+              event.data.data.extraOptions.share_vision = playerUser ? playerUser : true; 
+            }
+              
+            if(window.DM){
+              let left = parseInt(event.data.data.centerView.x);
+              let top = parseInt(event.data.data.centerView.y);
+              let monsterId = event.data.data.monsterData.baseId;
+              fetch_and_cache_monsters([monsterId], function(){
+                create_and_place_token(window.cached_monster_items[monsterId], undefined, undefined, left, top, undefined, undefined, true, event.data.data.extraOptions)
+              });
+            }
+            else{
+              window.MB.sendMessage("custom/myVTT/place-extras-token", event.data.data);
+            }
+          }                 
                   
           if(!window.DM){
             if(event.data.msgType == 'CharacterData'){
@@ -368,7 +399,6 @@ async function start_above_vtt_common() {
 
   startup_step("Gathering player character data");
   await rebuild_window_pcs();
-  await rebuild_window_users();
   window.color = color_for_player_id(my_player_id()); // shortcut that we should figure out how to not rely on
   localStorage.removeItem(`CampaignCharacters${window.gameId}`); // clean up old pc data
 
