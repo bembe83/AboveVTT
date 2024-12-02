@@ -1,0 +1,71 @@
+:root{
+	--dice-grid: 4;
+}
+
+input[type=number].no-spinner::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0;
+	-moz-appearance: textfield;
+}
+
+#godicemodule-resolver .popup-content{
+	/*background-color: #FCF5E5;
+	background: repeat url("../images/parchment.jpg");*/
+}
+
+#godicemodule-resolver .terms {
+  display: grid;
+  grid-template-columns: repeat(var(--dice-grid), 1fr);
+  grid-gap: 1rem;
+  margin: 1rem 0;
+}
+
+#godicemodule-resolver .terms i {
+  font-size: 3rem;
+  text-align: center;
+}
+
+#godicemodule-resolver .dice-roll {
+  display: block;
+  text-align: center;
+}
+
+#godicemodule-resolver .terms .dice-term .dice-term-input::placeholder {
+  opacity: 0;
+}
+
+#godicemodule-resolver .terms .dice-term .dice-term-input {
+  text-align: center;
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+  margin: 0;
+}
+
+#godicemodule-resolver .terms .dice-term-faces {
+  text-align: center;
+}
+
+#godicemodule-resolver .terms .dice-term {
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 0.5rem;
+}
+
+#godicemodule-resolver .terms .dice-term.fulfilled {
+  border:2px solid limegreen;
+}
+
+#godicemodule-resolver .terms .godice-module-flavor {
+  position: absolute;
+  font-size: var(--font-size-12);
+  bottom: 0;
+  border-bottom: solid 1px black;
+}
+
+#godicemodule-resolver .terms .dice-term-image {
+	width: 40px;
+	height: 40px;
+	align-self: center;
+	border:none;
+}

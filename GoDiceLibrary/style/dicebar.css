@@ -1,0 +1,298 @@
+/* ----------------------------------------- */
+/*  Root                                     */
+/* ----------------------------------------- */
+:root {
+
+  --godicemodule-path: '';
+  --die-type: 'D6';
+
+  --dicebar-height: 40px;
+  --dicebar-width: 40px;
+  --dicebar-dice-size: 40px;
+  /*--dicebar-slots: 8;*/
+
+  --dicebar-primaryColor: #00000080;
+  --dicebar-border-color: #000000ff;
+  --dicebar-border-color-active: #ff6400ff;
+  --dicebar-border-color-inactive: #939799ff;
+
+  --dicebar-x-pos: 0;
+  --dicebar-y-pos: 0;
+  --dicebar-margin-top: 0;
+  --dicebar-margin-bottom: 0;
+  --dicebar-margin-left: 0;
+  --dicebar-margin-right: 0;
+  --z-index-ui: 99;
+  --dicebar-direction: row;
+  --dicebar-position: fixed;
+  /*--dicebar-display: flex;*/
+  
+}
+
+/* ---------------------------------------- */
+/*  DiceBar                                 */
+/* ---------------------------------------- */
+#ui-middle {
+  z-index: calc(var(--z-index-app) + 1);
+}
+
+#dicebar {
+  z-index: calc(var(--z-index-ui) + 9);
+  pointer-events: none;
+  flex-wrap: nowrap;
+  margin: var(--dicebar-margin-top) var(--dicebar-margin-right) var(--dicebar-margin-bottom) var(--dicebar-margin-left);
+  position: var(--dicebar-position);
+  display: var(--dicebar-display);
+  flex-direction: var(--dicebar-direction);
+}
+
+#dicebar.vertical {
+	height: calc((var(--dicebar-dice-size)) * calc(var(--dicebar-slots) + 1));
+	width: var(--dicebar-dice-size);
+}
+
+#dicebar.horizontal {
+	width: calc((var(--dicebar-dice-size)) * calc(var(--dicebar-slots) + 1));
+	height: var(--dicebar-dice-size);
+}
+
+#dicebar.top {
+  top: var(--dicebar-y-pos); 
+}
+#dicebar.bottom {
+  bottom: var(--dicebar-y-pos); 
+}
+#dicebar.left {
+  left: var(--dicebar-x-pos);
+}
+#dicebar.right {
+  right: var(--dicebar-x-pos);
+}
+
+#dicebar .bar-controls {
+  flex: 0 0 32px;
+  height: 100%;
+  width: calc((var(--dicebar-dice-size) + 2px) * var(--dicebar-slots));
+  text-align: center;
+  color: var(--color-text-light-heading);
+  background: var(--dicebar-primaryColor);
+  border: 1px solid var(--dicebar-border-color);
+  box-shadow: 0 0 3px #444 inset;
+  border-radius: 3px;
+}
+
+#dicebar.vertical .bar-controls {
+	width: calc((var(--dicebar-dice-size) + 2px));
+	margin: 0;
+}
+
+#dicebar.horizontal .bar-controls {
+	width: calc((var(--dicebar-dice-size) + 2px) * var(--dicebar-slots));
+	margin: 0 0px 2px 2px;
+}
+
+#dicebar .bar-controls a {
+  display: block;
+}
+#dicebar .bar-controls a.page-control {
+  font-size: 1.5em;
+  line-height: 12px;
+}
+#dicebar .bar-controls span.page-number {
+  display: block;
+  font-size: var(--font-size-20);
+  line-height: 8px;
+}
+#dicebar #dice-action-bar {
+  flex: 1;
+  width: calc((var(--dicebar-dice-size) + 2px) * var(--dicebar-slots));
+  pointer-events: all;
+  flex-wrap: nowrap;
+}
+#dicebar #dice-action-bar.collapsed {
+  display: none;
+  pointer-events: none;
+}
+#dicebar #dice-list {
+  flex-wrap: nowrap;
+
+  list-style: none;
+  margin: 0 2px;
+  padding: 0;
+  border: 1px solid var(--dicebar-border-color);
+  border-radius: 3px;
+  display: grid;
+  /*grid-template-columns: repeat(var(--dicebar-slots), var(--dicebar-dice-size));*/
+}
+
+#dicebar.horizontal  #dice-list{
+	grid-template-columns: repeat(var(--dicebar-slots), var(--dicebar-dice-size));
+	height: var(--dicebar-height);
+}
+
+#dicebar.vertical  #dice-list{
+	grid-template-rows: repeat(var(--dicebar-slots), var(--dicebar-dice-size));
+	width: var(--dicebar-width);
+}
+
+#dicebar .dice {
+  position: relative;
+  width: var(--dicebar-dice-size);
+  height: var(--dicebar-dice-size);
+  border: 1px solid var(--dicebar-border-color);
+  border-radius: 2px;
+  background: var(--dicebar-primaryColor);
+  box-shadow: 0 0 5px var(--color-shadow-dark) inset;
+  cursor: pointer;
+}
+#dicebar .dice.inactive {
+  box-shadow: 0 0 5px #444 inset;
+}
+#dicebar .dice:hover {
+  box-shadow: 0 0 10px var(--dicebar-border-color-inactive) inset;
+}
+#dicebar .dice.active:hover {
+  border: 1px solid var(--dicebar-border-color-active);
+}
+#dicebar .dice .dice-key {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  padding: 1px 3px;
+  background: #111;
+  color: var(--color-text-light-highlight);
+  font-weight: bold;
+  pointer-events: none;
+}
+#dicebar .dice .dice-icon {
+  margin:  1px;
+  border: none;
+  height: calc(var(--dicebar-dice-size) - 4px);
+  width: calc(var(--dicebar-dice-size) - 4px);
+}
+#dicebar .dice .tooltip {
+  display: block;
+  min-width: 148px;
+  height: 26px;
+  padding: 2px 4px;
+  position: absolute;
+  top: -32px;
+  left: -50px;
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid var(--color-border-dark-primary);
+  border-radius: 3px;
+  color: var(--color-text-light-highlight);
+  line-height: 22px;
+  text-align: center;
+  white-space: nowrap;
+  word-break: break-all;
+}
+#dicebar #dicebar-directory-controls,
+#dicebar #dicebar-page-controls {
+  pointer-events: all;
+  z-index: calc(var(--z-index-ui) + 9);
+}
+#dicebar #dicebar-directory-controls a {
+  line-height: 24px;
+}
+
+/* ---------------------------------------- */
+/*  Settings                                */
+/* ---------------------------------------- */
+
+#chbConfigDiv div.form-group {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+#chbConfigDiv input[is="colorpicker-input"] {
+  background-color: unset;
+  max-width:20%;
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+  border: black 1px;
+}
+
+#chbConfigDiv input[type="Number"] {
+  background-color: white;
+  max-width:10%;
+  text-align: center;
+  border: black 1px;
+  float: left;
+  margin-right: 0.75em;
+}
+
+#chbConfigDiv div.colorsplash {
+  display: grid;
+  place-items: center;
+  background-color: blue;
+  padding-top: 0.4em;
+  padding-bottom: 0.4em;
+  border: black 1px;
+  border-radius: 0.5em;
+}
+
+#chbSetDiv button, #coreSetDiv button, #chbFlagDiv button, #coreFlagDiv button{
+  min-width: 100%;
+}
+
+/* fix boundary between two stylized settings divs */
+/* Extra specficity for first box to work properly with Tidy UI styles */
+#chbConfigDiv #chbSetDiv {
+  border-style: solid;
+  border-color: black;
+  border-width: 1px;
+  background-color: #d3d3d380;
+  padding: 4px;
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+#chbConfigDiv #coreSetDiv {
+  border-style: solid;
+  border-color: black;
+  border-width: 1px;
+  background-color: #d3d3d380;
+  padding: 4px;
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}
+
+/* Hide unnecessary, broken, or unused elements */
+#dicebar-page-controls, #dicebar-directory-controls #custom-macro-directory {
+  display: none;
+}
+
+/* ---------------------------------------- */
+/*  Media                                   */
+/* ---------------------------------------- */
+@media (max-width: 1120px) {
+  #dicebar {
+    width: calc(var(--dicebar-width) / 2);
+    height: calc(var(--dicebar-height));
+  }
+
+  #dicebar #dice-list {
+    grid-template-columns: repeat(var(--dicebar-slots), var(--dicebar-dice-size));
+  }
+
+  #dicebar .bar-controls {
+    justify-content: space-between;
+  }
+
+  #dicebar .bar-controls a {
+    flex: 0;
+  }
+
+  #dicebar .bar-controls span.page-number {
+    line-height: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+  }
+}
+

@@ -1,0 +1,21 @@
+.bonus-container {
+    display: grid;
+    grid-template-columns: auto auto;
+    row-gap: 10px;
+    text-align: left;
+    margin: 5%;
+}
+
+.bonus-button {
+	display: grid;
+    grid-template-columns: auto auto auto;
+    column-gap: 10px;
+}
+
+.bonus-button-column {
+	align-self:centre;
+}
+
+.modif {
+	width: 200px !important;
+}

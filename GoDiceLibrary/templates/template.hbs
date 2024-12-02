@@ -1,0 +1,105 @@
+{{#if (eq template 'dicebar')}}
+	<div id="dicebar" class="flexrow">
+	    <div id="dicebar-directory-controls" class="bar-controls flexcol">
+	        <a id="dicebar-toggle">
+	             <i class="fas fa-caret-down"></i>
+	        </a>
+	    </div>
+	    <nav id="dice-action-bar" class="flexrow {{barClass}}">
+	        <ol id="dice-list" class="flexrow" data-page="{{page}}">
+	            {{#each dice}}
+	            <li class="dice {{this.cssClass}}" data-slot="{{this.customSlot}}" data-tooltip="{{this.tooltip}}"
+	                {{#if this.diceId}}data-dice-id="{{this.diceId}}"{{/if}}>
+	                {{#if this.img}}
+	                <img class="dice-icon" src="{{this.img}}" {{#if this.dieColor}}style="background-color: {{this.dieColor}}"{{/if}}/>
+	                {{/if}}
+	            </li>
+	            {{/each}}
+	        </ol>
+	    </nav>
+	</div>
+{{else if (eq template 'diceroll')}}
+	<form autocomplete="off" id="roll-resolver" data-counter="{{terms.length}}">
+	    <div class="dice-roll">
+	        {{#if roll.options.flavor}}
+	        	<h2 class="godice-module-flavor"><div class="godice-icon"></div>{{roll.options.flavor}}</h2>
+	        {{else}}
+	        	<h2 class="godice-module-flavor"><div class="godice-icon"></div>Custom Roll</h2>
+	        {{/if}}
+	        <div class="godice-module-formula">{{roll._formula}}</div>
+	    </div>
+	    <div class="terms">
+	        {{#each terms as |term i|}}
+	        <div class="dice-term flexcol" data-term="{{i}}">
+	            {{#if term.faces}}
+	                {{#if this.image}}
+	                    <img src="{{this.image}}" alt="d{{this.faces}}" class="dice-term-image" style="background-color #006aab;"/>
+	                {{else}}
+	                     <i class="fa-solid {{this.icon}}"></i>
+	                {{/if}}
+	                <p class="dice-term-faces"><b>d{{term.faces}}</b></p>
+	            {{/if}}
+	            <input type="number" class="dice-term-input no-spinner" name="{{term.id}}" min="1" max="{{term.faces}}" step="1" data-term="{{i}}" placeholder="{{term.placeholder}}" data-die="d{{term.faces}}"/>
+	        </div>
+	        {{/each}}
+	    </div>
+	    <div class="dialog-buttons flexrow">
+	        <button type="submit" class="dialog-button ok default" data-button="ok" id="roll_submit">
+	            <!--<i class="fas d20"></i>-->
+	            Submit
+	        </button>
+	    </div>
+	</form>
+{{else if (eq template 'dietype')}}
+	<form id="die-type">
+		<div id="dieTypeTitle">
+			<h2 class="godice-module-flavor"><div class="godice-icon"></div>{{label}}</h2>
+		</div>
+		<div class="diceTypes">
+			<select id="diceTypes" class="diceTypeSelect" onchange="document.getElementById('diceTypeIcon').src = window.godice.utils.getDiceImage(event.target.value)">
+				{{#each diceTypes}}
+				<option id={{id}} value={{type}}>{{type}}</option>
+				{{/each}}
+			</select>
+			<img id="diceTypeIcon" src="{{img}}" style="width: 50px; height: 50px; margin-left: 10px; background-color: {{dieColor}};"/>
+		</div>
+		<div class="dialog-buttons flexrow">
+			<button type="submit" class="dialog-button ok default" data-button="ok" id="roll_submit">
+	            <i class="fas fa-check"></i>
+	            Submit
+	        </button>
+		</div>
+	</form>
+{{else if (eq template 'rollbonus')}}
+	<form id="die-type">
+		<div class="diceTypes bonus-container">
+				<label>Formula:</label><input id="formula" type="text" value ="{{formula}}" style="background-color: grey; color: darkslategrey" readonly/>
+				<label>Additional Bonus </label><input id="bonus" type="text" placeholder="eg. 1d4, 3d6+3, +6" />
+				<label>Elven Accuracy</label><input type="checkbox" id="elven" name="elven" value="True">
+				<input id="advdis" type="text" hidden="true" value="0"/>
+		</div>
+		<div class="dialog-buttons bonus-button">
+		{{#if d20}}
+				<div class ="bonus-button-column"><button type="submit" id="adv" class="dialog-button modif" onclick='document.getElementById("advdis").value="1"'>Advantage</button></div>
+				<div class ="bonus-button-column"><button type="submit" id="nor" class="dialog-button ok default modif" onclick='document.getElementById("advdis").value="0"'>Normal</button></div>
+				<div class ="bonus-button-column"><button type="submit" id="dis" class="dialog-button modif" onclick='document.getElementById("advdis").value="-1"'>Disadvantage</button></div>
+		{{else}}
+				<div class ="bonus-button-column">&nbsp;</div>
+				<div class ="bonus-button-column"><button type="submit" class="dialog-button ok default" data-button="ok" id="roll_submit">Roll</button></div>
+				<div class ="bonus-button-column">&nbsp;</div>
+		{{/if}}
+		</div>
+	</form>
+{{else if (eq template 'chatcontrol')}}
+	<div id="godiceroll-modifier" class="godiceroll-modifier" title="GoDice Modifier">
+		<div class="godiceroll-rangenumber"><input type="range" id="rangenumber" min="-15" max="15" title="GoDiceRoll Modifier"></div>
+		<span id="rangevalue" class="godiceroll-span">0</span>
+		<div id="buttoncontainer" class="godiceroll-advdis">
+		  	<button class="godiceroll-advdis-btn" id="advButton" value="Adv" data-value="kh">Adv</button>
+			<button class="godiceroll-advdis-btn active" id="norButton" value="Nor" data-value="">Nor</button>
+			<button class="godiceroll-advdis-btn" id="disButton" value="Dis" data-value="kl">Dis</button>
+		</div>
+	</div>
+{{else}}
+	<div>404 - Template type not defined</div>
+{{/if}}
