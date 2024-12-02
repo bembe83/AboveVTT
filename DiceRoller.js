@@ -254,8 +254,13 @@ function getRollData(rollButton){
     let rollType = 'custom';
     let rollTitle = 'AboveVTT';
     let damageType = undefined;
-    if($(rollButton).find('.ddbc-damage__value').length>0){
-      expression = $(rollButton).find('.ddbc-damage__value').text().replace(/\s/g, '');
+    if($(rollButton).find('.ddbc-damage__value, .ct-spell-caster__modifier-amount').length>0){
+      expression = $(rollButton).find('.ddbc-damage__value, .ct-spell-caster__modifier-amount').text().replace(/\s/g, '');
+      if($(rollButton).find('.ct-spell-caster__modifier-amount').length>0){
+        rollType ='damage';
+        rollTitle = $(rollButton).closest('[class*="styles_content"]')?.find('[class*="styles_spellName"]')?.text() || rollTitle;
+        damageType = $(rollButton).next()?.find('[class*="damage-type"][aria-label]')?.attr('aria-label')?.replace(' damage', '') || damageType;
+      }
     }
     else if($(rollButton).find('.ddbc-signed-number').length>0){
       expression = `1d20${$(rollButton).find('.ddbc-signed-number').attr('aria-label').replace(/\s/g, '')}`;
@@ -774,7 +779,7 @@ class DiceRoller {
             if(window.CAMPAIGN_INFO?.dmId == ddbMessage.entityId ){
                 ddbMessage.data.context.avatarUrl = dmAvatarUrl
             }
-            else if(window.pcs?.filter(d => d.characterId == ddbMessage.entityId) && ddbMessage?.data?.context != undefined){
+            else if(window.pcs?.filter(d => d.characterId == ddbMessage.entityId)?.length>0 && ddbMessage?.data?.context != undefined){
                 ddbMessage.data.context.avatarUrl = window.pcs?.filter(d => d.characterId == ddbMessage.entityId)[0].image
             } 
             if((this.#pendingSpellSave != undefined || this.#pendingDamageType != undefined) && message.eventType === "dice/roll/fulfilled"){
@@ -976,7 +981,7 @@ class DiceRoller {
         } 
         else if(window.CAMPAIGN_INFO?.dmId == ddbMessage.entityId || ddbMessage.entityId == 'false'){
             ddbMessage.data.context.avatarUrl = dmAvatarUrl
-        } else if(window.pcs?.filter(d => d.characterId == ddbMessage.entityId)){
+        } else if(window.pcs?.filter(d => d.characterId == ddbMessage.entityId)?.length>0){
             ddbMessage.data.context.avatarUrl = window.pcs?.filter(d => d.characterId == ddbMessage.entityId)[0].image
         }      
         if (isValid(this.#pendingDiceRoll.name)) {

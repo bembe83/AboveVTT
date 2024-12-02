@@ -1094,7 +1094,19 @@ function create_and_place_token(listItem, hidden = undefined, specificImage= und
                     }
                     break;
             }
-            
+            if(listItem.monsterData.senses.length > 0 && foundOptions.vision == undefined){
+                let darkvision = 0;
+                for(let i=0; i < listItem.monsterData.senses.length; i++){
+                    const ftPosition = listItem.monsterData.senses[i].notes.indexOf('ft.')
+                    const range = parseInt(listItem.monsterData.senses[i].notes.slice(0, ftPosition));
+                    if(range > darkvision)
+                        darkvision = range;
+                }
+                options.vision = {
+                    feet: darkvision.toString(),
+                    color: (window.TOKEN_SETTINGS?.vision?.color) ? window.TOKEN_SETTINGS.vision.color : 'rgba(142, 142, 142, 1)'
+                }
+            }
             break;
         case ItemType.Open5e:
              switch (options['defaultmaxhptype']) {
@@ -1196,7 +1208,9 @@ function create_and_place_token(listItem, hidden = undefined, specificImage= und
             break;
     }
     if(options.statBlock && window.JOURNAL.notes[options.statBlock]){
-        const statText = window.JOURNAL.notes[options.statBlock].text
+        let statText = $(`<div>${window.JOURNAL.notes[options.statBlock].text}</div>`);
+        statText.find('style').remove();
+        statText=statText[0].innerHTML;
         let hitDiceData =  $(statText).find('.custom-hp-roll.custom-stat').text();
         let averageHP = $(statText).find('.custom-avghp.custom-stat').text();
 
@@ -1396,6 +1410,11 @@ function create_and_place_token(listItem, hidden = undefined, specificImage= und
     if(foundOptions.color != undefined){
         options.color = foundOptions.color;
     }
+
+
+
+
+
     options.itemType = listItem.type;
     options.itemId = listItem.id;
     options.listItemPath = listItem.fullPath();
@@ -1794,6 +1813,15 @@ function register_token_row_context_menu() {
                     }
                 };
             }
+            if(rowItem.isTypeMonster()){
+                menuItems["copyDDBToken"] = {
+                    name: 'Copy to My Tokens',
+                    callback: function(itemKey, opt, originalEvent) {
+                        let itemToPlace = find_sidebar_list_item(opt.$trigger);
+                        create_ddb_token_copy_inside(itemToPlace);
+                    }
+                }
+            }
             if(rowItem.isTypeFolder() || rowItem.isTypePC() || rowItem.isTypeEncounter()){
                 menuItems["border"] = "---";
 
@@ -1930,7 +1958,7 @@ function move_mytokens_to_parent_folder_and_delete_folder(listItem, callback) {
  * Creates a new "My Token" object within a folder
  * @param listItem {SidebarListItem} the folder item to create a token in
  */
-function create_token_inside(listItem, tokenName = "New Token", tokenImage = '', type='') {
+function create_token_inside(listItem, tokenName = "New Token", tokenImage = '', type='', options = undefined, statBlock = undefined) {
     if (!listItem.isTypeFolder() || !listItem.fullPath().startsWith(RootFolder.MyTokens.path)) {
         console.warn("create_token_inside called with an incorrect item type", listItem);
         return;
@@ -1954,10 +1982,28 @@ function create_token_inside(listItem, tokenName = "New Token", tokenImage = '',
         listItem.id,
         { name: newTokenName,
           alternativeImages: [tokenImage]
-        }
+        },
     );
     if(['.mp4', '.webm', '.m4v'].some(d => type.includes(d))){
         customization.tokenOptions.videoToken = true;
+    }
+    if(options != undefined){
+        customization.tokenOptions = {
+            ...customization.tokenOptions,
+            ...options,
+            alternativeImages: [options.imgsrc]
+        }
+    }
+    if(statBlock != undefined){
+        window.JOURNAL.notes[customization.id] = {
+            id: customization.id,
+            plain: statBlock,
+            player: true,
+            statBlock: true,
+            text: statBlock
+        };
+        window.JOURNAL.persist();
+        customization.tokenOptions.statBlock = customization.id;
     }
 
     persist_token_customization(customization, function (didSucceed, error) {
@@ -2300,6 +2346,43 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
     });
     inputWrapper.append(imageScaleWrapper);
 
+    let startingOffsetX = customization.tokenOptions.offset?.x || 0;
+    let offsetXWrapper = build_token_num_input(startingOffsetX, false, 'Image Offset X', "", "", 1, function (offsetX) {
+
+        if(customization.tokenOptions.offset == undefined)
+            customization.tokenOptions.offset = {x: 0, y: 0}
+        customization.tokenOptions.offset.x = offsetX;
+        persist_token_customization(customization);
+        decorate_modal_images(sidebarPanel, listItem, placedToken);
+    });
+    inputWrapper.append(offsetXWrapper);
+
+    let startingOffsetY = customization.tokenOptions.offset?.y || 0;
+    let offsetYWrapper = build_token_num_input(startingOffsetY, false, 'Image Offset Y', "", "", 1, function (offsetY) {
+        if(customization.tokenOptions.offset == undefined)
+            customization.tokenOptions.offset = {x: 0, y: 0}
+        customization.tokenOptions.offset.y = offsetY;
+        persist_token_customization(customization);
+        decorate_modal_images(sidebarPanel, listItem, placedToken);
+    });
+    inputWrapper.append(offsetYWrapper);
+
+
+    let startingImageZoom = customization.tokenOptions.imageZoom || 0;
+    let imageZoomWrapper = build_token_num_input(startingImageZoom, false, 'Image Zoom %', -100, '', 5, function (imageZoom) { 
+        customization.setTokenOption("imageZoom", imageZoom);
+        persist_token_customization(customization);
+        decorate_modal_images(sidebarPanel, listItem, placedToken);  
+    });
+    inputWrapper.append(imageZoomWrapper);
+
+    let startingOpacity = customization.tokenOptions.imageOpacity || 1;
+    let opacityWrapper = build_token_num_input(startingOpacity, tokens,  'Image Opacity', 0, 1, 0.1, function (opacity) {
+        customization.setTokenOption("imageOpacity", opacity);
+        persist_token_customization(customization);
+        decorate_modal_images(sidebarPanel, listItem, placedToken);
+    });
+    inputWrapper.append(opacityWrapper);
 
     // border color
     if(listItem.isTypePC()){
@@ -3033,6 +3116,7 @@ function inject_encounter_monsters() {
 function did_change_mytokens_items() {
     rebuild_token_items_list();
     redraw_token_list();
+    filter_token_list($('[name="token-search"]').val() ? $('[name="token-search"]').val() : "");
 }
 
 /**
@@ -3400,7 +3484,7 @@ function register_custom_token_image_context_menu() {
                     imgHtml.addClass('magnify');                         
                     imgHtml.attr('href', imgHtml.attr('src'));
                     imgHtml = imgHtml[0].outerHTML;
-                    imgHtml = imgHtml.replace('disableremoteplayback', 'disableremoteplayback autoplay loop');
+                    imgHtml = imgHtml.replace('disableremoteplayback', 'disableremoteplayback autoplay loop').replace('div', 'img');
                     let msgdata = {
                         player: window.PLAYER_NAME,
                         img: window.PLAYER_IMG, 
@@ -3521,6 +3605,40 @@ function find_token_options_for_list_item(listItem) {
     } else {
         return find_or_create_token_customization(listItem.type, listItem.id, listItem.parentId, rootId)?.allCombinedOptions() || {};
     }
+}
+
+function create_ddb_token_copy_inside(listItem){
+    if (!listItem) return {};
+
+    // set up whatever you need to. We'll override a few things after
+    let foundOptions = find_token_options_for_list_item(listItem);
+    let options = {...foundOptions}; // we may need to put this in specific places within the switch statement below
+  
+    options.name = listItem.name;
+    
+    let tokenSizeSetting;
+    let tokenSize;
+
+    tokenSizeSetting = options.tokenSize;
+    tokenSize = parseInt(tokenSizeSetting);
+    if (tokenSizeSetting === undefined || typeof tokenSizeSetting !== 'number') {
+        options.sizeId = listItem.monsterData.sizeId;
+        // TODO: handle custom sizes
+    }
+    options.monster = 'customStat'
+    
+    if(foundOptions.color != undefined){
+        options.color = foundOptions.color;
+    }
+
+    options.imgsrc = random_image_for_item(listItem);
+
+    // TODO: figure out if we still need to do this, and where they are coming from
+    delete options.undefined;
+    delete options[""];
+    const statBlock = build_stat_block_for_copy(listItem, options)
+
+    
 }
 
 function display_change_image_modal(placedToken) {

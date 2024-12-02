@@ -27,6 +27,10 @@ function clearFrame(){
 	});
 }
 
+const debounceSendNote = mydebounce(function(id, note){
+	window.MB.sendMessage('custom/myVTT/note',  {note: note, id: id, from:window.PLAYER_ID})
+}, 2000);
+
 const delayedClear = mydebounce(() => clearFrame());
 
 function hideVideo(streamerid) {
@@ -364,7 +368,7 @@ class MessageBroker {
 							li.animate({ opacity: 0 }, animationDuration, function() {
 							 	li.html(newlihtml);
 							 	window.JOURNAL.translateHtmlAndBlocks(li);	
-								window.JOURNAL.add_journal_roll_buttons(li);
+								add_journal_roll_buttons(li);
 								window.JOURNAL.add_journal_tooltip_targets(li);
 								add_stat_block_hover(li)
 								let neweight = li.height();
@@ -845,11 +849,12 @@ class MessageBroker {
 				if(!window.DM){
 					window.JOURNAL.chapters=msg.data.chapters;
 					window.JOURNAL.build_journal();
+					window.JOURNAL.persist(true);
 				}
 			}
 			
 			if(msg.eventType=="custom/myVTT/note"){
-				if(!window.DM){
+				if(!window.DM || (msg.data.from && msg.data.from != window.PLAYER_ID)){
 					window.JOURNAL.notes[msg.data.id]=msg.data.note;
 					
 					window.JOURNAL.build_journal();
@@ -859,12 +864,21 @@ class MessageBroker {
 					}				
 					if(msg.data.popup)
 						window.JOURNAL.display_note(msg.data.id);
+					const openNote = $(`.note[data-id='${msg.data.id}']`);
 					
+
+					if(window.JOURNAL.notes[msg.data.id].abilityTracker && openNote.length>0){
+						for(let i in window.JOURNAL.notes[msg.data.id].abilityTracker){
+							openNote.find(`input[data-tracker-key='${i}']`).val(window.JOURNAL.notes[msg.data.id].abilityTracker[i])
+						}
+					}
+
+					window.JOURNAL.persist(true);
+
 				}
 			}
 			if(msg.eventType=="custom/myVTT/notesSync"){
 				if(!window.DM){
-
 					for(let i in msg.data.notes){
 						let noteId = msg.data.notes[i].id;
 						window.JOURNAL.notes[noteId] = msg.data.notes[i];
@@ -873,7 +887,8 @@ class MessageBroker {
 							window.TOKEN_OBJECTS[msg.data.id].place();	
 						}	
 					}			
-					window.JOURNAL.build_journal();				
+					window.JOURNAL.build_journal();			
+					window.JOURNAL.persist(true);	
 				}
 			}
 			if(msg.eventType=="custom/myVTT/DMAvatar"){
@@ -1935,6 +1950,11 @@ class MessageBroker {
 						window.DRAWINGS = [];
 					}
 					window.LOADING = true;
+					if(!window.DM && (data.player_map_is_video == '1' || data.is_video == '1')){
+						data.map = data.player_map;
+						data.is_video = data.player_map_is_video;
+					}
+
 					load_scenemap(data.map, data.is_video, data.width, data.height, data.UVTTFile, async function() {
 						console.group("load_scenemap callback")
 						if(!window.CURRENT_SCENE_DATA.scale_factor)

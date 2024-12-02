@@ -208,11 +208,10 @@ function change_zoom(newZoom, x, y, reset = false) {
 		$(window).scrollTop(pageY);	
 	}
 
-	$("body").css({
+	$('#VTTWRAPPER').css({
 		"--window-zoom": window.ZOOM,
 		"--font-size-zoom": Math.max(12 * Math.max((3 - window.ZOOM), 0), 8.5) + "px"
-	}) 
-
+	})
 	set_default_vttwrapper_size();
 	if(reset == true){
 		$("#scene_map")[0].scrollIntoView({
@@ -475,15 +474,16 @@ async function load_scenemap(url, is_video = false, width = null, height = null,
 			width: width,
 			height: height,
 			videoId: videoid,
-			playerVars: { 'autoplay': 1, 'controls': 1, 'rel': 0 },
+			playerVars: { 'autoplay': 0, 'controls': 1, 'rel': 0 },
 			events: {
 				'onStateChange': function(event) {  if (event.data == 0) window.YTPLAYER.seekTo(0); },
 				'onReady': function(e) { 
-					let ytvolume= $("#youtube_volume").val();
+					let ytvolume=window.MIXER?.state()?.animatedMap?.volume != undefined ? window.MIXER?.state()?.animatedMap?.volume : $("#youtube_volume").val();
 					if(ytvolume)
-						window.YTPLAYER.setVolume(ytvolume); 
+						e.target.setVolume(ytvolume); 
 					else
-						window.YTPLAYER.setVolume(50);
+						e.target.setVolume(25);
+					e.target.playVideo();
 				}			
 			}
 		});
@@ -547,12 +547,13 @@ async function load_scenemap(url, is_video = false, width = null, height = null,
 		if (width != null) {
 			newmapSize = 'width: ' + width + 'px; height: ' + height + 'px;';
 		}
-		let videoVolume = 0.5;
+		let videoVolume = window.MIXER?.state()?.animatedMap?.volume != undefined ? window.MIXER?.state()?.animatedMap?.volume : $("#youtube_volume").val() != undefined ? $("#youtube_volume").val() : 0.25;
+		
 		if(window.DM){
-			videoVolume = $("#youtube_volume").val()/100 * $("#master-volume input").val();
+			videoVolume = videoVolume/100 * $("#master-volume input").val();
 		}
 		else{
-			videoVolume = 0.5 * $("#master-volume input").val()
+			videoVolume = videoVolume * $("#master-volume input").val()
 		}
 		if(url.includes('google')){
 	    if (url.startsWith("https://drive.google.com") && url.indexOf("uc?id=") < 0 && url.indexOf("thumbnail?id=") < 0 ) {
@@ -576,7 +577,7 @@ async function load_scenemap(url, is_video = false, width = null, height = null,
 		{
 		  url = "https://api.onedrive.com/v1.0/shares/u!" + btoa(url) + "/root/content";
 		}
-		let newmap = $(`<video style="${newmapSize} position: absolute; top: 0; left: 0;z-index:10" playsinline autoplay loop data-volume='0.5' onloadstart="this.volume=${videoVolume}" id="scene_map" src="${url}" />`);
+		let newmap = $(`<video style="${newmapSize} position: absolute; top: 0; left: 0;z-index:10" playsinline autoplay loop data-volume='0.25' onloadstart="this.volume=${videoVolume/100}" id="scene_map" src="${url}" />`);
 		newmap.off("loadeddata").one("loadeddata", callback);
 		newmap.off("error").on("error", map_load_error_cb);
 
@@ -792,9 +793,9 @@ function load_monster_stat(monsterId, tokenId, customStatBlock=undefined) {
 		$(".sidebar-panel-loading-indicator").hide();
 		return;
 	}
-	if(window.TOKEN_OBJECTS[tokenId].options.monster == 'open5e'){
+	if(window.all_token_objects[tokenId].options.monster == 'open5e'){
 		let container = build_draggable_monster_window();
-		build_and_display_stat_block_with_id(window.TOKEN_OBJECTS[tokenId].options.stat, container, tokenId, function () {
+		build_and_display_stat_block_with_id(window.all_token_objects[tokenId].options.stat, container, tokenId, function () {
 			$(".sidebar-panel-loading-indicator").hide();
 		}, true);
 		return;
@@ -1305,6 +1306,7 @@ function init_mouse_zoom() {
 	window.addEventListener('wheel', function (e) {
 		if (e.ctrlKey) {
 			e.preventDefault();
+			e.stopPropagation();
 			let newScale;
 			if (e.deltaY > MAX_ZOOM_STEP) {
 				newScale = window.ZOOM * 0.9;
@@ -1798,20 +1800,39 @@ function open_player_sheet(sheet_url, closeIfOpen = true) {
 		$(event.target).contents().find("head").append($(`<link type="text/css" rel="Stylesheet" href="${window.EXTENSION_PATH}DiceContextMenu/DiceContextMenu.css" />`));
 		$(event.target).contents().find("head").append(`
 			<style>
-			button.avtt-roll-button {
-				/* lifted from DDB encounter stat blocks  */
-				color: #b43c35;
-				border: 1px solid #b43c35;
-				border-radius: 4px;
-				background-color: #fff;
-				white-space: nowrap;
-				font-size: 14px;
-				font-weight: 600;
-				font-family: Roboto Condensed,Open Sans,Helvetica,sans-serif;
-				line-height: 18px;
-				letter-spacing: 1px;
-				padding: 1px 4px 0;
-			}			
+			button.avtt-roll-button,
+			.ct-sidebar__inner .integrated-dice__container,
+			.ct-sidebar__inner .avtt-roll-button{
+			      /* lifted from DDB encounter stat blocks  */
+			      color: var(--theme-contrast, #b43c35);
+			      background: transparent !important;
+			      border: 1px solid var(--theme-color, #b43c35);
+			      border-radius: 4px;
+			      background-color: #fff;
+			      white-space: nowrap;
+			      font-family: Roboto Condensed,Open Sans,Helvetica,sans-serif;
+			      letter-spacing: 1px;
+			      padding: 1px 4px 0;	       
+			}
+			.ct-sidebar__inner .integrated-dice__container, .ct-sidebar__inner .avtt-roll-button{
+			    font-size:12px;
+			    line-height:10px;
+			    padding:2px 2px 1px 2px;
+			}
+      .ct-sidebar__inner .stat-block .avtt-roll-button{
+          font-size:15px;
+          line-height:15px;
+          font-weight: unset;
+      }
+      .ct-sidebar__inner [class*='ddbc-creature-block'] .avtt-roll-button{
+          /* lifted from DDB encounter stat blocks  */
+          color: #b43c35 !important;
+          background: #fff !important;
+          border: 1px solid #b43c35 !important;
+          line-height:unset !important;
+          font-size:unset !important;
+          padding: 1px 4px 0 !important;  
+      }
 			.MuiPaper-root {
 				padding: 0px 16px;
 				width: 100px;
@@ -2576,8 +2597,8 @@ function init_ui() {
 
 	window.ZOOM = 1.0;
 
-	$('body').css('--window-zoom', window.ZOOM);
-	VTT = $(`<div id='VTT' style='position:absolute; top:0px;left:0px;  '/>`);
+	
+	const VTT = $(`<div id='VTT' style='position:absolute; top:0px;left:0px;  '/>`);
 
 	//VTT.css("margin-left","200px");
 	//VTT.css("margin-top","200px");
@@ -2685,7 +2706,9 @@ function init_ui() {
 				left: window.scrollX + curXPos - m.pageX,
 				top: window.scrollY + curYPos - m.pageY
 			}
-			requestAnimationFrame(function(){window.scrollTo(scrollOptions)});
+			requestAnimationFrame(function(){
+				window.scrollTo(scrollOptions)
+			});
 		}
 	}
 
@@ -2697,13 +2720,13 @@ function init_ui() {
 		if (m.button == 2) { // ONLY THE RIGHT CLICK
 			if($(m.target).closest($(".context-menu-root")).length>0 ) // AVOID RIGHT CLICK TRAP
 				return;
-			//e.preventDefault();
 			curDown = true;
-			$("body").css("cursor", "grabbing");
+			$("#VTT, #black_layer").css("cursor", "grabbing");
 			//cover iframes so you can drag through windows
-			if (get_avtt_setting_value("iframeStatBlocks") === true) {
+			const openDraggables = $("#resizeDragMon");
+			if (openDraggables.find('iframe').length>0) {
 				// iframes yoink the right-click drag when you're moving the map. The non-iframe stat blocks don't need to worry about this
-				$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));
+				openDraggables.append($('<div class="iframeResizeCover"></div>'));
 			}
 			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
 			//return false;
@@ -2712,8 +2735,11 @@ function init_ui() {
 
 	// Function separated so it can be dis/enabled
 	function mouseup(event) {
-		curDown = false;
-		$("body").css("cursor", "");
+		
+		if (event.button == 2) {
+			curDown = false;
+			$("#VTT, #black_layer").css("cursor", "");
+		}
 		//remove iframe cover that prevents mouse interaction
 		$('.iframeResizeCover').remove();
 		if (event.target.tagName.toLowerCase() !== 'a') {
@@ -3840,7 +3866,8 @@ function resize_player_sheet_thin() {
 	$(".ct-character-header-desktop__group--long-rest .ct-character-header-desktop__button").css({ "padding": "2px 10px", "margin": "0px" });
 	$(".ct-character-header-desktop__group-tidbits").css({ "width": "60%" });
 
-	$(".ct-character-header-desktop__group--campaign").css({ "position": "relative", "top": "15px", "left": "auto", "right": "-10px", "margin-right": "0px" });
+
+	$("[class*='styles_campaignSummary']").closest('[class*="styles_container"]').css({ "position": "relative", "top": "15px", "left": "auto", "right": "-10px", "margin-right": "0px" });
 	let height = `${$.position?.scrollbarWidth() ? 512 - $.position.scrollbarWidth() : 512}px`
 	let searchableHeight = `${$.position?.scrollbarWidth() ? 563 - $.position.scrollbarWidth() : 563}px`
   let containerHeight = `${$.position?.scrollbarWidth() ? 563 - $.position.scrollbarWidth() : 563}px`
@@ -3881,7 +3908,7 @@ function reset_character_sheet_css() {
 	$(".ct-character-header-desktop__group--long-rest .ct-character-header-desktop__button").removeAttr( 'style' );
 	$(".ct-character-header-desktop__group-tidbits").removeAttr( 'style' );
 
-	$(".ct-character-header-desktop__group--campaign").removeAttr( 'style' );
+	$("[class*='styles_campaignSummary']").closest('[class*="styles_container"]').removeAttr( 'style' );
 	$(".ct-primary-box").removeAttr( 'style' );
 	$(".ddbc-tab-options__content").removeAttr( 'style' );
 
@@ -3992,9 +4019,15 @@ width=${width},height=${height},left=100,top=100`;
 	childWindows[name].onbeforeunload = function(){
 		closePopout(name);
 	}
-	setTimeout(function(){
-		childWindows[name].document.title = name
-	}, 1000);
+	function checkTitle() {
+		if(childWindows[name].document && childWindows[name].document?.title != name){    
+	    childWindows[name].document.title = name; 
+	    setTimeout(checkTitle, 1000); 
+	  }
+	}	
+
+	checkTitle();
+
 	$(childWindows[name].document).find('body, head').empty();
 	$(childWindows[name].document).find('body').append(cloneSelector.clone(true,true));
 	$(childWindows[name].document).find('head').append($('link, style').clone());

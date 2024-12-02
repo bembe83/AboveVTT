@@ -7,22 +7,16 @@ $(function() {
 let recentCharacterUpdates = {};
 
 const debounce_add_extras = mydebounce(() => {
-  if (is_abovevtt_page()) {
+  const isAbove = is_abovevtt_page()
+  if(isAbove || window.sendToTab != undefined){
     $('.add-monster-token-to-vtt').remove();
     const extraRows = $('.ct-extra-row')
     for(let i=0; i<extraRows.length; i++){
       $(extraRows[i]).append($(`<button class='add-monster-token-to-vtt'>+</button>`)) 
     }
-    let pc = find_pc_by_player_id(my_player_id(), false)
-    const playerTokenID = pc ? pc.sheet : '';
+
     $('.add-monster-token-to-vtt').off('click.addExtra').on('click.addExtra', async function(e){
       e.stopImmediatePropagation();
-      let tokenPosition = (window.TOKEN_OBJECTS[playerTokenID]) ? 
-        {
-          x: parseFloat(window.TOKEN_OBJECTS[playerTokenID].options.left) + parseFloat(window.TOKEN_OBJECTS[playerTokenID].options.size)/2,
-          y: parseFloat(window.TOKEN_OBJECTS[playerTokenID].options.top) + parseFloat(window.TOKEN_OBJECTS[playerTokenID].options.size)/2
-        } : 
-        center_of_view();
 
       let playerData = await DDBApi.fetchCharacterDetails([window.PLAYER_ID])
       let tokenName = $(this).parent().find('.ddbc-extra-name').text().replace("*", '');
@@ -37,27 +31,46 @@ const debounce_add_extras = mydebounce(() => {
         sizeId: monsterData.sizeId,
         name: monsterData.name,
         player_owned: true,
-        share_vision: window.myUser ? window.myUser : true,
         hidden: false,
         locked: false,
         deleteableByPlayers: true,
         lockRestrictDrop: "none",
         restrictPlayerMove: false
       }
-      if(!window.TOKEN_OBJECTS[playerTokenID])
-        tokenPosition = convert_point_from_view_to_map(tokenPosition.x, tokenPosition.y)
-      window.MB.sendMessage("custom/myVTT/place-extras-token", {
-          monsterData: monsterData,
-          centerView: tokenPosition,
-          sceneId: window.CURRENT_SCENE_DATA.id,
-          extraOptions: extraOptions
-      });
-    })
-  
- 
-  
-  } 
+      
 
+      const data = {
+          monsterData: monsterData,
+          extraOptions: extraOptions
+      }
+      if(!isAbove){
+            
+        data.playerID = window.PLAYER_ID 
+        tabCommunicationChannel.postMessage({
+          msgType: 'dropExtra',
+          characterId: window.location.href.split('/').slice(-1)[0],
+          data: data,
+          sendTo: window.sendToTab
+        });
+      }
+      else{
+        let pc = find_pc_by_player_id(window.PLAYER_ID, false)
+        const playerTokenID = pc ? pc.sheet : '';
+        let tokenPosition = (window.TOKEN_OBJECTS[playerTokenID]) ? 
+        {
+          x: parseFloat(window.TOKEN_OBJECTS[playerTokenID].options.left) + parseFloat(window.TOKEN_OBJECTS[playerTokenID].options.size)/2,
+          y: parseFloat(window.TOKEN_OBJECTS[playerTokenID].options.top) + parseFloat(window.TOKEN_OBJECTS[playerTokenID].options.size)/2
+        } : 
+        center_of_view();
+        if(!window.TOKEN_OBJECTS[playerTokenID])
+          tokenPosition = convert_point_from_view_to_map(tokenPosition.x, tokenPosition.y)
+        data.centerView = tokenPosition;
+        data.sceneId = window.CURRENT_SCENE_DATA.id;
+        data.extraOptions.share_vision = window.myUser ? window.myUser : true;
+        window.MB.sendMessage("custom/myVTT/place-extras-token", data);
+      }
+    })
+  }
 }, 100);
 
 const sendCharacterUpdateEvent = mydebounce(() => {
@@ -330,6 +343,7 @@ async function init_characters_pages(container = $(document)) {
   if (typeof window.EXTENSION_PATH !== "string" || window.EXTENSION_PATH.length <= 1) {
     window.EXTENSION_PATH = container.find("#extensionpath").attr('data-path');
   }
+
   // it's ok to call both of these, because they will do any clean up they might need and then return early
   init_character_sheet_page();
   init_character_list_page_without_avtt();
@@ -420,10 +434,10 @@ function convertToRPGRoller(){
           
           
           if (rollData.rollType === "damage") {
-            damage_dice_context_menu(rollData.expression, rollData.modifier, rollData.rollTitle, rollData.rollType, window.PLAYER_NAME, window.PLAYER_IMG)
+            damage_dice_context_menu(rollData.expression, rollData.modifier, rollData.rollTitle, rollData.rollType, window.PLAYER_NAME, window.PLAYER_IMG, undefined, undefined, rollData.damageType)
               .present(e.clientY, e.clientX) // TODO: convert from iframe to main window
           } else {
-            standard_dice_context_menu(rollData.expression, rollData.modifier, rollData.rollTitle, rollData.rollType, window.PLAYER_NAME, window.PLAYER_IMG)
+            standard_dice_context_menu(rollData.expression, rollData.modifier, rollData.rollTitle, rollData.rollType, window.PLAYER_NAME, window.PLAYER_IMG, undefined, undefined, rollData.damageType)
               .present(e.clientY, e.clientX) // TODO: convert from iframe to main window
           }
     })
@@ -656,9 +670,91 @@ function observe_character_sheet_changes(documentToObserve) {
           return button;
         });
         console.log(`${icons.length} aoe spells discovered`);
-      }
+      }    
     }
-   
+    //for character page snippets and sidebar text. Can add anything else that's text isn't modified without removing parent.
+    const snippets = documentToObserve.find(`
+      .ddbc-snippet__content p:not('.above-vtt-visited'), 
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div>div[class*='-detail']>div:not(.ct-item-detail__customize):not([class*='__intro']) p:not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div>div[class*='-detail']>div[class*='ct-item-detail__customize']:nth-child(4) p:not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div>div[class*='-detail']>div:not(.ct-item-detail__customize):not([class*='__intro']) tr:not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div>div[class*='-detail']>div:not(.ct-item-detail__customize):not([class*='__intro']) div[class*='--damage']:not([class*='__modifier']):not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div>div[class*='-detail']>div:not(.ct-item-detail__customize):not([class*='__intro']) span:not([class*='button']):not([class*='casting']):not([class*='__modifier']):not(.above-vtt-visited),
+      [class*='spell-damage-group'] span[class*='__value']:not(.above-vtt-visited)
+    `);
+
+    if(add_journal_roll_buttons && snippets.length > 0){
+      snippets.addClass("above-vtt-visited");
+      snippets.find('.ddbc-snippet__tag').each(function(){
+        $(this).parent().replaceWith($(this).text());
+      })
+      snippets.find('td').each(function(){
+          let text = $(this).text();
+          text = text.replace("–", "-");
+          $(this).text(text);
+      })
+      snippets.each(function(){
+        add_journal_roll_buttons($(this));
+      })
+    }
+
+    // for buttons text that changes based on input, such as damage change from adjusting spell level in the sidebar
+    const manualSetRollbuttons = documentToObserve.find(`.ct-spell-caster__modifier-amount:not(.above-vtt-visited)`) 
+    if(manualSetRollbuttons.length > 0){
+      manualSetRollbuttons.addClass("above-vtt-visited");
+      const rollImage = window.PLAYER_IMG
+      const rollName = window.PLAYER_NAME
+
+      const clickHandler = function(e) {
+
+        let rollData = {} 
+        rollData = getRollData(this);
+        if(!rollData.expression.match(allDiceRegex) && window.EXPERIMENTAL_SETTINGS['rpgRoller'] != true){
+          return;
+        }
+        e.stopImmediatePropagation();
+        
+        window.diceRoller.roll(new DiceRoll(rollData.expression, rollData.rollTitle, rollData.rollType), undefined, undefined, undefined, undefined, rollData.damageType);
+
+      };
+
+      const rightClickHandler = function(e) {
+        let rollData = {} 
+        if($(this).hasClass('avtt-roll-formula-button')){
+           rollData = DiceRoll.fromSlashCommand($(this).attr('data-slash-command'))
+           rollData.modifier = `${Math.sign(rollData.calculatedConstant) == 1 ? '+' : ''}${rollData.calculatedConstant}`
+        }
+        else{
+           rollData = getRollData(this)
+        }
+        if(!rollData.expression.match(allDiceRegex) && window.EXPERIMENTAL_SETTINGS['rpgRoller'] != true){
+          return;
+        }
+        e.stopPropagation();
+        e.preventDefault();
+
+        
+        
+        if (rollData.rollType === "damage") {
+          damage_dice_context_menu(rollData.expression, rollData.modifier, rollData.rollTitle, rollData.rollType, window.PLAYER_NAME, window.PLAYER_IMG, undefined, undefined, rollData.damageType)
+            .present(e.clientY, e.clientX) 
+        } else {
+          standard_dice_context_menu(rollData.expression, rollData.modifier, rollData.rollTitle, rollData.rollType, window.PLAYER_NAME, window.PLAYER_IMG)
+            .present(e.clientY, e.clientX)
+        }
+      }
+      manualSetRollbuttons.each(function(){
+        const button = $(`<button class='avtt-roll-button'></button>`)
+        button.click(clickHandler);
+        button.on("contextmenu", rightClickHandler);
+        $(this).wrap(button);
+      })
+    }
+    const extras_stats = documentToObserve.find(`.ct-sidebar__inner .ddbc-creature-block:not(.above-vtt-visited), [class*='styles_creatureBlock']:not(.above-vtt-visited)`);
+    if(extras_stats.length>0){
+      extras_stats.addClass("above-vtt-visited");   
+      scan_player_creature_pane($(extras_stats));
+    }
 
 
     const spells = documentToObserve.find(".ct-spells-spell__action:not('.above-vtt-visited')") 
@@ -747,42 +843,6 @@ function observe_character_sheet_changes(documentToObserve) {
           } 
         }     
       });
-      if($(`style#advantageHover`).length == 0){
-          $('body').append(`
-            <style id='advantageHover'>
-            .ddbc-combat-attack__icon.above-vtt-visited,
-            .ct-spells-spell__action.above-vtt-visited .ct-spells-spell__at-will{
-              border: 1px solid var(--theme-color, #ddd);
-              border-radius: 5px;
-              padding: 3px;
-              margin: 0px 2px 0px 0px;
-            }
-            #site .advantageHover svg [fill="#b0b7bd"], 
-            #site .advantageHover svg [fill="#242528"],
-            #site .advantageHover svg .prefix__st0,
-            #site .advantageHover svg .prefix__st2,
-            #site .advantageHover svg .prefix__st4,
-            #site .advantageHover svg [fill="#b0b7bd"] *, 
-            #site .advantageHover svg [fill="#242528"] *{
-              fill: #4fcf4f !important;
-            }
-            #site .advantageHover {
-              color: #4fcf4f !important;
-            }
-            #site .disadvantageHover svg [fill="#b0b7bd"], 
-            #site .disadvantageHover svg [fill="#242528"],
-            #site .disadvantageHover svg .prefix__st0,
-            #site .disadvantageHover svg .prefix__st2,
-            #site .disadvantageHover svg .prefix__st4,
-            #site .disadvantageHover svg [fill="#b0b7bd"] *, 
-            #site .disadvantageHover svg [fill="#242528"] *{
-                fill: #bb4242 !important;
-            }
-            #site .disadvantageHover {
-              color: #4fcf4f !important;
-            }
-          </style>`);
-      }
     }
 
 
@@ -1053,19 +1113,60 @@ function observe_character_sheet_changes(documentToObserve) {
               menu[class*='styles_tabs']{
                   margin-bottom: 6px;
               }
-              button.avtt-roll-button {
+              div button.add-monster-token-to-vtt {
+                  border-radius: 5px;
+                  padding: 2px 6px;
+                  border: 1px solid var(--theme-color);
+                  background: var(--theme-background);
+              }
+              .ct-character-sheet__inner button.avtt-roll-button,
+              .ct-sidebar__inner .integrated-dice__container,
+              .ct-sidebar__inner .avtt-roll-button{
                   /* lifted from DDB encounter stat blocks  */
-                  color: #b43c35;
-                  border: 1px solid #b43c35;
-                  border-radius: 4px;
-                  background-color: #fff;
+                  color: var(--theme-contrast, #b43c35) !important;
+                  background: transparent !important;
+                  border: 1px solid var(--theme-color, #b43c35) !important;
+                  border-radius: 4px !important;
                   white-space: nowrap;
-                  font-size: 14px;
-                  font-weight: 600;
                   font-family: Roboto Condensed,Open Sans,Helvetica,sans-serif;
-                  line-height: 18px;
                   letter-spacing: 1px;
-                  padding: 1px 4px 0;
+                  padding: 1px 4px 0;  
+              }
+              .ct-character-sheet__inner button.avtt-roll-button:hover,
+              .ct-sidebar__inner .integrated-dice__container:hover,
+              .ct-sidebar__inner .avtt-roll-button:hover{
+                background: var(--theme-transparent, #ced9e0) !important;
+              }
+              .ct-sidebar__inner .integrated-dice__container, 
+              .ct-sidebar__inner .avtt-roll-button{
+                  font-size:12px;
+                  line-height:10px;
+                  padding:2px 2px 1px 2px;
+              }    
+              .ct-sidebar__inner .stat-block .avtt-roll-button{
+                  font-size:15px;
+                  line-height:15px;
+                  font-weight: unset;
+              }
+
+              .ct-sidebar__inner .glc-game-log .abovevtt-sidebar-injected button.avtt-roll-button{
+                color: rgb(92, 112, 128) !important;
+              }
+
+              .ct-sidebar__inner .glc-game-log .abovevtt-sidebar-injected button.avtt-roll-button:hover{
+                background: #ced9e0 !important;
+              }
+
+
+              .ct-sidebar__inner [class*='ddbc-creature-block'] .avtt-roll-button,
+              .ct-sidebar__inner [class*='styles_creatureBlock'] .avtt-roll-button{
+                  /* lifted from DDB encounter stat blocks  */
+                  color: #b43c35 !important;
+                  background: #fff !important;
+                  border: 1px solid #b43c35 !important;
+                  line-height:unset !important;
+                  font-size:unset !important;
+                  padding: 1px 4px 0 !important;  
               }
               [class*='ct-primary-box__tab'] .ddbc-tab-options__body,
               .ct-primary-box__tab--actions .ddbc-tab-options__content{
@@ -1194,9 +1295,7 @@ function observe_character_sheet_changes(documentToObserve) {
             }
             gameLogButton.click()
         }
-        if (($(mutationTarget).hasClass('ct-sidebar__inner') || $(mutation.addedNodes[0]).hasClass('ct-creature-pane')) && mutationTarget.find('.ct-creature-pane').length>0) {
-          scan_player_creature_pane(mutationTarget);
-        }
+
 
         if (mutationTarget.closest(".ct-game-log-pane").length == 0 && mutationTarget.find('.ct-game-log-pane').length == 0 && mutationTarget.find(".ct-sidebar__header").length > 0 && mutationTarget.find(".ddbc-html-content").length > 0 && mutationTarget.find("#castbutton").length == 0) {
           // we explicitly don't want this to happen in `.ct-game-log-pane` because otherwise it will happen to the injected gamelog messages that we're trying to send here
