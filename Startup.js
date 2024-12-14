@@ -66,6 +66,7 @@ $(function() {
           $(`[class*='listItemTextRoot']:contains('${lastSendToDefault}')`).click();
         }
         $('body').toggleClass('reduceMovement', (window.EXPERIMENTAL_SETTINGS['reduceMovement'] == true));
+        $('body').toggleClass('mobileAVTTUI', (window.EXPERIMENTAL_SETTINGS['iconUi'] == true));
           // STREAMING STUFF
 
         window.STREAMPEERS = {};
@@ -505,7 +506,7 @@ async function start_above_vtt_for_players() {
     reposition_player_sheet();
     setTimeout(function(){
       if(!window.showPanel){
-        hide_sidebar();
+        hide_sidebar(false);
       }
     }, 1000);
     if(!window.CURRENT_SCENE_DATA.is_video || !window.CURRENT_SCENE_DATA.player_map.includes('youtu')){

@@ -121,7 +121,17 @@ Mousetrap.bind('shift+space', function (e) {     //collapse/show character sheet
             window.TOKEN_OBJECTS[tokenId].highlight();   
     }
 });
-
+Mousetrap.bind('shift+s', function (e) { 
+    e.preventDefault();
+    if ($('#grid_snap_drawings .ddbc-tab-options__header-heading').hasClass('ddbc-tab-options__header-heading--is-active')) {
+        $('#grid_snap_drawings .ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', false)
+        window.toggleDrawingSnap = false;
+    } else {
+        $('#grid_snap_drawings .ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', true)
+        window.toggleDrawingSnap = true;
+    }
+});
+           
 
 Mousetrap.bind('q', function () {       //collapse/show sidebar. (q is next to tab, also used to show/hide elements)
     $('#hide_rightpanel').click()
@@ -350,6 +360,20 @@ Mousetrap.bind('ctrl', function () {
 Mousetrap.bind('ctrl', function () {
 	ctrlHeld=false;
 	window.toggleSnap=false;
+}, 'keyup');
+Mousetrap.bind('ctrl+shift', function () {
+    ctrlHeld=true;
+    shiftHeld=true;
+    $(window).off('blur.shiftCheck').one('blur.shiftCheck', function(){
+      window.shiftHeld = false;
+    })
+    window.toggleSnap=true;
+}, 'keydown');
+
+Mousetrap.bind('ctrl+shift', function () {
+    ctrlHeld=false;
+    shiftHeld = false;
+    window.toggleSnap=false;
 }, 'keyup');
 
 Mousetrap.bind('shift+h', function () {

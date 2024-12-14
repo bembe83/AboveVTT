@@ -12,10 +12,10 @@ function init_sidebar_tabs() {
     sidebarContent.append(tokensPanel.build());
     init_tokens_panel();
 
-      $("#scenes-panel").remove();
-      scenesPanel = new SidebarPanel("scenes-panel", false);
-      sidebarContent.append(scenesPanel.build());
-      init_scenes_panel();
+    $("#scenes-panel").remove();
+    scenesPanel = new SidebarPanel("scenes-panel", false);
+    sidebarContent.append(scenesPanel.build());
+    init_scenes_panel();
 
   } else {
     $("#players-panel").remove();
@@ -1116,7 +1116,7 @@ function build_sidebar_list_row(listItem) {
         </g>
     </svg>`)
     }
-    else if(tokenCustomizations?.tokenOptions?.videoToken == true || ['.mp4', '.webm','.mkv'].some(d => listingImage.includes(d))){
+    else if(tokenCustomizations?.tokenOptions?.videoToken == true || ['.mp4', '.webm','.mkv'].some(d => listingImage?.includes(d))){
         img = $(`<video disableRemotePlayback muted src="" loading="lazy" alt="${listItem.name} image" class="token-image video-listing" />`);   
         video = true;
     } else{

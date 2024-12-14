@@ -1590,7 +1590,12 @@ function redraw_elev(openLegened = false) {
 	}
 }
 function open_elev_legend(){
-	let elevationWindow = find_or_create_generic_draggable_window('elev_legend_window', 'Elevation Legend', false, false, undefined, '200px', 'fit-content', '32px', '317px', false, '.row-color');
+	const mobileUI = $('body').hasClass('mobileAVTTUI');
+	const position = {
+		top: mobileUI ? '7px' :'32px',
+		left: mobileUI ? '150px':'317px'
+	}
+	let elevationWindow = find_or_create_generic_draggable_window('elev_legend_window', 'Elevation Legend', false, false, undefined, '200px', 'fit-content', position.top, position.left, false, '.row-color');
 	elevationWindow.find('.elevationLegendDiv').remove();
 
 
@@ -2117,16 +2122,59 @@ function is_rgba_fully_transparent(rgba){
 	return rgba.split(",")?.[3]?.trim().replace(")","") === "0"
 }
 
-function get_event_cursor_position(event){
-	let eventLocation = {
-		pageX: (event.touches) ? ((event.touches[0]) ? event.touches[0].pageX : event.changedTouches[0].pageX) : event.pageX,
-		pageY: (event.touches) ? ((event.touches[0]) ? event.touches[0].pageY : event.changedTouches[0].pageY) : event.pageY,
-	}
-	const pointX = Math.round(((eventLocation.pageX - window.VTTMargin) * (1.0 / window.ZOOM)));
-	const pointY = Math.round(((eventLocation.pageY - window.VTTMargin) * (1.0 / window.ZOOM)));
+/**
+ * Snaps the given coordinates to the nearest grid intersection, based on the current scene data.
+ * Supports square grids and includes offsets if they are defined. TODO vert and horz hex
+ * 
+ * @param {number} pointX - The X-coordinate to be snapped.
+ * @param {number} pointY - The Y-coordinate to be snapped.
+ * @returns {Array<number>} - The snapped [X, Y] coordinates.
+ */
+function get_snapped_coordinates(pointX, pointY) {
 
-	return [pointX, pointY]
+    const offsetX = parseFloat(window.CURRENT_SCENE_DATA.offsetx) || 0;
+    const offsetY = parseFloat(window.CURRENT_SCENE_DATA.offsety) || 0;
+
+    if (window.CURRENT_SCENE_DATA.gridType == "1") {
+        // Square grid
+        const gridWidth = parseFloat(window.CURRENT_SCENE_DATA.hpps);
+        const gridHeight = parseFloat(window.CURRENT_SCENE_DATA.vpps);
+        pointX = Math.round((pointX-offsetX) / gridWidth) * gridWidth + offsetX;
+        pointY = Math.round((pointY-offsetY) / gridHeight) * gridHeight + offsetY;
+    } else if (window.CURRENT_SCENE_DATA.gridType == "2" || window.CURRENT_SCENE_DATA.gridType == "3") {
+        // Hex grid (vertical or horizontal)
+        console.log("Hex snapping is not implemented yet.");
+    }
+
+    return [pointX, pointY];
 }
+
+/**
+ * Converts a cursor event to coordinates in the virtual tabletop, with optional snapping.
+ * Snapping behavior is controlled by the global toggleSnap flag.
+ * 
+ * @param {Event} event - The cursor event (e.g., mouse or touch event).
+ * @returns {Array<number>} - The calculated [X, Y] coordinates.
+ */
+function get_event_cursor_position(event, preventSnap = false) {
+    // Determine the cursor location from the event
+    let eventLocation = {
+        pageX: (event.touches) ? ((event.touches[0]) ? event.touches[0].pageX : event.changedTouches[0].pageX) : event.pageX,
+        pageY: (event.touches) ? ((event.touches[0]) ? event.touches[0].pageY : event.changedTouches[0].pageY) : event.pageY,
+    };
+
+    // Convert to local coordinates
+    let pointX = Math.round(((eventLocation.pageX - window.VTTMargin) * (1.0 / window.ZOOM)));
+    let pointY = Math.round(((eventLocation.pageY - window.VTTMargin) * (1.0 / window.ZOOM)));
+
+    // Apply snapping if enabled
+    if (!preventSnap && ((window.toggleSnap && !window.toggleDrawingSnap) || (window.toggleDrawingSnap && !window.toggleSnap))) {
+        [pointX, pointY] = get_snapped_coordinates(pointX, pointY);
+    }
+
+    return [pointX, pointY];
+}
+
 function numToColor(num, alpha, max) {
     let valueAsPercentageOfMax = num / max;
 	// actual max is 16777215 but represnts white so we will take a max that is
@@ -2441,6 +2489,29 @@ function drawing_mousemove(e) {
 					window.DRAWCOLOR,
 					isFilled,
 					window.LINEWIDTH);
+			}
+			else if(window.DRAWFUNCTION === "wall-door-convert" || window.DRAWFUNCTION === "wall-door" || window.DRAWFUNCTION === "door-door-convert"){
+				drawRect(window.temp_context,
+						window.BEGIN_MOUSEX,
+						window.BEGIN_MOUSEY,
+						width,
+						height,
+						window.DRAWCOLOR,
+						isFilled,
+						3,
+						true);
+			}
+			else if(window.DRAWFUNCTION === "wall-eraser" || window.DRAWFUNCTION === "wall-height-convert" || window.DRAWFUNCTION === "wall-door-convert"  || window.DRAWFUNCTION == "wall-eraser-one" || window.DRAWFUNCTION === "door-door-convert"){
+				drawRect(window.temp_context,
+						window.BEGIN_MOUSEX,
+						window.BEGIN_MOUSEY,
+						width,
+						height,
+						`rgba(255, 255, 255, 1)`,
+						isFilled,
+						3,
+						undefined,
+						true);
 			}
 			else{
 				drawRect(window.temp_context,
@@ -2985,16 +3056,29 @@ function drawing_mouseup(e) {
 			let xInside; 
 			let yInside;
 			
-			xInside = (rectLine.rx < wallLine[0].a.x) && (rectLine.rx < wallLine[0].b.x) && (rectLine.rx+rectLine.rw > wallLine[0].b.x ) && (rectLine.rx+rectLine.rw > wallLine[0].a.x )		
-			yInside = (rectLine.ry < wallLine[0].a.y) && (rectLine.ry < wallLine[0].b.y) && (rectLine.ry+rectLine.rh > wallLine[0].b.y ) && (rectLine.ry+rectLine.rh > wallLine[0].a.y )
+			xInside = (rectLine.rx <= wallLine[0].a.x) && (rectLine.rx <= wallLine[0].b.x) && (rectLine.rx+rectLine.rw >= wallLine[0].b.x ) && (rectLine.rx+rectLine.rw >= wallLine[0].a.x )		
+			yInside = (rectLine.ry <= wallLine[0].a.y) && (rectLine.ry <= wallLine[0].b.y) && (rectLine.ry+rectLine.rh >= wallLine[0].b.y ) && (rectLine.ry+rectLine.rh >= wallLine[0].a.y )
 			
-			
+			if(Array.isArray(left?.x)){
+				left.x = left.x.sort((n1,n2) => n2-n1)[2]
+			}
+			if(Array.isArray(right?.x)){
+				right.x = right.x.sort((n1,n2) => n2-n1)[1]
+			}
+			if(Array.isArray(top?.y)){
+				top.y = top.y.sort((n1,n2) => n2-n1)[2]
+			}
+			if(Array.isArray(bottom?.y)){
+				bottom.y = bottom.y.sort((n1,n2) => n2-n1)[1]
+			}
 
-			fullyInside = (yInside &&  xInside)
+
+			fullyInside = (yInside &&  xInside);
+			const onePixel = (top.y == bottom.y && (Array.isArray(left?.y) || Array.isArray(right?.y))) || (left.x == right.x && (Array.isArray(top?.x) || Array.isArray(bottom?.x)))
 	
 
 
-			if(left != false || right != false || top != false || bottom != false || fullyInside){
+			if(fullyInside || (!onePixel && (left != false || right != false || top != false || bottom != false))){
 				if(window.DRAWFUNCTION == "wall-eraser-one" || window.DRAWFUNCTION === "door-door-convert" || window.DRAWFUNCTION == 'wall-height-convert'){
 					fullyInside = true;
 				}
@@ -3048,7 +3132,8 @@ function drawing_mouseup(e) {
 					let x2;
 					let y1;
 					let y2;
-					if(left != false){
+	
+					if(left != false && !Array.isArray(left?.y)){
 						if(wallLine[0].b.x > wallLine[0].a.x){
 							x1 = (wallLine[0].a.x);
 							y1 = (wallLine[0].a.y);
@@ -3074,7 +3159,7 @@ function drawing_mouseup(e) {
 						window.DRAWINGS.push(data);
 						undoArray.push([...data]);
 					}	
-					if(right != false){
+					if(right != false && !Array.isArray(right?.y)){
 						if(wallLine[0].b.x > wallLine[0].a.x){
 							x1 = (wallLine[0].b.x);
 							y1 = (wallLine[0].b.y);
@@ -3102,7 +3187,7 @@ function drawing_mouseup(e) {
 						window.DRAWINGS.push(data);	
 						undoArray.push([...data]);			
 					}
-					if(top != false){
+					if(top != false && !Array.isArray(top?.x)){
 						if(wallLine[0].a.y > wallLine[0].b.y){
 							x1 = (wallLine[0].b.x);
 							y1 = (wallLine[0].b.y);
@@ -3130,7 +3215,7 @@ function drawing_mouseup(e) {
 						undoArray.push([...data]);
 					
 					}
-					if(bottom != false){
+					if(bottom != false && !Array.isArray(bottom?.x)){
 						if(wallLine[0].a.y > wallLine[0].b.y){
 							x1 = (wallLine[0].a.x);
 							y1 = (wallLine[0].a.y);
@@ -3194,11 +3279,11 @@ function drawing_mouseup(e) {
 				left = (intersectingWalls[i].left != false) ? intersectingWalls[i].left : left;
 				right = (intersectingWalls[i].right != false) ? intersectingWalls[i].right : right;
 
-				if(bottom != false){
+				if(bottom != false && !Array.isArray(bottom?.x)){
 					x1 = bottom.x;
 					y1 = bottom.y;
 				}
-				if(left != false){
+				if(left != false && !Array.isArray(right?.y)){
 					if(x1 == undefined){
 						x1 = left.x;
 						y1 = left.y;
@@ -3208,7 +3293,7 @@ function drawing_mouseup(e) {
 						y2 = left.y;
 					}
 				}
-				if(right != false){
+				if(right != false && !Array.isArray(left?.y)){
 					if(x1 == undefined){
 						x1 = right.x;
 						y1 = right.y;
@@ -3218,7 +3303,7 @@ function drawing_mouseup(e) {
 						y2 = right.y;
 					}
 				}
-				if(top != false){	
+				if(top != false && !Array.isArray(top?.x)){	
 					if(x1 == undefined){
 						x1 = top.x;
 						y1 = top.y;
@@ -3655,21 +3740,30 @@ function drawCircle(ctx, centerX, centerY, radius, style, fill=true, lineWidth =
 
 }
 
-function drawRect(ctx, startx, starty, width, height, style, fill=true, lineWidth = 6)
+function drawRect(ctx, startx, starty, width, height, style, fill=true, lineWidth = 6, addStrokeToFill = false, addDottedStrokeToBorder)
 {
 	ctx.beginPath();
+	ctx.lineWidth = lineWidth;
+	ctx.strokeStyle = style;
+	ctx.fillStyle = style;
 	if(fill)
 	{
-		ctx.fillStyle = style;
-		ctx.fillRect(startx/window.CURRENT_SCENE_DATA.scale_factor, starty/window.CURRENT_SCENE_DATA.scale_factor, width/window.CURRENT_SCENE_DATA.scale_factor, height/window.CURRENT_SCENE_DATA.scale_factor);
+		ctx.rect(startx/window.CURRENT_SCENE_DATA.scale_factor, starty/window.CURRENT_SCENE_DATA.scale_factor, width/window.CURRENT_SCENE_DATA.scale_factor, height/window.CURRENT_SCENE_DATA.scale_factor);
+		ctx.fill()
+		if(addStrokeToFill){
+			ctx.stroke();
+		}
 	}
 	else
 	{
-		ctx.lineWidth = lineWidth;
-		ctx.strokeStyle = style;
-		ctx.beginPath();
 		ctx.rect(startx/window.CURRENT_SCENE_DATA.scale_factor, starty/window.CURRENT_SCENE_DATA.scale_factor, width/window.CURRENT_SCENE_DATA.scale_factor, height/window.CURRENT_SCENE_DATA.scale_factor);
 		ctx.stroke();
+		if(addDottedStrokeToBorder){
+			ctx.setLineDash([2*lineWidth, 2*lineWidth])
+			ctx.strokeStyle = `rgba(0,0,0,1)`;
+			ctx.stroke();
+			ctx.setLineDash([]);
+		}
 	}
 
 }
@@ -5240,14 +5334,6 @@ Ray.prototype.cast = function(boundary) {
   const x4 = this.pos.x + this.dir.x;
   const y4 = this.pos.y + this.dir.y;
   
-  const addedScale = 1;
-
-  x1 = x1 < x3 ? x1+addedScale : x1-addedScale
-  y1 = y1 < y3 ? y1+addedScale : y1-addedScale
-
-  x2 = x2 < x4 ? x2+addedScale : x2-addedScale
-  y2 = y2 < y4 ? y2+addedScale : y2-addedScale
-
   const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
   // if denominator is zero then the ray and boundary are parallel
   if (den === 0) {
@@ -5258,7 +5344,7 @@ Ray.prototype.cast = function(boundary) {
   let t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
   let u = -((x1 -x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
   
-  if (t > 0 && t < 1 && u > 0) {
+  if (t >= 0 && t <= 1 && u >= 0) {
     const pt = new Vector();
     pt.x = x1 + t * (x2 - x1);
     pt.y = y1 + t * (y2 - y1);
@@ -5449,6 +5535,16 @@ function lineLine(x1, y1, x2, y2, x3, y3, x4, y4) {
     let intersectionY = y1 + (uA * (y2-y1));
 
     return {x: intersectionX, y: intersectionY};
+  }
+  else if(isNaN(uB) && isNaN(uB)){
+  	if((x3<x1&&x3<x2&&x4<x1&&x4<x2) || (x3>x1&&x3>x2&&x4>x1&&x4>x2) || (y3<y1&&y3<y2&&y4<y1&&y4<y2) || (y3>y1&&y3>y2&&y4>y1&&y4>y2))
+  		return false;
+  	else if(y1==y2 && y2==y3 && y3==y4){
+  		return {x: [x1, x2, x3, x4], y: y1};
+  	}
+  	else if(x1==x2 && x2==x3 && x3==x4){
+  		return {x: x1, y: [y1, y2, y3, y4]};
+  	}
   }
   return false;
 }
