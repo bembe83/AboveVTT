@@ -391,7 +391,8 @@ async function init_characters_pages(container = $(document)) {
 
 
     window.diceRoller = new DiceRoller(); 
-    window.ddbConfigJson = await DDBApi.fetchConfigJson();
+    if(!window.ddbConfigJson)
+      window.ddbConfigJson = await DDBApi.fetchConfigJson();
   }
 }
 
@@ -406,11 +407,7 @@ const debounceRemoveRPGRoller =  mydebounce(() => {
 
 
 function convertToRPGRoller(){
-    if(is_abovevtt_page() && window.EXPERIMENTAL_SETTINGS['rpgRoller'] != true){
-      $(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`).off('click.rpg-roller')
-      $(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`).off('contextmenu.rpg-roller')
-      return;
-    }
+
     let urlSplit = window.location.href.split("/");
     if(urlSplit.length > 0 && !is_abovevtt_page()) {
       window.PLAYER_ID = urlSplit[urlSplit.length - 1].split('?')[0];
@@ -425,9 +422,7 @@ function convertToRPGRoller(){
           else{
              rollData = getRollData(this)
           }
-          if(!rollData.expression.match(allDiceRegex) && window.EXPERIMENTAL_SETTINGS['rpgRoller'] != true){
-            return;
-          }
+
           e.stopPropagation();
           e.preventDefault();
 
@@ -462,10 +457,23 @@ function init_character_sheet_page() {
 
   // check for name and image
   set_window_name_and_image(function() {
-    observe_character_sheet_changes($(document));
+    observe_character_sheet_changes($('#site-main, .ct-sidebar__portal'));
+    observe_non_sheet_changes($('body'));
     inject_join_exit_abovevtt_button();
     observe_character_theme_change();
     observe_character_image_change();
+    $(document).off('keydown.keypressAdv keyup.keypressAdv').on('keydown.keypressAdv keyup.keypressAdv', function(e) {
+      let target = $('.ddbc-combat-attack__icon.above-vtt-visited:hover, .ct-spells-spell__action.above-vtt-visited:hover')
+      if(e.shiftKey){
+        $(target).toggleClass('advantageHover', true)
+      }
+      else if(e.ctrlKey || e.metaKey){
+        $(target).toggleClass('disadvantageHover', true)
+      }else{
+        $(target).toggleClass('advantageHover', false)
+        $(target).toggleClass('disadvantageHover', false)
+      }
+    });
   });
 
   // observe window resizing and injeect our join/exit button if necessary
@@ -592,7 +600,10 @@ function observe_character_sheet_changes(documentToObserve) {
   }
 
   window.character_sheet_observer = new MutationObserver(function(mutationList, observer) {
+    if(window.DRAGGING || (typeof arrowKeysHeld !== 'undefined' && (arrowKeysHeld[0] || arrowKeysHeld[1] || arrowKeysHeld[2] || arrowKeysHeld[3])))
+      return;
 
+   
     // console.log("character_sheet_observer", mutationList);
 
     // initial injection of our buttons
@@ -709,9 +720,7 @@ function observe_character_sheet_changes(documentToObserve) {
 
         let rollData = {} 
         rollData = getRollData(this);
-        if(!rollData.expression.match(allDiceRegex) && window.EXPERIMENTAL_SETTINGS['rpgRoller'] != true){
-          return;
-        }
+
         e.stopImmediatePropagation();
         
         window.diceRoller.roll(new DiceRoll(rollData.expression, rollData.rollTitle, rollData.rollType), undefined, undefined, undefined, undefined, rollData.damageType);
@@ -727,9 +736,7 @@ function observe_character_sheet_changes(documentToObserve) {
         else{
            rollData = getRollData(this)
         }
-        if(!rollData.expression.match(allDiceRegex) && window.EXPERIMENTAL_SETTINGS['rpgRoller'] != true){
-          return;
-        }
+
         e.stopPropagation();
         e.preventDefault();
 
@@ -846,7 +853,7 @@ function observe_character_sheet_changes(documentToObserve) {
     }
 
 
-    const spellDamageButtons = $(`.ddbc-spell-damage-effect .integrated-dice__container:not('.above-vtt-visited-spell-damage')`)
+    const spellDamageButtons = documentToObserve.find(`.ddbc-spell-damage-effect .integrated-dice__container:not('.above-vtt-visited-spell-damage')`)
     if(spellDamageButtons.length > 0){
       $(spellDamageButtons).addClass("above-vtt-visited-spell-damage");
       spellDamageButtons.off('click.spellSave').on('click.spellSave', function(e){
@@ -860,7 +867,7 @@ function observe_character_sheet_changes(documentToObserve) {
     } 
 
 
-    const damageButtons = $(`.ddb-note-roll:not('.above-vtt-visited-damage'), .integrated-dice__container:not('.above-vtt-visited-damage')`)
+    const damageButtons = documentToObserve.find(`.ddb-note-roll:not('.above-vtt-visited-damage'), .integrated-dice__container:not('.above-vtt-visited-damage')`)
     if(damageButtons.length > 0){
       $(damageButtons).addClass("above-vtt-visited-damage");
       damageButtons.off('click.damageType').on('click.damageType', function(e){
@@ -884,7 +891,7 @@ function observe_character_sheet_changes(documentToObserve) {
         
         let settingOption = { 
             "versatile":{
-              label: "Versatile rolls",
+              label: "Icon Roll Versatile weapons",
               type: "dropdown",
               options: [
                 { value: "both", label: "Roll both damages", description: "Both 1 and 2 handed rolls will be rolled." },
@@ -894,7 +901,7 @@ function observe_character_sheet_changes(documentToObserve) {
               defaultValue: "both"
             },
             "crit":{
-              label: "Crit Type",
+              label: "Icon Roll Crit Type",
               type: "dropdown",
               options:[
                 { value: "0", label: "Double damage dice", description: "Doubles damage dice for crits." },
@@ -905,20 +912,45 @@ function observe_character_sheet_changes(documentToObserve) {
               defaultValue: "0"
             },
             "critRange":{
-              label: "Crit Range",
+              label: "Icon Roll Crit Range",
               type: "input",
               inputType: 'number',
               max: '20',
               min: '1',
               step: '1',
               defaultValue: "20"
+            },
+            "hitRoll":{
+              label: "Added to Attacks",
+              type: "input",
+              inputType: "text",
+              defaultValue: ""
+            },
+            "damageRoll":{
+              label: "Added to Damage",
+              type: "input",
+              inputType: "text",
+              defaultValue: ""
+            },
+            "checkRoll":{
+              label: "Added to Ability Checks",
+              type: "input",
+              inputType: "text",
+              defaultValue: ""
+            },
+            "saveRoll":{
+              label: "Added to Saves",
+              type: "input",
+              inputType: "text",
+              defaultValue: ""
             }
         }
-        let options = $(`<div id='icon-roll-options' 
-          style= 'z-index: 100000;
+        let options = $(`<div id='icon-roll-options'  
+              style= 'z-index: 100000;
               width: 20%;
               height: 20%;
-              width: 300px;
+              width: 350px;
+              max-width: 80%;
               height: 300px;
               position: fixed;
               display: none;
@@ -927,12 +959,13 @@ function observe_character_sheet_changes(documentToObserve) {
               transform: translate(-50%, -50%);
               background: var(--theme-background-solid);
               box-shadow: 0px 0px 4px var(--theme-contrast);
-              padding-right: 5px;
               border-radius: 15px;
               border: 1px solid var(--theme-contrast);
               color: var(--theme-contrast);
-            '>
-        </div>`)
+              overflow:hidden;'>  
+              </div>`)
+        let optionsContents = $(`<div style='overflow: auto; max-height:100%;'></div>`);
+        options.append(optionsContents);
         let closeOptions = $(`<div id='close-icon-roll-options' 
           style='z-index: 99999;
             height: 100%;
@@ -953,7 +986,7 @@ function observe_character_sheet_changes(documentToObserve) {
               window.CHARACTER_AVTT_SETTINGS[i] = settingOption[i].defaultValue;
             }
            let wrapper = $(`
-             <div id='${i}Setting' style='font-size: 14px;display:flex; margin: 10px 0px 10px 0px;align-items: center;' data-option-name="${i}">
+             <div id='${i}Setting' style='font-size: 14px;display:flex; margin: 5px 0px;align-items: center;' data-option-name="${i}">
                <div style="margin-right: 3px; margin-left: 10px; flex-grow: 1;font-weight: 700;font-size: 14px;">${settingOption[i].label}:</div>
              </div>
            `);
@@ -986,20 +1019,20 @@ function observe_character_sheet_changes(documentToObserve) {
             
             wrapper.append(input);
 
-            options.append(wrapper)
+            optionsContents.append(wrapper)
         }
         let optionsInfo = $(`<div style='font-size: 11px; margin: 10px; align-items: flex-start; display: flex; flex-direction: column;'>
-         <div style='margin-bottom:5px;'>• These settings only apply to rolls made with icons/cast buttons to the left of actions/spells.</div>
+         <div style='margin-bottom:5px;'>• Settings mentioning 'Icon Rolls' only apply to rolls made with icons/cast buttons to the left of actions/spells.</div>
          <div style='margin-bottom:5px;'>• Perfect Crits is a normal roll + max roll on crit dice</div>
          <div style='margin-bottom:5px;'>• Double Damage Total is 2*(dice damage+mod)</div>
-         <div style='margin-bottom:5px;'>• Hold Shift/Ctrl to roll ADV/DIS respectively.</div>
-         <div style='margin-bottom:5px;'>• Hold Alt + Shift/Ctrl to roll Super ADV/DIS respectively</div>
+         <div style='margin-bottom:5px;'>• For icon rolls hold Shift/Ctrl to roll ADV/DIS respectively.</div>
+         <div style='margin-bottom:5px;'>• For icon rolls hold Alt + Shift/Ctrl to roll Super ADV/DIS respectively</div>
           </div>`)
-        options.append(optionsInfo);
+        optionsContents.append(optionsInfo);
 
       }
       if($('#avtt-icon-roll-span').length == 0){
-        let settings = $(`<span id='avtt-icon-roll-span' style="font-weight: 700;font-size: 11px;">AVTT Icon Roll Settings <span style='font-size: 11px;'class="ddbc-manage-icon__icon "></span></span>`)
+        let settings = $(`<span id='avtt-icon-roll-span' style="font-weight: 700;font-size: 11px;">AVTT Roll Settings <span style='font-size: 11px;'class="ddbc-manage-icon__icon "></span></span>`)
         settings.off().on('click', function(){
           $('#close-icon-roll-options').css('display', 'block');
           $('#icon-roll-options').css('display', 'block');
@@ -1030,7 +1063,7 @@ function observe_character_sheet_changes(documentToObserve) {
       })
       attackIcons.off('click.multiroll contextmenu.multiroll').on('click.multiroll contextmenu.multiroll', function(e) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         let versatileRoll = window.CHARACTER_AVTT_SETTINGS.versatile;
                      
         let rollButtons = $(this).parent().find(`.integrated-dice__container:not('.avtt-roll-formula-button'):not('.above-vtt-visited'):not('.above-vtt-dice-visited'):not('.above-aoe'), .integrated-dice__container.abovevtt-icon-roll`);
@@ -1056,27 +1089,23 @@ function observe_character_sheet_changes(documentToObserve) {
           let diceRoll;
 
           if(data.expression != undefined){
-            if (/^1d20[+-]([0-9]+)/g.test(data.expression)) {
-               if(e.altKey){
-                  if(e.shiftKey){
-                    diceRoll = new DiceRoll(`3d20kh1${data.modifier}`, data.rollTitle, data.rollType);
-                   }
-                   else if(e.ctrlKey || e.metaKey){
-                    diceRoll = new DiceRoll(`3d20kl1${data.modifier}`, data.rollTitle, data.rollType);
-                   }
-               }
-               else if(e.shiftKey){
-                diceRoll = new DiceRoll(`2d20kh1${data.modifier}`, data.rollTitle, data.rollType);
-               }
-               else if(e.ctrlKey || e.metaKey){
-                diceRoll = new DiceRoll(`2d20kl1${data.modifier}`, data.rollTitle, data.rollType);
-               }else{
-                diceRoll = new DiceRoll(data.expression, data.rollTitle, data.rollType)
-               }
+            if (/^1d20/g.test(data.expression)) {
+              if(e.altKey){
+                if(e.shiftKey){
+                  data.expression = data.expression.replaceAll(/^1d20/g, '3d20kh1')
+                 }
+                 else if(e.ctrlKey || e.metaKey){
+                  data.expression = data.expression.replaceAll(/^1d20/g, '3d20kl1')
+                 }
+              }
+              else if(e.shiftKey){
+                data.expression = data.expression.replaceAll(/^1d20/g, '2d20kh1')
+              }
+              else if(e.ctrlKey || e.metaKey){
+                data.expression = data.expression.replaceAll(/^1d20/g, '3d20k11')
+              }  
             }
-            else{
-              diceRoll = new DiceRoll(data.expression, data.rollTitle, data.rollType)
-            }
+            diceRoll = new DiceRoll(data.expression, data.rollTitle, data.rollType);
             if(damageTypeText == undefined && data.damageType != undefined)
               damageTypeText = data.damageType
             window.diceRoller.roll(diceRoll, true, window.CHARACTER_AVTT_SETTINGS.critRange ? window.CHARACTER_AVTT_SETTINGS.critRange : 20, window.CHARACTER_AVTT_SETTINGS.crit ? window.CHARACTER_AVTT_SETTINGS.crit : 2, spellSaveText, damageTypeText);
@@ -1107,6 +1136,11 @@ function observe_character_sheet_changes(documentToObserve) {
       if($(`style#advantageHover`).length == 0){
           $('body').append(`
             <style id='advantageHover'>
+              div#icon-roll-options input,
+              div#icon-roll-options select{
+                  width: 140px;
+                  max-width:50%
+              }
               menu[class*='styles_tabs']>li>button[class*='styles_tabButton']{
                   max-height: 26px;
               }
@@ -1235,19 +1269,8 @@ function observe_character_sheet_changes(documentToObserve) {
       }    
     }
 
+    debounceConvertToRPGRoller();
 
-    $(document).off('keydown.keypressAdv keyup.keypressAdv').on('keydown.keypressAdv keyup.keypressAdv', function(e) {
-      let target = $('.ddbc-combat-attack__icon.above-vtt-visited:hover, .ct-spells-spell__action.above-vtt-visited:hover')
-      if(e.shiftKey){
-        $(target).toggleClass('advantageHover', true)
-      }
-      else if(e.ctrlKey || e.metaKey){
-        $(target).toggleClass('disadvantageHover', true)
-      }else{
-        $(target).toggleClass('advantageHover', false)
-        $(target).toggleClass('disadvantageHover', false)
-      }
-    });
 
     
     // handle updates to element changes that would strip our buttons
@@ -1255,46 +1278,21 @@ function observe_character_sheet_changes(documentToObserve) {
       try {
         let mutationTarget = $(mutation.target);
         const mutationParent = mutationTarget.parent();
-         mutation.addedNodes.forEach(function(added_node){
-          if($(added_node).hasClass('integrated-dice__container') || $(added_node).find('.integrated-dice__container')){
-            if((!is_abovevtt_page() && (window.sendToTab !== undefined || window.sendToTabRPGRoller !== undefined)) || window.EXPERIMENTAL_SETTINGS['rpgRoller'] == true || window.self != window.top){
-              debounceConvertToRPGRoller();
-            }
-            else{
-              $(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`).off('click.rpg-roller'); 
-              $(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`).off('contextmenu.rpg-roller') 
-            }         
-          }
-        })
-        if(mutationTarget[0].nodeName == 'BUTTON' && mutationTarget.attr('name') == 'rpgRoller'){
-          if((!is_abovevtt_page() && (window.sendToTab !== undefined || window.sendToTabRPGRoller !== undefined)) || window.EXPERIMENTAL_SETTINGS['rpgRoller'] == true || window.self != window.top)
-            debounceConvertToRPGRoller();
-          else
-            $(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`).off('click.rpg-roller');
-            $(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`).off('contextmenu.rpg-roller')
-        }
         
-        mutation.removedNodes.forEach(function(removed_node) {
-          if($(removed_node).hasClass("ct-game-log-pane")) {
-            setTimeout(function() {
-              change_sidbar_tab($("#switch_gamelog"), true);
-              // deselect the gamelog tab since we're not technically showing the gamelog
-              deselect_all_sidebar_tabs();
-              $("#switch_gamelog svg").attr("class", "gamelog-button__icon");
-            }, 0);
-          }
-        });
-       
-
-   
-        if((mutationTarget.hasClass('.ajs-ok:not(.ajs-hidden)') || mutationTarget.find('.ajs-ok:not(.ajs-hidden)').length>0) && $('.alertify ~ div.alertify:not(.ajs-hidden):last-of-type').length>0 && !['Beyond 20 Settings', 'Beyond 20 Quick Settings', 'Beyond20 Hotkey'].includes($('.alertify ~ div.alertify:not(.ajs-hidden):last-of-type .ajs-header').text())){
-           $('.alertify ~ div.alertify:not(.ajs-hidden):last-of-type .ajs-button.ajs-ok').click();
-           let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button")
-            if(gameLogButton.length == 0){
-              gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
+        if(is_abovevtt_page()){
+          mutation.removedNodes.forEach(function(removed_node) {
+            if($(removed_node).hasClass("ct-game-log-pane")) {
+              setTimeout(function() {
+                change_sidbar_tab($("#switch_gamelog"), true);
+                // deselect the gamelog tab since we're not technically showing the gamelog
+                deselect_all_sidebar_tabs();
+                $("#switch_gamelog svg").attr("class", "gamelog-button__icon");
+              }, 0);
             }
-            gameLogButton.click()
+          });
         }
+
+
 
 
         if (mutationTarget.closest(".ct-game-log-pane").length == 0 && mutationTarget.find('.ct-game-log-pane').length == 0 && mutationTarget.find(".ct-sidebar__header").length > 0 && mutationTarget.find(".ddbc-html-content").length > 0 && mutationTarget.find("#castbutton").length == 0) {
@@ -1316,10 +1314,9 @@ function observe_character_sheet_changes(documentToObserve) {
         if(is_abovevtt_page()){
            
             // console.log(`sidebar inserted: ${event.target.classList}`);
-          if (mutationTarget.hasClass('ct-sidebar__pane-content')){
+          if (mutationTarget.is('.ct-sidebar__pane-content, .ct-sidebar__inner [class*="styles_content"]>div')){
              // The user clicked on something that shows details. Open the sidebar and show it
-            show_sidebar();
-        
+            show_sidebar(false);
           }
             
           if ($(mutation.addedNodes[0]).hasClass('ct-sidebar__pane-default') || $(mutation.addedNodes[0]).hasClass('ct-reset-pane')) {
@@ -1449,12 +1446,51 @@ function observe_character_sheet_changes(documentToObserve) {
       }
     });
   });
+  for(let i = 0; i<documentToObserve.length; i++){
+    const mutation_target = documentToObserve.get(i);
+    const mutation_config = { attributes: true, childList: true, characterData: true, subtree: true };
+    window.character_sheet_observer.observe(mutation_target, mutation_config);
+  }
 
-  const mutation_target = documentToObserve.get(0);
-  const mutation_config = { attributes: true, childList: true, characterData: true, subtree: true };
-  window.character_sheet_observer.observe(mutation_target, mutation_config);
 }
 
+function observe_non_sheet_changes(documentToObserve) {
+
+
+  window.non_sheet_observer = new MutationObserver(function(mutationList, observer) {
+    if(window.DRAGGING || (typeof arrowKeysHeld !== 'undefined' && (arrowKeysHeld[0] || arrowKeysHeld[1] || arrowKeysHeld[2] || arrowKeysHeld[3])))
+      return;
+    mutationList.forEach(mutation => {
+      try {
+        let mutationTarget = $(mutation.target);
+        //Remove beyond20 popup and swtich to gamelog
+        if((mutationTarget.hasClass('.ajs-ok:not(.ajs-hidden)') || mutationTarget.find('.ajs-ok:not(.ajs-hidden)').length>0) && $('.alertify ~ div.alertify:not(.ajs-hidden):not(:has(~ .alertify))').length>0 && !['Beyond 20 Settings', 'Beyond 20 Quick Settings', 'Beyond20 Hotkey'].includes($('.alertify ~ div.alertify:not(.ajs-hidden):last-of-type .ajs-header').text())){
+          const abovePage = is_abovevtt_page();       
+          $('.alertify ~ div.alertify:not(.ajs-hidden):not(:has(~ .alertify)) .ajs-button.ajs-ok').click();        
+          if(abovePage || !window.EXPERIMENTAL_SETTINGS?.rpgRoller){
+            let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button")
+            if(gameLogButton.length == 0){
+              gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
+            }
+            gameLogButton.click();
+          }
+          if(abovePage)
+           window.MB.reprocess_chat_message_history();
+        }
+      }
+      catch{
+        console.warn("non_sheet_observer failed to parse mutation", error, mutation);
+      }
+    })
+  });
+
+  for(let i = 0; i<documentToObserve.length; i++){
+    const mutation_target = documentToObserve.get(i);
+    //observers changes to body direct children being removed/added
+    const mutation_config = { attributes: false, childList: true, characterData: false, subtree: false };
+    window.non_sheet_observer.observe(mutation_target, mutation_config);
+  }
+}
 /** Attempts to read the player name and image from the page every.
  * This will retry every second until it successfully reads from the page
  * @param {function} callback a function to execute after player name and image have been read from the page */

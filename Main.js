@@ -1415,7 +1415,7 @@ function init_splash() {
 	ul.append("<li><a style='font-weight:bold;text-decoration: underline;' target='_blank' href='https://www.patreon.com/AboveVTT'>Patreon</a></li>");
 	cont.append(ul);*/
 	cont.append("");
-	cont.append("<div style='padding-top:10px'>Contributors: <b>SnailDice (Nadav),Stumpy, Palad1N, KuzKuz, Coryphon, Johnno, Hypergig, JoshBrodieNZ, Kudolpf, Koals, Mikedave, Jupi Taru, Limping Ninja, Turtle_stew, Etus12, Cyelis1224, Ellasar, DotterTrotter, Mosrael, Bain, Faardvark, Azmoria, Natemoonlife, Pensan, H2, CollinHerber, Josh-Archer, TachyonicSpace, TheRyanMC, j3f (jeffsenn), MonstraG</b></div>");
+	cont.append("<div style='padding-top:10px'>Contributors: <b>SnailDice (Nadav),Stumpy, Palad1N, KuzKuz, Coryphon, Johnno, Hypergig, JoshBrodieNZ, Kudolpf, Koals, Mikedave, Jupi Taru, Limping Ninja, Turtle_stew, Etus12, Cyelis1224, Ellasar, DotterTrotter, Mosrael, Bain, Faardvark, Azmoria, Natemoonlife, Pensan, H2, CollinHerber, Josh-Archer, TachyonicSpace, TheRyanMC, j3f (jeffsenn), MonstraG, Wyrmwood</b></div>");
 
 	cont.append("<br>AboveVTT is an hobby opensource project. It's completely free (like in Free Speech). The resources needed to pay for the infrastructure are kindly donated by the supporters through <a style='font-weight:bold;text-decoration: underline;' target='_blank' href='https://www.patreon.com/AboveVTT'>Patreon</a> , what's left is used to buy wine for cyruzzo");
 
@@ -1873,27 +1873,10 @@ function open_player_sheet(sheet_url, closeIfOpen = true) {
 		console.log("removing headers");
 
 
-		// DICE STREAMING ?!?!
-		if(!window.DM){
-			let firstTime=false;
-			if(!window.MYMEDIASTREAM)
-				firstTime = true;
-			let diceRollPanel = $(event.target).contents().find(".dice-rolling-panel__container");
-			if (diceRollPanel.length > 0) {
-				window.MYMEDIASTREAM = diceRollPanel.get(0).captureStream(0);
-
-
-				if (window.JOINTHEDICESTREAM) {
-					// we should tear down and reconnect
-					for (let i in window.STREAMPEERS) {
-						console.log("replacing the track")
-						window.STREAMPEERS[i].getSenders()[0].replaceTrack(window.MYMEDIASTREAM.getVideoTracks()[0]);
-					}
-				}
-
-			}
-
+		if (window.JOINTHEDICESTREAM) {
+			joinDiceRoom();
 		}
+
 		// WIP to allow players to add in tokens from their extra tab
 		// observe_character_sheet_companion($(event.target).contents());
 
@@ -1937,13 +1920,12 @@ function close_player_sheet()
 		}
 		window.MB.sendMessage("custom/myVTT/player_sheet_closed", { player_sheet: window.PLAYER_SHEET });
 	}
-
 	if (window.character_sheet_observer) {
 		window.character_sheet_observer.disconnect();
 		delete window.character_sheet_observer;
 	}
 	if(!window.DM){
-			observe_character_sheet_changes($(document));
+			observe_character_sheet_changes($('#site-main, .ct-sidebar__portal'));
 	}
 }
 
@@ -2051,20 +2033,24 @@ function init_character_page_sidebar() {
 	$(".ct-sidebar__inner").off("click.setCondition").on("click.setCondition", ".set-conditions-button", function(clickEvent) {
 		let conditionName = $(clickEvent.target).parent().find("span").text();
 			$('.ct-combat__statuses-group--conditions .ct-combat__summary-label:contains("Conditions"), .ct-combat-tablet__cta-button:contains("Conditions"), .ct-combat-mobile__cta-button:contains("Conditions")').click();
-			$('.ct-condition-manage-pane').css('visibility', 'hidden');
-			$(`.ct-sidebar__inner .ct-condition-manage-pane__condition-name:contains('${conditionName}') ~ .ct-condition-manage-pane__condition-toggle>[class*='styles_toggle'][aria-pressed="false"]`).click();
+			setTimeout(function(){
+				$('.ct-condition-manage-pane').css('visibility', 'hidden');
+				$(`.ct-sidebar__inner .ct-condition-manage-pane__condition-name:contains('${conditionName}') ~ .ct-condition-manage-pane__condition-toggle>[class*='styles_toggle'][aria-pressed="false"]`).click();
+			}, 10)
 			setTimeout(function(){
 				$(`#switch_gamelog`).click();
-			}, 10)
+			}, 20)
 	});	
 	$(".ct-sidebar__inner").off("click.removeCondition").on("click.removeCondition", ".remove-conditions-button", function(clickEvent) {
 		let conditionName = $(clickEvent.target).parent().find("span").text();
 			$('.ct-combat__statuses-group--conditions .ct-combat__summary-label:contains("Conditions"), .ct-combat-tablet__cta-button:contains("Conditions"), .ct-combat-mobile__cta-button:contains("Conditions")').click();
-			$('.ct-condition-manage-pane').css('visibility', 'hidden');
-			$(`.ct-sidebar__inner .ct-condition-manage-pane__condition-name:contains('${conditionName}') ~ .ct-condition-manage-pane__condition-toggle>[class*='styles_toggle'][aria-pressed="true"]`).click();
+			setTimeout(function(){
+				$('.ct-condition-manage-pane').css('visibility', 'hidden');
+				$(`.ct-sidebar__inner .ct-condition-manage-pane__condition-name:contains('${conditionName}') ~ .ct-condition-manage-pane__condition-toggle>[class*='styles_toggle'][aria-pressed="true"]`).click();
+			}, 10)
 			setTimeout(function(){
 				$(`#switch_gamelog`).click();
-			}, 10)
+			}, 20)
 
 	});
 	$("a.ct-character-header-desktop__builder-link").on("click", function(){
@@ -3986,7 +3972,7 @@ function toggle_sidebar_visibility() {
  * This will show the sidebar regardless of which page we are playing on.
  * It will also adjust the position of the character sheet .
  */
-function show_sidebar() {
+function show_sidebar(dispatchResize = true) {
 
 	let toggleButton = $("#hide_rightpanel");
 	toggleButton.addClass("point-right").removeClass("point-left");
@@ -4006,7 +3992,8 @@ function show_sidebar() {
 		$("#sheet").removeClass("sidebar_hidden");
 	}
 	$('canvas.dice-rolling-panel__container, .roll-mod-container').css('--sidebar-width', '340px');
-	window.dispatchEvent(new Event('resize'));
+	if(dispatchResize)
+		window.dispatchEvent(new Event('resize'));
 	addGamelogPopoutButton()
 }
 

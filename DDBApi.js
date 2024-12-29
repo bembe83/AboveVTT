@@ -18,7 +18,7 @@ class DDBApi {
     const request = await fetch(url, config).then(DDBApi.lookForErrors);
     const response = await request.json();
     MYCOBALT_TOKEN = response.token;
-    MYCOBALT_TOKEN_EXPIRATION = Date.now() + (response.ttl * 1000) - 10000;
+    MYCOBALT_TOKEN_EXPIRATION = Date.now() + ((response.ttl - 30) * 1000);
     return response.token;
   }
 
@@ -48,24 +48,25 @@ class DDBApi {
   static async fetchJsonWithToken(url, extraConfig = {}) {
     const token = await DDBApi.#refreshToken();
     const config = {...extraConfig,
-      credentials: 'omit',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
       }
     }
     const request = await fetch(url, config).then(DDBApi.lookForErrors)
     return await request.json();
   }
 
-  static async fetchJsonWithCredentials(url, extraConfig = {}) {
-    console.debug("DDBApi.fetchJsonWithCredentials url", url)
-    const request = await fetch(url, {...extraConfig, credentials: 'include'}).then(DDBApi.lookForErrors);
-    console.debug("DDBApi.fetchJsonWithCredentials request", request);
-    const response = await request.json();
-    console.debug("DDBApi.fetchJsonWithCredentials response", response);
-    return response;
+    static async fetchJsonWithTokenOmitCred(url, extraConfig = {}) {
+    const token = await DDBApi.#refreshToken();
+    const config = {...extraConfig,
+      credentials: 'omit',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+    const request = await fetch(url, config).then(DDBApi.lookForErrors)
+    return await request.json();
   }
 
   static async postJsonWithToken(url, body) {
@@ -73,7 +74,7 @@ class DDBApi {
       method: 'POST',
       body: JSON.stringify(body)
     }
-    return await DDBApi.fetchJsonWithToken(url, config);
+    return await DDBApi.fetchJsonWithTokenOmitCred(url, config);
   }
 
   static async deleteWithToken(url) {
@@ -111,7 +112,7 @@ class DDBApi {
     }
 
     const url = `https://encounter-service.dndbeyond.com/v1/encounters/${id}`;
-    const response = await DDBApi.fetchJsonWithCredentials(url);
+    const response = await DDBApi.fetchJsonWithToken(url);
     console.debug("DDBApi.fetchEncounter response", response);
     return response.data;
   }
@@ -119,25 +120,10 @@ class DDBApi {
   static async fetchAllEncounters() {
     console.log(`DDBApi.fetchAllEncounters starting`);
 
-    const url = `https://encounter-service.dndbeyond.com/v1/encounters`;
-
-    // make the first request to get pagination info
-    console.log(`DDBApi.fetchAllEncounters attempting to fetch page 1`);
-    const firstPage = await DDBApi.fetchJsonWithToken(`${url}?page=1`);
-    let encounters = firstPage.data;
-    const numberOfPages = firstPage.pagination.pages;
-    if (isNaN(numberOfPages)) {
-      throw new Error(`Unexpected Pagination Data: ${JSON.stringify(firstPage.pagination)}`);
-    } else {
-      console.log(`DDBApi.fetchAllEncounters attempting to fetch pages 2 through ${numberOfPages}`);
-    }
-    for (let i = 2; i <= numberOfPages; i++) {
-      const response = await DDBApi.fetchJsonWithToken(`${url}?page=${i}`)
-      console.debug(`DDBApi.fetchAllEncounters page ${i} response: `, response);
-      encounters = encounters.concat(response.data);
-      console.log(`DDBApi.fetchAllEncounters successfully fetched page ${i}`);
-    }
-    return encounters;
+    const url = `https://encounter-service.dndbeyond.com/v1/encounters?skip=0&take=99999`;
+    const response = await DDBApi.fetchJsonWithToken(`${url}`)
+    
+    return response.data;
   }
 
   static async deleteAboveVttEncounters(encounters) {
@@ -243,7 +229,7 @@ class DDBApi {
   static async fetchActiveCharacters(campaignId) {
     // This is what the encounter page called at one point, but seems to use fetchCampaignCharacters now
     const url = `https://www.dndbeyond.com/api/campaign/active-characters/${campaignId}`
-    const response = await DDBApi.fetchJsonWithCredentials(url);
+    const response = await DDBApi.fetchJsonWithToken(url);
     return response.data;
   }
 
@@ -254,22 +240,24 @@ class DDBApi {
       return characterIds;
     }
 
-    try {
-      // This is what the campaign page calls
-      window.playerUsers = await DDBApi.fetchActiveCharacters(campaignId);
-      characterIds = window.playerUsers.map(c => c.id);
-    } catch (error) {
-      console.warn("fetchCampaignCharacterIds caught an error trying to collect ids from fetchActiveCharacters", error);
-    }
+
     try {
       window.playerUsers = await DDBApi.fetchCampaignCharacters(campaignId);
-      window.playerUsers.forEach(c => {
-        if (!characterIds.includes(c.id)) {
-          characterIds.push(c.id);
-        }
-      });
-    } catch (error) {
-      console.warn("fetchCampaignCharacterIds caught an error trying to collect ids from fetchActiveCharacters", error);
+      characterIds = window.playerUsers.map(c => c.id);
+    } 
+    catch (error) {
+      try {
+        // This is what the campaign page calls
+        window.playerUsers = await DDBApi.fetchActiveCharacters(campaignId);
+        window.playerUsers.forEach(c => {
+          if (!characterIds.includes(c.id)) {
+            characterIds.push(c.id);
+          }
+        });
+      } 
+      catch (error) {
+        console.warn("fetchCampaignCharacterIds caught an error trying to collect ids from fetchActiveCharacters", error);
+      } 
     }
     let playerUser = window.playerUsers.filter(d=> d.id == window.PLAYER_ID)[0]?.userId;
     window.myUser = playerUser ? playerUser : 'THE_DM'; 

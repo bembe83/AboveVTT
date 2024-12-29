@@ -294,8 +294,6 @@ function getRollData(rollButton){
       }
     }
 
-    let roll = new rpgDiceRoller.DiceRoll(expression); 
-    let regExpression = new RegExp(`${expression.replace(/[+-]/g, '\\$&')}:\\s`);
 
     if($(rollButton).parents(`[class*='saving-throws-summary']`).length > 0){
       rollType = 'save'
@@ -334,12 +332,41 @@ function getRollData(rollButton){
         rollTitle = $(rollButton).closest(`.ddbc-combat-action-attack-general`).find('.ddbc-action-name, [class*="styles_actionName"]').text();
       }
     }
-    const modifier = (roll.rolls.length > 1 && expression.match(/[+-]\d*$/g, '')) ? `${roll.rolls[roll.rolls.length-2]}${roll.rolls[roll.rolls.length-1]}` : '';
+    
+    let roll = new rpgDiceRoller.DiceRoll(expression); 
+    let regExpression = new RegExp(`${expression.replace(/[+-]/g, '\\$&')}:\\s`);
+    let modifier = (roll.rolls.length > 1 && expression.match(/[+-]\d*$/g)) ? `${roll.rolls[roll.rolls.length-2]}${roll.rolls[roll.rolls.length-1]}` : '';
+  
+    if(rollType == 'damage' && (window.CHARACTER_AVTT_SETTINGS?.damageRoll?.match(allDiceRegex) || !isNaN(parseInt(window.CHARACTER_AVTT_SETTINGS?.damageRoll)))){
+        expression = `${expression}${window.CHARACTER_AVTT_SETTINGS.damageRoll.match(/[+-]/g) ? '': '+'}${window.CHARACTER_AVTT_SETTINGS.damageRoll}`;
+        roll = new rpgDiceRoller.DiceRoll(expression); 
+        modifier = (roll.rolls.length > 1 && expression.match(/[+-]\d*$/g)) ? `${roll.rolls[roll.rolls.length-2]}${roll.rolls[roll.rolls.length-1]}` : '';
+    }
+    else if((rollType == 'to hit' || rollType == 'attack') && (window.CHARACTER_AVTT_SETTINGS?.hitRoll?.match(allDiceRegex) || !isNaN(parseInt(window.CHARACTER_AVTT_SETTINGS?.hitRoll)))){
+        expression = `${expression}${window.CHARACTER_AVTT_SETTINGS.hitRoll.match(/[+-]/g) ? '': '+'}${window.CHARACTER_AVTT_SETTINGS.hitRoll}`;
+        roll = new rpgDiceRoller.DiceRoll(expression); 
+        modifier = (roll.rolls.length > 1 && expression.match(/[+-]\d*$/g)) ? `${roll.rolls[roll.rolls.length-2]}${roll.rolls[roll.rolls.length-1]}` : '';
+    }
+    else if((rollType == 'check') && (window.CHARACTER_AVTT_SETTINGS?.checkRoll?.match(allDiceRegex) || !isNaN(parseInt(window.CHARACTER_AVTT_SETTINGS?.checkRoll)))){
+        expression = `${expression}${window.CHARACTER_AVTT_SETTINGS.checkRoll.match(/[+-]/g) ? '': '+'}${window.CHARACTER_AVTT_SETTINGS.checkRoll}`;
+        roll = new rpgDiceRoller.DiceRoll(expression); 
+        modifier = (roll.rolls.length > 1 && expression.match(/[+-]\d*$/g)) ? `${roll.rolls[roll.rolls.length-2]}${roll.rolls[roll.rolls.length-1]}` : '';
+    }
+     else if((rollType == 'save') && (window.CHARACTER_AVTT_SETTINGS?.saveRoll?.match(allDiceRegex) || !isNaN(parseInt(window.CHARACTER_AVTT_SETTINGS?.saveRoll)))){
+        expression = `${expression}${window.CHARACTER_AVTT_SETTINGS.saveRoll.match(/[+-]/g) ? '': '+'}${window.CHARACTER_AVTT_SETTINGS.saveRoll}`;
+        roll = new rpgDiceRoller.DiceRoll(expression); 
+        modifier = (roll.rolls.length > 1 && expression.match(/[+-]\d*$/g)) ? `${roll.rolls[roll.rolls.length-2]}${roll.rolls[roll.rolls.length-1]}` : '';
+    }
+    
 
     const followingText = $(rollButton)[0].nextSibling?.textContent?.trim()?.split(' ')[0]
     damageType = followingText && window.ddbConfigJson.damageTypes.some(d => d.name.toLowerCase() == followingText.toLowerCase()) ? followingText : damageType;     
 
-  
+
+
+
+    
+
     return {
       roll: roll,
       expression: expression,
@@ -365,6 +392,7 @@ class DiceRoller {
     #pendingCritType = undefined;
     #pendingSpellSave = undefined;
     #pendingDamageType = undefined;
+    #pendingCrit = undefined;
 
     /** @returns {boolean} true if a roll has been or will be initiated, and we're actively waiting for DDB messages to come in so we can parse them */
     get #waitingForRoll() {
@@ -394,6 +422,7 @@ class DiceRoller {
     setPendingDamageType(damageTypeText){
         this.#pendingDamageType = damageTypeText;
     }
+
     /// PUBLIC FUNCTIONS
     getDamageType(button){
       let damageTypeIcon = $(button).find(`.ddbc-damage__icon [class*='damage-type'][aria-label]`)  
@@ -419,7 +448,7 @@ class DiceRoller {
      * @param diceRoll {DiceRoll} the dice expression to parse and roll. EG: 1d20+4
      * @returns {boolean} whether or not dice were rolled
      */
-    async roll(diceRoll, multiroll = false, critRange = 20, critType = 2, spellSave = undefined, damageType=undefined) {
+    async roll(diceRoll, multiroll = false, critRange = 20, critType = 2, spellSave = undefined, damageType=undefined, forceCritType = undefined) {
         try {
             if (diceRoll === undefined || diceRoll.expression === undefined || diceRoll.expression.length === 0) {
                 console.warn("DiceRoller.parseAndRoll received an invalid diceRoll object", diceRoll);
@@ -495,7 +524,7 @@ class DiceRoller {
                 let output = roll.output.replace(regExpression, '');
                 let total = roll.total;
                 let expression = diceRoll.expression;
-                if(this.#critAttackAction != undefined && critType == 3){
+                if((this.#critAttackAction != undefined && critType == 3) || forceCritType == 3){
                     doubleCrit = true;
                     total = total * 2;
                     const outputSplit = output.split(' = ')
@@ -621,6 +650,7 @@ class DiceRoller {
             this.#pendingCritType = critType;
             this.#pendingSpellSave = spellSave;
             this.#pendingDamageType = damageType;
+            this.#pendingCrit = forceCritType;
             this.clickDiceButtons(diceRoll);
             console.groupEnd();
             return true;
@@ -767,13 +797,21 @@ class DiceRoller {
         this.#pendingDiceRoll = undefined;
         this.#pendingSpellSave = undefined;
         this.#pendingDamageType = undefined;
+        this.#pendingCrit = undefined;
                 
     }
 
     /** wraps all messages that are sent by DDB, and processes any that we need to process, else passes it along as-is */
     #wrappedDispatch(message) {
         console.group("DiceRoller.#wrappedDispatch");
+        if(this.#waitingForRoll && message.source == 'Beyond20'){
+            return;
+        }
         if (!this.#waitingForRoll) {
+            if(message.source == 'Beyond20'){
+                this.ddbDispatch(message);
+                return;
+            }
             console.debug("swap image only, not capturing: ", message);
             let ddbMessage = { ...message };
             if(window.CAMPAIGN_INFO?.dmId == ddbMessage.entityId ){
@@ -794,12 +832,20 @@ class DiceRoller {
                 this.ddbDispatch(ddbMessage);
             }
         } else if (message.eventType === "dice/roll/pending") {
+            if(message.source == 'Beyond20'){
+                this.ddbDispatch(message);
+                return;
+            }
             console.log("capturing pending message: ", message);
             let ddbMessage = { ...message };
             this.#swapDiceRollMetadata(ddbMessage);
             this.#pendingMessage = ddbMessage;
             this.ddbDispatch(ddbMessage);
         } else if (message.eventType === "dice/roll/fulfilled" && this.#pendingMessage?.data?.rollId === message.data.rollId) {
+            if(message.source == 'Beyond20'){
+                this.ddbDispatch(message);
+                return;
+            }
             console.log("capturing fulfilled message: ", message)
             let alteredMessage = this.#swapRollData(message);
             console.log("altered fulfilled message: ", alteredMessage);
@@ -906,7 +952,7 @@ class DiceRoller {
 
                 // now that we've replaced all the dice expressions with their results, we need to execute the expression to get the final result
                 let calculatedTotal = eval(replacedExpression);
-                if(this.#critAttackAction != undefined && this.#pendingCritType == 3){
+                if((this.#critAttackAction != undefined && this.#pendingCritType == 3) || this.#pendingCrit == 3){
                     calculatedTotal = calculatedTotal * 2; 
                 }
                 console.log("pendingExpression: ", this.#pendingDiceRoll.expression, ", replacedExpression: ", replacedExpression, ", calculatedTotal:", calculatedTotal, ", replacedValues: ", replacedValues);
@@ -956,7 +1002,7 @@ class DiceRoller {
             ddbMessage.avttExpressionResult = this.#pendingDiceRoll.expressionResult;
             console.log("DiceRoll ddbMessage.avttExpression: ", ddbMessage.avttExpression);
         }
-        if(this.#critAttackAction != undefined && this.#pendingCritType == 3){
+        if((this.#critAttackAction != undefined && this.#pendingCritType == 3) || this.#pendingCrit == 3){
             ddbMessage.avttExpression = `2(${this.#pendingDiceRoll.expression})`;
             ddbMessage.avttExpressionResult = `2(${this.#pendingDiceRoll.expressionResult})`;
         }
@@ -964,19 +1010,19 @@ class DiceRoller {
         if(ddbMessage.data.rolls.some(d=> d.rollType.includes('damage')))
             ddbMessage.avttDamageType = this.#pendingDamageType;
 
-        if (["character", "monster"].includes(this.#pendingDiceRoll.entityType)) {
+        if (["character", "monster"].includes(this.#pendingDiceRoll?.entityType)) {
             ddbMessage.entityType = this.#pendingDiceRoll.entityType;
             ddbMessage.data.context.entityType = this.#pendingDiceRoll.entityType;
         }
-        if (this.#pendingDiceRoll.entityId !== undefined) {
+        if (this.#pendingDiceRoll?.entityId !== undefined) {
             ddbMessage.entityId = this.#pendingDiceRoll.entityId;
             ddbMessage.data.context.entityId = this.#pendingDiceRoll.entityId;
         }
         const isValid = (str) => { return typeof str === "string" && true && str.length > 0 };
-        if (isValid(this.#pendingDiceRoll.action)) {
+        if (isValid(this.#pendingDiceRoll?.action)) {
             ddbMessage.data.action = this.#pendingDiceRoll.action;
         }
-        if (isValid(this.#pendingDiceRoll.avatarUrl)) {
+        if (isValid(this.#pendingDiceRoll?.avatarUrl)) {
             ddbMessage.data.context.avatarUrl = this.#pendingDiceRoll.avatarUrl;
         } 
         else if(window.CAMPAIGN_INFO?.dmId == ddbMessage.entityId || ddbMessage.entityId == 'false'){
@@ -984,7 +1030,7 @@ class DiceRoller {
         } else if(window.pcs?.filter(d => d.characterId == ddbMessage.entityId)?.length>0){
             ddbMessage.data.context.avatarUrl = window.pcs?.filter(d => d.characterId == ddbMessage.entityId)[0].image
         }      
-        if (isValid(this.#pendingDiceRoll.name)) {
+        if (isValid(this.#pendingDiceRoll?.name)) {
             ddbMessage.data.context.name = this.#pendingDiceRoll.name;
         }
     }

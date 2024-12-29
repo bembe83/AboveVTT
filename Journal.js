@@ -155,9 +155,14 @@ class JournalManager{
 			};
 			if(window.DM){ // old storage kept as backup for now. 
 				try{
-					localStorage.setItem('JournalStatblocks', JSON.stringify(statBlocks));   // we may decide to clear these on succesful storage migration above after 1.29
+					/*
+					Stop saving this here in 1.30 - remove at later date once confirmed migrated. 
+
+					localStorage.setItem('JournalStatblocks', JSON.stringify(statBlocks));   
 					localStorage.setItem('Journal' + this.gameid, JSON.stringify(journal));
 					localStorage.setItem('JournalChapters' + this.gameid, JSON.stringify(chapters));
+
+					*/ 
 				}
 				catch(e){
 					console.warn('localStorage Journal Storage Failed', e) // prevent errors from stopping code when local storage is full.
@@ -1407,6 +1412,10 @@ class JournalManager{
 		for(let i=0; i<trackerSpans.length; i++){
 			$(trackerSpans[i]).replaceWith(`[track]${$(trackerSpans[i]).text()}[/track]`);
 		}
+		const iframes = target.find('.journal-site-embed')
+		for(let i=0; i<iframes.length; i++){
+			$(iframes[i]).replaceWith(`<iframe class='journal-site-embed' src='${$(iframes[i]).text()}'></iframe>`);
+		}
     	let data = $(target).clone().html();
 
         let lines = data.split(/(<br \/>|<br>|<p>|\n)/g);
@@ -1805,6 +1814,9 @@ class JournalManager{
 			}
 			.note-tracker{
 				 border: 1px dotted #bb5600;
+			}
+			.journal-site-embed{
+			    border: 1px dotted #5656bb;
 			}
 			@media(min-width: 768px) {
 				 .Basic-Text-Frame-2 {
@@ -2637,6 +2649,7 @@ class JournalManager{
 			      { title: 'For DM Eyes Online', block: 'div', wrapper: true, classes: 'dm-eyes-only' },
 			      { title: 'Add Ability Tracker; Format: "Wild Shape 2"', inline: 'span', wrapper:true, classes: 'note-tracker'},
 			      { title: 'Ignore AboveVTT auto formating', inline: 'span', wrapper: true, classes: 'ignore-abovevtt-formating' },
+			      { title: 'Embed Site in Journal', inline: 'span', wrapper: true, classes: 'journal-site-embed'}
 			    ] },
 			    { title: 'Custom Statblock Stats', items: [
 			      { title: 'AC', inline: 'b', classes: 'custom-ac custom-stat'},

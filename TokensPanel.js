@@ -2385,9 +2385,10 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
     inputWrapper.append(opacityWrapper);
 
     // border color
-    if(listItem.isTypePC()){
+    if(listItem.isTypePC() && customization.tokenOptions.playerThemeBorder != false){
         customization.tokenOptions.color = color_from_pc_object(find_pc_by_player_id(listItem.id));
     }
+
     const color = customization.tokenOptions.color || random_token_color();
     const borderColorWrapper = build_token_border_color_input(color, function (newColor, eventType) {
         customization.setTokenOption("color", newColor);
@@ -2395,38 +2396,63 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
         decorate_modal_images(sidebarPanel, listItem, placedToken);
     });
     borderColorWrapper.removeClass("border-color-wrapper"); // sets display:block!important; but we want to be able to hide this one
-    const specificBorderColorSetting = {
-        name: 'specificBorderColor',
-        label: 'Specify Border Color',
-        type: 'toggle',
-        options: [
-            { value: true, label: "Specific Color", description: "The token will use the specified color." },
-            { value: false, label: "Round", description: "The token will use a random border color." }
-        ],
-        defaultValue: false
-    };
-
-
-
 
     const specificBorderColorValue = (typeof customization.tokenOptions.color === "string" && customization.tokenOptions.color.length > 0);
+    if(listItem.isTypePC()){
+        const playerThemeColorSetting = {
+            name: 'playerThemeBorderColor',
+            label: 'Player Border Color',
+            type: 'dropdown',
+            options: [
+                { value: true, label: "Player Theme Color", description: "The token will use the player theme color." },
+                { value: false, label: "Custom Color", description: "The token will use a specified border color." }
+            ],
+            defaultValue: true
+        };
+        const borderColorDropdown = build_dropdown_input(playerThemeColorSetting, specificBorderColorValue, function (useSpecificColorKey, newValue) {
+            customization.setTokenOption("playerThemeBorder", newValue)
+            if (newValue == 'true') {
+                customization.setTokenOption("color", color_from_pc_object(find_pc_by_player_id(listItem.id)));
+                persist_token_customization(customization);
+                borderColorWrapper.hide();
+                redraw_settings_panel_token_examples(customization.tokenOptions);
+                decorate_modal_images(sidebarPanel, listItem, placedToken);
+            } else {
+                customization.setTokenOption("color", color);
+                persist_token_customization(customization);
+                borderColorWrapper.show();
+            }
+        });
+        inputWrapper.append(borderColorDropdown);
+    }
+    else{
+        const specificBorderColorSetting = {
+            name: 'specificBorderColor',
+            label: 'Specify Border Color',
+            type: 'toggle',
+            options: [
+                { value: true, label: "Specific Color", description: "The token will use the specified color." },
+                { value: false, label: "Round", description: "The token will use a random border color." }
+            ],
+            defaultValue: false
+        };
 
-    const borderColorToggle = build_toggle_input(specificBorderColorSetting, specificBorderColorValue, function (useSpecificColorKey, useSpecificColorValue) {
-        if (useSpecificColorValue === true) {
-            customization.setTokenOption("color", color);
-            persist_token_customization(customization);
-            borderColorWrapper.show();
-        } else {
-            customization.setTokenOption("color", undefined);
-            persist_token_customization(customization);
-            borderColorWrapper.hide();
-        }
-    });
-    if(!listItem.isTypePC()){
+        const borderColorToggle = build_toggle_input(specificBorderColorSetting, specificBorderColorValue, function (useSpecificColorKey, useSpecificColorValue) {
+            if (useSpecificColorValue === true) {
+                customization.setTokenOption("color", color);
+                persist_token_customization(customization);
+                borderColorWrapper.show();
+            } else {
+                customization.setTokenOption("color", undefined);
+                persist_token_customization(customization);
+                borderColorWrapper.hide();
+            }
+        });
         inputWrapper.append(borderColorToggle);
     }
+
     inputWrapper.append(borderColorWrapper);
-    if (!specificBorderColorValue) {
+    if (!specificBorderColorValue || (listItem.isTypePC() && customization.tokenOptions.playerThemeBorder != false)) {
         borderColorWrapper.hide();
     }
 
@@ -2896,19 +2922,35 @@ function redraw_token_images_in_modal(sidebarPanel, listItem, placedToken, drawI
         })
     }
 
-
+    function* addExampleToken(index) {
+        
+        while(index < index+10 && index<alternativeImages.length-1){
+            setTimeout(function(){
+                let tokenDiv = build_token_div_for_sidebar_modal(alternativeImages[index], listItem, placedToken);
+                modalBody.append(tokenDiv);
+                index++;
+            })
+            yield
+        }
+       
+    }
+    let buildToken = addExampleToken(0);
+    modalBody.off('scroll.exampleToken').on('scroll.exampleToken', function(){
+        if (modalBody.scrollTop() + 500 >= 
+            modalBody[0].scrollHeight) { 
+            for(let i = 0; i<10; i++){
+                buildToken.next()
+            }
+        } 
+    });
     for (let i = 0; i < alternativeImages.length; i++) {
         if (drawInline) {
             let tokenDiv = build_token_div_for_sidebar_modal(alternativeImages[i], listItem, placedToken);
             modalBody.append(tokenDiv);
         } else {
-            setTimeout(function () {
-                // JS doesn't have threads, but setTimeout allows us to execute this inefficient block of code after the rest of the modal has finished drawing.
-                // This gives the appearance of a faster UI because the modal will display and then these images will pop in.
-                // most of the time, this isn't needed, but if there are a lot of images (like /DDBTokens/Human), this make a pretty decent impact.
-                let tokenDiv = build_token_div_for_sidebar_modal(alternativeImages[i], listItem, placedToken);
-                modalBody.append(tokenDiv);
-            });
+            if(i<10){
+                buildToken.next();
+            }
         }
     }
 
