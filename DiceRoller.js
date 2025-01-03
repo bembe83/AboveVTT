@@ -468,6 +468,7 @@ class DiceRoller {
 			//let roll = new rpgDiceRoller.DiceRoll(diceRoll.expression); 
 			let roll = await window.godice.rollResult.rollDice(diceRoll.expression);
 			forceCritType = Number(window.CHARACTER_AVTT_SETTINGS.crit || 0);
+			critRange = Number(window.CHARACTER_AVTT_SETTINGS.critRange || 20);
             let regExpression = new RegExp(`${diceRoll.expression.replace(/[+-]/g, '\\$&')}:\\s`);
             let rollType = (diceRoll.rollType) ? diceRoll.rollType : 'Custom';
             let rollTitle = (diceRoll.action) ? diceRoll.action : 'AboveVTT';
