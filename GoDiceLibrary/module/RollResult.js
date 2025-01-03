@@ -35,9 +35,11 @@ class RollResult {
 			formula= formula + "+" + rollBonus["bonus"];
 		
 		var advdis = Number(rollBonus["advdis"]);
+		var rollType =  Number(rollBonus["rolltype"]);
 		var elvish = rollBonus["elven"];
 		var d20dice = (elvish&&advdis==1)?3:2;
-		
+		var critType = Number(window.CHARACTER_AVTT_SETTINGS.crit || 0);
+				
 		var matches = formula.matchAll(formulaRegex);
 		
 		for (const match of matches) {
@@ -54,7 +56,7 @@ class RollResult {
 			
 			if(match.groups.dice){
 				if(match.groups.operator) results.push(match.groups.operator);
-				//if contains d20 apply advantage or disadvantege logic
+				//if contains d20 apply advantage or disadvantage logic
 				if(match.groups.faces == 20){
 					if(advdis == 1) {
 						match.groups.numberOfDice = d20dice;
@@ -62,6 +64,15 @@ class RollResult {
 					} else if(advdis == -1){
 						match.groups.numberOfDice = d20dice;
 						match.groups.modifier="kl";
+					}
+				}else{
+					if(rollType == 1){
+						if(critType == 1){
+								constants.push("+");
+								constants.push(Number(match.groups.faces*match.groups.numberOfDice));
+						}else if(critType == 0){
+								match.groups.numberOfDice = 2*match.groups.numberOfDice;
+						}
 					}
 				}
 				

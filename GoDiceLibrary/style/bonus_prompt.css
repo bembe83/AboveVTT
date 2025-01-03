@@ -6,9 +6,21 @@
     margin: 5%;
 }
 
-.bonus-button {
+.bonus-buttons-3 {
 	display: grid;
     grid-template-columns: auto auto auto;
+    column-gap: 10px;
+}
+
+.bonus-buttons-2 {
+	display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 10px;
+}
+
+.bonus-buttons-1 {
+	display: grid;
+    grid-template-columns: auto;
     column-gap: 10px;
 }
 

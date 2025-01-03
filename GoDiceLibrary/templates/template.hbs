@@ -75,20 +75,27 @@
 		<div class="diceTypes bonus-container">
 				<label>Formula:</label><input id="formula" type="text" value ="{{formula}}" style="background-color: grey; color: darkslategrey" readonly/>
 				<label>Additional Bonus </label><input id="bonus" type="text" placeholder="eg. 1d4, 3d6+3, +6" />
-				<label>Elven Accuracy</label><input type="checkbox" id="elven" name="elven" value="True">
 				<input id="advdis" type="text" hidden="true" value="0"/>
+				<input id="rolltype" type="text" hidden="true" value="0"/>
+				{{#if d20}}
+					<label>Elven Accuracy</label><input type="checkbox" id="elven" name="elven" value="True">
+				{{else}}
+					<input type="checkbox" id="elven" hidden="true" name="elven" value="True">
+				{{/if}}
 		</div>
-		<div class="dialog-buttons bonus-button">
 		{{#if d20}}
-				<div class ="bonus-button-column"><button type="submit" id="adv" class="dialog-button modif" onclick='document.getElementById("advdis").value="1"'>Advantage</button></div>
-				<div class ="bonus-button-column"><button type="submit" id="nor" class="dialog-button ok default modif" onclick='document.getElementById("advdis").value="0"'>Normal</button></div>
-				<div class ="bonus-button-column"><button type="submit" id="dis" class="dialog-button modif" onclick='document.getElementById("advdis").value="-1"'>Disadvantage</button></div>
+			<div class="dialog-buttons bonus-buttons-3 ">
+					<div class ="bonus-button-column"><button type="submit" id="adv" class="modif" onclick='document.getElementById("advdis").value="1"'>Advantage</button></div>
+					<div class ="bonus-button-column"><button type="submit" id="nor" class="modif" onclick='document.getElementById("advdis").value="0"'>Normal</button></div>
+					<div class ="bonus-button-column"><button type="submit" id="dis" class="modif" onclick='document.getElementById("advdis").value="-1"'>Disadvantage</button></div>
+			</div>
 		{{else}}
-				<div class ="bonus-button-column">&nbsp;</div>
-				<div class ="bonus-button-column"><button type="submit" class="dialog-button ok default" data-button="ok" id="roll_submit">Roll</button></div>
-				<div class ="bonus-button-column">&nbsp;</div>
+			<div class="dialog-buttons bonus-buttons-2">
+					<div class ="bonus-button-column"><button type="submit" id="roll" class="modif" onclick='document.getElementById("rolltype").value="0"'>Roll</button></div>
+					<div class ="bonus-button-column"><button type="submit" id="crit" class="modif" onclick='document.getElementById("rolltype").value="1"'>Critical Hit</button></div>
+			</div>
 		{{/if}}
-		</div>
+		
 	</form>
 {{else if (eq template 'chatcontrol')}}
 	<div id="godiceroll-modifier" class="godiceroll-modifier" title="GoDice Modifier">

@@ -27,6 +27,7 @@ export class RollBonusPrompt {
 			
 			result["bonus"]  = promptData.querySelector("#bonus").value;
 			result["advdis"] = Number(promptData.querySelector("#advdis").value);
+			result["rolltype"] = Number(promptData.querySelector("#rolltype").value);
 			result["elven"]  = promptData.querySelector("#elven").checked;
 			console.debug(result);
 		

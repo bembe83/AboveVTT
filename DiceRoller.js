@@ -339,7 +339,7 @@ function getRollData(rollButton){
   
     if(rollType == 'damage' && (window.CHARACTER_AVTT_SETTINGS?.damageRoll?.match(allDiceRegex) || !isNaN(parseInt(window.CHARACTER_AVTT_SETTINGS?.damageRoll)))){
         expression = `${expression}${window.CHARACTER_AVTT_SETTINGS.damageRoll.match(/[+-]/g) ? '': '+'}${window.CHARACTER_AVTT_SETTINGS.damageRoll}`;
-        roll = new rpgDiceRoller.DiceRoll(expression); 
+        roll = new rpgDiceRoller.DiceRoll(expression);
         modifier = (roll.rolls.length > 1 && expression.match(/[+-]\d*$/g)) ? `${roll.rolls[roll.rolls.length-2]}${roll.rolls[roll.rolls.length-1]}` : '';
     }
     else if((rollType == 'to hit' || rollType == 'attack') && (window.CHARACTER_AVTT_SETTINGS?.hitRoll?.match(allDiceRegex) || !isNaN(parseInt(window.CHARACTER_AVTT_SETTINGS?.hitRoll)))){
@@ -358,14 +358,8 @@ function getRollData(rollButton){
         modifier = (roll.rolls.length > 1 && expression.match(/[+-]\d*$/g)) ? `${roll.rolls[roll.rolls.length-2]}${roll.rolls[roll.rolls.length-1]}` : '';
     }
     
-
     const followingText = $(rollButton)[0].nextSibling?.textContent?.trim()?.split(' ')[0]
     damageType = followingText && window.ddbConfigJson.damageTypes.some(d => d.name.toLowerCase() == followingText.toLowerCase()) ? followingText : damageType;     
-
-
-
-
-    
 
     return {
       roll: roll,
@@ -470,14 +464,14 @@ class DiceRoller {
                 self.#resetVariables();
             }, this.timeoutDuration);
             let msgdata = {}
-			//let roll = new rpgDiceRoller.DiceRoll(diceRoll.expression); 
 			//Show GoDice Popup
+			//let roll = new rpgDiceRoller.DiceRoll(diceRoll.expression); 
 			let roll = await window.godice.rollResult.rollDice(diceRoll.expression);
+			forceCritType = Number(window.CHARACTER_AVTT_SETTINGS.crit || 0);
             let regExpression = new RegExp(`${diceRoll.expression.replace(/[+-]/g, '\\$&')}:\\s`);
             let rollType = (diceRoll.rollType) ? diceRoll.rollType : 'Custom';
             let rollTitle = (diceRoll.action) ? diceRoll.action : 'AboveVTT';
             let modifier = (roll.rolls.length > 1 && diceRoll.expression.match(/[+-]\d*$/g, '')) ? `${roll.rolls[roll.rolls.length-2]}${roll.rolls[roll.rolls.length-1]}` : '';
-            
 
             let critSuccess = false;
             let critFail = false;
