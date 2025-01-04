@@ -71,9 +71,15 @@ let debounceAudioChecks = mydebounce(() => {
 	checkAudioVolume();
 }, 20)
 
-const debouncePlace = mydebounce((token) => {
-	token.place(0);
-
+let longDebounceLightChecks = mydebounce(() => {		
+		if(window.DRAGGING)
+			return;
+		if(window.walls?.length < 5){
+			redraw_light_walls();	
+		}
+		//let promise = [new Promise (_ => setTimeout(redraw_light(), 1000))];
+		requestAnimationFrame(redraw_light);
+		debounceAudioChecks();
 }, 300);
 
 
@@ -767,9 +773,10 @@ class Token {
 
 			if(window.EXPERIMENTAL_SETTINGS.dragLight == true)
 				throttleLight();
-				
-			debouncePlace(this);
-			this.update_and_sync();	
+			else
+				longDebounceLightChecks();
+		
+			this.sync();
 		}
 	}
 
@@ -960,8 +967,8 @@ class Token {
 		} 
 		else {
 			if(this.options.tokenStyleSelect === "circle" || this.options.tokenStyleSelect === "square"){
-				tokenWidth = tokenWidth - 10;
-				tokenHeight = tokenHeight - 10;
+				tokenWidth = tokenWidth - window.CURRENT_SCENE_DATA.hpps/10;
+				tokenHeight = tokenHeight - window.CURRENT_SCENE_DATA.vpps/10;
 			}
 			token.css('--token-hp-aura-color', tokenHpAuraColor);
 			if(this.tempHp) {
@@ -976,8 +983,8 @@ class Token {
 		} 
 		else {
 			if(this.options.tokenStyleSelect === "circle" || this.options.tokenStyleSelect === "square"){
-				tokenWidth = tokenWidth - 3;
-				tokenHeight = tokenHeight - 3;
+				tokenWidth = tokenWidth - Math.min(1, window.CURRENT_SCENE_DATA.hpps/40);
+				tokenHeight = tokenHeight - Math.min(1, window.CURRENT_SCENE_DATA.vpps/40);
 			}
 			token.css('--token-border-color', this.options.color);
 			$("#combat_area tr[data-target='" + this.options.id + "'] img[class*='Avatar']").css("border-color", this.options.color);
@@ -987,8 +994,8 @@ class Token {
 		}
 		else {
 			if(this.options.tokenStyleSelect === "circle" || this.options.tokenStyleSelect === "square"){
-				tokenWidth = tokenWidth - 10;
-				tokenHeight = tokenHeight - 10;
+				tokenWidth = tokenWidth - window.CURRENT_SCENE_DATA.hpps/10;
+				tokenHeight = tokenHeight - window.CURRENT_SCENE_DATA.vpps/10;
 			}
 			token.css('--token-hpbar-aura-color', tokenHpAuraColor);
 			if(this.tempHp) {
@@ -2326,8 +2333,6 @@ class Token {
 				if(this.options.darkness){
 					let copyImage = $(`[data-darkness='darkness_${this.options.id}']`);
 					copyImage.css({
-						left: parseInt(parseFloat(this.options.left) / window.CURRENT_SCENE_DATA.scale_factor),
-						top: parseInt(parseFloat(this.options.top) / window.CURRENT_SCENE_DATA.scale_factor),
 						'--token-width': `calc(${this.sizeWidth()}px / var(--scene-scale))`,
 						'--token-height': `calc(${this.sizeHeight()}px / var(--scene-scale))`,
 						width: `var(--token-width)`,
@@ -2338,6 +2343,14 @@ class Token {
 						'--token-scale': old.css('--token-scale'),
 	    				'--token-rotation': old.css('--token-rotation')
 					})
+					copyImage.animate({
+							left: parseInt(parseFloat(this.options.left) / window.CURRENT_SCENE_DATA.scale_factor),
+							top: parseInt(parseFloat(this.options.top) / window.CURRENT_SCENE_DATA.scale_factor),
+						}, 
+						{ 
+							duration: animationDuration, queue: true
+						}
+					);
 				}
 				if(this.options.tokenStyleSelect == 'definitelyNotAToken' || this.options.underDarkness == true){
 						old.toggleClass('underDarkness', true);
@@ -2375,8 +2388,6 @@ class Token {
 						else{
 							let copyToken = $(`[data-notatoken='notatoken_${this.options.id}']`);
 							copyToken.css({
-								left: parseInt(parseFloat(this.options.left) / window.CURRENT_SCENE_DATA.scale_factor),
-								top: parseInt(parseFloat(this.options.top) / window.CURRENT_SCENE_DATA.scale_factor),
 								'--token-width': `calc(${this.sizeWidth()}px / var(--scene-scale))`,
 								'--token-height': `calc(${this.sizeHeight()}px / var(--scene-scale))`,
 								width: `var(--token-width)`,
@@ -2402,6 +2413,14 @@ class Token {
 							copyToken.toggleClass('declutterToken', this.options.lockRestrictDrop == "declutter")
 							copyToken.attr('data-name', old.attr('data-name'));
 							copyToken.toggleClass('hasTooltip', $(old).hasClass('hasTooltip'));
+							copyToken.animate({
+									left: parseInt(parseFloat(this.options.left) / window.CURRENT_SCENE_DATA.scale_factor),
+									top: parseInt(parseFloat(this.options.top) / window.CURRENT_SCENE_DATA.scale_factor),
+								}, 
+								{ 
+									duration: animationDuration, queue: true
+								}
+							);
 						}
 
 						let copyImage = $(`[data-notatoken='notatoken_${this.options.id}']`).find('.token-image')

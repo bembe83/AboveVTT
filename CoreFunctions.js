@@ -677,7 +677,7 @@ function showGoogleDriveWarning(){
       <div id="above-vtt-error-message">
         <h2>Google Drive Issue</h2>
         <h3 id="error-message">Google has made changes</h3>
-        <div id="error-message-details"><p>Google has made some changes to google drive links that may cause maps and other images/audio/video to no longer load. </p><p>They no longer support (it was never officially supported) google drive as a public host.</p> <p>We suggesting moving to other hosts such as dropbox, onedrive, imgur, or your prefered hosting solution.</p><p> For more information or help with other hosting options see our discord: <a href='https://discord.com/channels/815028457851191326/823177610149756958/1201995534038990909'>Google Drive Issue</a></p></div>
+        <div id="error-message-details"><p> If you moved/updated/reuploaded the file you may need a new link. It's possible the link is not shared publicly. If it does not come from 'share->copy link' on the site or the url does not have 'id=' in it it may be a link format we do not currently support. Feel free to reach out to us on discord if you find a different format.</p><p>Otherwise Google has made some changes to google drive links that may cause maps and other images/audio/video to no longer load. </p><p>They no longer support (it was never officially supported) google drive as a public host.</p> <p>We suggesting moving to other hosts such as dropbox, onedrive, imgur, or your prefered hosting solution.</p><p> For more information or help with other hosting options see our discord: <a href='https://discord.com/channels/815028457851191326/823177610149756958/1201995534038990909'>Google Drive Issue</a></p></div>
         <div class="error-message-buttons">
           <button id="close-error-button">Close</button>
         </div>
@@ -1065,16 +1065,13 @@ async function harvest_game_id() {
   }
 
   if (is_characters_page()) {
-    const campaignSummaryButton = $(".ddbc-campaign-summary, [class*='styles_campaignSummary']");
-    if (campaignSummaryButton.length > 0) {
-      if ($(".ct-campaign-pane__name-link").length === 0) {
-        campaignSummaryButton.click(); // campaign sidebar is closed. open it
-      }
-      const fromLink = $(".ct-campaign-pane__name-link").attr("href")?.split("/")?.pop();
-      if (typeof fromLink === "string" && fromLink.length > 1) {
-        return fromLink;
-      }
+   
+    
+    const fromLink = $("[href^='/games/']").attr("href")?.split("/")?.pop();
+    if (typeof fromLink === "string" && fromLink.length > 1) {
+      return fromLink;
     }
+    
 
     // we didn't find it on the page so hit the DDB API, and try to pull it from there
     const characterId = window.location.pathname.split("/").pop();

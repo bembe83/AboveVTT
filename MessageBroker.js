@@ -76,7 +76,7 @@ const debounceHandleInjected = mydebounce(() => {
 				add_journal_roll_buttons(li);
 				window.JOURNAL.add_journal_tooltip_targets(li);
 				add_stat_block_hover(li)
-				let newheight = li.height();
+				let newheight = li.find('>[class*="MessageContainer-Flex"]').height();
 				li.height(newheight);
 			
 				let output = $(`${current.data.injected_data.whisper == '' ? '' : `<div class='above-vtt-roll-whisper'>To: ${(current.data.injected_data.whisper == window.PLAYER_NAME && current.data.player_name == window.PLAYER_NAME) ? `Self` : current.data.injected_data.whisper}</div>`}<div class='above-vtt-container-roll-output'>${li.find('.abovevtt-roll-container').attr('title')}</div>`);
@@ -94,6 +94,8 @@ const debounceHandleInjected = mydebounce(() => {
 								li.find('.chat-link').css('display', 'none');
 							}
 							$(img[i]).attr('href', img[i].src);
+							newheight = li.find('>[class*="MessageContainer-Flex"]').height();
+							li.height(newheight);
 						}
 						$(img[i]).off('error').on("error", function (e) {
 	            let el = $(e.target)
@@ -139,6 +141,8 @@ const debounceHandleInjected = mydebounce(() => {
 											});
 											li.find('.chat-link').css('display', 'none');
 										}
+										newheight = li.find('>[class*="MessageContainer-Flex"]').height();
+										li.height(newheight);
 						}, false);
 					}
 				}
@@ -1720,7 +1724,7 @@ class MessageBroker {
 			}
 			t.sync = mydebounce(function(e) { // VA IN FUNZIONE SOLO SE IL TOKEN NON ESISTE GIA					
 				window.MB.sendMessage('custom/myVTT/token', t.options);
-			}, 10);
+			}, 300);
 			t.place();
 
 			let playerTokenId = $(`.token[data-id*='${window.PLAYER_ID}']`).attr("data-id");
@@ -1730,7 +1734,7 @@ class MessageBroker {
 		}
 }
 
-	async handleScene(msg) {
+	async handleScene(msg, forceRefresh=false) {
 		console.debug("handlescene", msg);
 		try{
 			if(msg.data.scale_factor == undefined || msg.data.scale_factor == ''){
@@ -1750,7 +1754,7 @@ class MessageBroker {
 																				
 			
 
-			if(isSameScaleAndMaps){
+			if(isSameScaleAndMaps && !forceRefresh){
 				let scaleFactor = window.CURRENT_SCENE_DATA.scale_factor;
 				let conversion = window.CURRENT_SCENE_DATA.conversion;
 
@@ -1985,6 +1989,8 @@ class MessageBroker {
 									if(msg.data.id != window.CURRENT_SCENE_DATA.id || lastSceneRequestTime != window.sceneRequestTime){
 										return;
 									}
+									if(forceRefresh)
+										delete window.all_token_objects[id]
 									await self.handleToken({
 										data: data.tokens[id],
 										loading: true,
@@ -2287,18 +2293,12 @@ class MessageBroker {
 
 		
 			window.reconnectAttemptAbovews++;
-			if(window.reconnectAttemptAbovews > 5)
-				return;
 
-			if(window.reconnectAttemptAbovews < 5){
-				let msgdata = {
-					player: window.PLAYER_NAME,
-					img: window.PLAYER_IMG,
-					text: "You have disconnected from the AboveVTT websocket. Attempting to reconnect!",
-					whisper: window.PLAYER_NAME
-				};
-				this.inject_chat(msgdata);	
-				this.loadAboveWS(function(){ 
+
+			alert("You have disconnected from the AboveVTT websocket.\n\nThis could be caused by a VPN, anti-tracker, adblocker, firewall, school/work network settings, or other extention/program.\n\nIt may also happen if the tab was in the background too long\n\nReconnect?",)
+			this.loadAboveWS(function(){ 
+				AboveApi.getScene(window.CURRENT_SCENE_DATA.id).then((response) => {
+					window.MB.handleScene(response, true);
 					setTimeout(
 						function(){
 							let msgdata = {
@@ -2309,19 +2309,12 @@ class MessageBroker {
 
 							window.MB.inject_chat(msgdata);
 						}, 4000)
-					}
-				);
-			}
-			else {
-				let msgdata = {
-					player: window.PLAYER_NAME,
-					img: window.PLAYER_IMG,
-					text: `<span><p>You have disconnected from the AboveVTT websocket 5 times. It is likely you are experiencing connection issues. </p><p>Reconnect messages/forced reconnect will be disabled until refresh.</p><p>This could be caused by a VPN, anti-tracker, adblocker, firewall, school/work network settings, or other extention/program.</p></span>`,
-					whisper: window.PLAYER_NAME
-				};
-				this.inject_chat(msgdata);
-			}
-					
+				}).catch((error) => {
+					console.error("Failed to download scene", error);
+				});
+
+				}, true
+			);		
 		}
 	}
 }

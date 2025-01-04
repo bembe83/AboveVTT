@@ -160,7 +160,7 @@ class DiceContextMenu {
         return this.section("SEND TO:", s => {
             s.row("Everyone", svg_everyone(), sendToText === "Everyone");
             s.row("Self", svg_self(), sendToText === "Self");
-            if (!window.DM) {
+            if (!window.DM && (window.CAMPAIGN_INFO.dmId != window.myUser || window.EXPERIMENTAL_SETTINGS['rpgRoller'] == true)) {
                 s.row("Dungeon Master", svg_dm(), sendToText === "Dungeon Master");
             }
         })
@@ -260,14 +260,17 @@ class DiceContextMenuSection {
                     e.preventDefault();
                     e.stopPropagation();
                 })
-                rowInput.on("change", function(e) {
+                rowInput.on("keypress change blur", function(e) {
                     inputCallback($(this).val());
+                    if (e.key === "Enter") {      
+                        $('.dcm-roll-button').click();
+                    }
                 });
                 let rowHtml = $(`
                     <div class="dcm-row" role="expression">
                         <div class="dcm-row-icon dcm-row-title">
                             <span>${rowTitle}</span>
-                        </div>                        
+                        </div>
                     </div>
                 `);
                 rowHtml.append(rowInput);
