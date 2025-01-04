@@ -10,7 +10,7 @@ var id = "godicemodule-resolver";
 
 export class RollBonusPrompt {
 	
-	async showRollBonusPrompt(formula, d20) {
+	showRollBonusPrompt = async (formula, d20) => {
 			let modulePath = Utils.getModulePath();
 			let template;
 			let args = { template: "rollbonus", formula: formula, d20: d20};

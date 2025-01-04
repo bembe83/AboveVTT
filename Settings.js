@@ -442,6 +442,17 @@ function avtt_settings() {
 	})
 	settings.push(
 	{
+		name: "godiceRoller",
+		label: "Enable  GoDice where possible",
+		type: "toggle",
+		options: [
+			{ value: true, label: "GoDice Dice", description: `Disables DDB dice and uses manual/bluetooth number input` },
+			{ value: false, label: "DDB Dice", description: `Defaults to DDB dice` }
+		],
+		defaultValue: false
+	})
+	settings.push(
+	{
 		name: "disableSendToTab",
 		label: "Disable capture of pc tab rolls",
 		type: "toggle",
@@ -539,29 +550,45 @@ function set_avtt_setting_value(name, newValue) {
 			local_peer_setting_changed(name, newValue);
 			break;
 		case "rpgRoller":
-		 if(is_abovevtt_page()){
-		    tabCommunicationChannel.postMessage({
-		      msgType: 'setupObserver',
-		      tab: (window.EXPERIMENTAL_SETTINGS['disableSendToTab'] ==  true) ? undefined : window.PLAYER_ID,
-		      rpgTab: (window.EXPERIMENTAL_SETTINGS['rpgRoller'] ==  true) ? window.PLAYER_ID : undefined,
-		      iframeTab: window.PLAYER_ID,
-		      rpgRoller: newValue
-		    })
-			//Enable GoDice RollBar and Roller
-			if(window.godice.dicebar){
-				window.godice.dicebar.enable(window.EXPERIMENTAL_SETTINGS['rpgRoller']);
-				window.godice.dicebar.render();
-			}
-		  }
-		  break;
+			 if(is_abovevtt_page()){
+			    tabCommunicationChannel.postMessage({
+			      msgType: 'setupObserver',
+			      tab: (window.EXPERIMENTAL_SETTINGS['disableSendToTab'] ==  true) ? undefined : window.PLAYER_ID,
+			      rpgTab: (window.EXPERIMENTAL_SETTINGS['rpgRoller'] ==  true) ? window.PLAYER_ID : undefined,
+			      iframeTab: window.PLAYER_ID,
+			      rpgRoller: newValue
+			    })
+				if(newValue == true && window.EXPERIMENTAL_SETTINGS['godiceRoller'] ==  true)
+					document.getElementsByName("godiceRoller")[0].click();
+			  }
+			  break;
+		  case "godiceRoller":
+			   if(is_abovevtt_page()){
+			      tabCommunicationChannel.postMessage({
+			        msgType: 'setupObserver',
+			        tab: (window.EXPERIMENTAL_SETTINGS['disableSendToTab'] ==  true) ? undefined : window.PLAYER_ID,
+			        rpgTab: (window.EXPERIMENTAL_SETTINGS['godiceRoller'] ==  true) ? window.PLAYER_ID : undefined,
+			        iframeTab: window.PLAYER_ID,
+			        godiceRoller: newValue
+			      })
+			  	//Enable GoDice RollBar and Roller
+			  	if(window.godice.dicebar){
+			  		window.godice.dicebar.enable(window.EXPERIMENTAL_SETTINGS['godiceRoller']);
+			  		window.godice.dicebar.render();
+			  	}
+				if(newValue == true && window.EXPERIMENTAL_SETTINGS['rpgRoller'] ==  true)
+					document.getElementsByName("rpgRoller")[0].click();
+		    }
+		 	break;		  
 		case "disableSendToTab":
 		 	if(is_abovevtt_page()){
 			 	tabCommunicationChannel.postMessage({
 	   		      msgType: 'setupObserver',
 	  		      tab: (window.EXPERIMENTAL_SETTINGS['disableSendToTab'] ==  true) ? undefined : window.PLAYER_ID,
-	  		      rpgTab: (window.EXPERIMENTAL_SETTINGS['rpgRoller'] ==  true) ? window.PLAYER_ID : undefined,
+	  		      rpgTab: (window.EXPERIMENTAL_SETTINGS['rpgRoller'] ==  true || window.EXPERIMENTAL_SETTINGS['godiceRoller'] ==  true) ? window.PLAYER_ID : undefined,
 				  iframeTab: window.PLAYER_ID,
-	   		      rpgRoller: window.EXPERIMENTAL_SETTINGS['rpgRoller']
+	   		      rpgRoller: window.EXPERIMENTAL_SETTINGS['rpgRoller'],
+				  godiceRoller: window.EXPERIMENTAL_SETTINGS['godiceRoller'] 
 	  		    })
 		 	}
 		 	break;

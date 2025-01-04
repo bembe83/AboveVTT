@@ -1,5 +1,5 @@
 import { GoDice } from './GoDice.js';
-import { GoDiceExt, connectedDice, disconnectedDice } from './GoDiceExt.js';
+import { connectedDice, disconnectedDice } from './GoDiceExt.js';
 import { Utils, renderTemplate, rollTimer } from './Utils.js';
 import { DieTypePrompt } from "./DieTypePrompt.js";
 import { RollResult } from "./RollResult.js";

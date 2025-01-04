@@ -84,14 +84,14 @@ $(function() {
           enable_dice_streaming_feature(window.JOINTHEDICESTREAM );
         }
 		if(window.godice.dicebar){
-			window.godice.dicebar.enable(window.EXPERIMENTAL_SETTINGS['rpgRoller'] );
+			window.godice.dicebar.enable(window.EXPERIMENTAL_SETTINGS['godiceRoller'] );
 			window.godice.dicebar.render();
 		}
         tabCommunicationChannel.addEventListener ('message', (event) => {
           if(event.data.msgType == 'CharacterData' && !find_pc_by_player_id(event.data.characterId, false))
             return;
           if(event.data.msgType == 'roll'){
-            if(window.EXPERIMENTAL_SETTINGS['rpgRoller'] == true && event.data.msg.sendTo == window.PLAYER_ID){
+            if((window.EXPERIMENTAL_SETTINGS['rpgRoller'] == true || window.EXPERIMENTAL_SETTINGS['godiceRoller'] ) && event.data.msg.sendTo == window.PLAYER_ID){
                window.MB.inject_chat(event.data.msg);
             }
             else{
@@ -126,9 +126,10 @@ $(function() {
             tabCommunicationChannel.postMessage({
               msgType: 'setupObserver',
               tab: (window.EXPERIMENTAL_SETTINGS['disableSendToTab'] ==  true) ? undefined : window.PLAYER_ID,
-              rpgTab: (window.EXPERIMENTAL_SETTINGS['rpgRoller'] ==  true) ? window.PLAYER_ID : undefined,
+              rpgTab: (window.EXPERIMENTAL_SETTINGS['rpgRoller'] ==  true || window.EXPERIMENTAL_SETTINGS['godiceRoller'] == true) ? window.PLAYER_ID : undefined,
               iframeTab: window.PLAYER_ID,
-              rpgRoller: window.EXPERIMENTAL_SETTINGS['rpgRoller']
+              rpgRoller: window.EXPERIMENTAL_SETTINGS['rpgRoller'], 
+			  godiceRoller: window.EXPERIMENTAL_SETTINGS['godiceRoller']
             })
             return;
           }
@@ -233,7 +234,8 @@ $(function() {
           msgType: 'setupObserver',
           tab: (window.EXPERIMENTAL_SETTINGS['disableSendToTab'] ==  true) ? undefined : window.PLAYER_ID,
           iframeTab: window.PLAYER_ID,
-          rpgRoller: window.EXPERIMENTAL_SETTINGS['rpgRoller']
+          rpgRoller: window.EXPERIMENTAL_SETTINGS['rpgRoller'],
+		  godiceRoller: window.EXPERIMENTAL_SETTINGS['godiceRoller']
         })
         sendBeyond20Event('register-generic-tab', {action:'register-generic-tab'});
       })

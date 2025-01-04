@@ -26,19 +26,26 @@ class RollResult {
 		var rollReturn = new RollResult();
 		
 		var d20 = formula.includes("d20");
-		
-		var rollBonus = await new RollBonusPrompt().showRollBonusPrompt(formula, d20);
-		
-		if(rollBonus["bonus"].startsWith("+") || rollBonus["bonus"].startsWith("-") )
-			formula = formula + rollBonus["bonus"];
-		else
-			formula= formula + "+" + rollBonus["bonus"];
-		
-		var advdis = Number(rollBonus["advdis"]);
-		var rollType =  Number(rollBonus["rolltype"]);
-		var elvish = rollBonus["elven"];
+		var formulaHasDie = formula.match(dieRegex);
+		var advdis = 0;
+		var rollType =  0;
+		var elvish = false;
 		var d20dice = (elvish&&advdis==1)?3:2;
 		var critType = Number(window.CHARACTER_AVTT_SETTINGS.crit || 0);
+				
+		if(formulaHasDie){
+			var rollBonus = await new RollBonusPrompt().showRollBonusPrompt(formula, d20);
+			
+			if(rollBonus["bonus"].startsWith("+") || rollBonus["bonus"].startsWith("-") )
+				formula = formula + rollBonus["bonus"];
+			else
+				formula= formula + "+" + rollBonus["bonus"];
+			
+			advdis = Number(rollBonus["advdis"]);
+			rollType =  Number(rollBonus["rolltype"]);
+			elvish = rollBonus["elven"];
+			d20dice = (elvish&&advdis==1)?3:2;
+		}
 				
 		var matches = formula.matchAll(formulaRegex);
 		
@@ -49,7 +56,7 @@ class RollResult {
 			if(match.groups.constant){
 				 if(match.groups.operator) 
 					constants.push(match.groups.operator);
-				else
+				else if(formulaHasDie)
 					constants.push("+");
 				constants.push(Number(match.groups.constant));
 			}
@@ -90,9 +97,11 @@ class RollResult {
 			formula = results.join('');
 		
 		rollReturn["notation"] = formula;
-		
-		var newRolls = await new DiceRollPrompt().showDicePrompt(formula, diePrompt);
-		
+	
+		var newRolls = undefined;
+		if(formulaHasDie){
+			var newRolls = await new DiceRollPrompt().showDicePrompt(formula, diePrompt);
+		}
 		results.forEach(function(result, i){
 			if(dieRegex.test(result)) {
 				const newroll = [];

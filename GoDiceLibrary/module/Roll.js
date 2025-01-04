@@ -12,9 +12,9 @@ import { rollDice, rollMultipleDice, sortDiceRolls, calculateDiceRollTotal } fro
  * @returns {object} An object containing the total of the dice roll and a string representing the detailed result.
  */
 export const diceRegex = /(\d+)?d(\d+)(kh\d?|kl\d?)?([\+\-]\d+)?/;
-export const dieRegex = /(\d+)?[dD](\d+)(kh\d?|kl\d?)?/
+export const dieRegex = /(\d+)?[dD](\d+)(kh\d?|kl\d?)?/;
 export const modifierRegex = /([\+\-]?\d+)+/;
-export const formulaRegex = /(?<operator>[ ]?[+\-\/*][ ]?)?(?:(?<dice>(?<numberOfDice>[\d]+)?[dD](?<faces>[\d]+)(?<explode>![\d]*)?(?<implode>¡[\d]*)?(?<modifier>(kh\d?|kl\d?))?)|(?<constant>[\d]+))/gm;
+export const formulaRegex = /(?<operator>[ ]?[+\-\/*][ ]?)?(?:(?<dice>(?<numberOfDice>[\d]+)?[dD](?<faces>[\d]+)(?<explode>![\d]*)?(?<implode>¡[\d]*)?(?<modifier>(kh\d?|kl\d?))?)|(?<constant>[\d]+))/g;
 export const operatorRegEx = /[+\-\/*]/;
  
 export function roll(diceString, diceRolls = null) {

@@ -13,20 +13,20 @@ var maxDiceGrid = 6;
 
 export class DiceRollPrompt {
 	
-	async showDicePrompt(formula, diceList) {
+	showDicePrompt = async (formula, diceList) => {
 		var newRolls = [];
 		console.debug(formula, " - ", diceList);
 		if (formula && diceList) {
 			let modulePath = Utils.getModulePath();
 			let args = this.prepareRollPromptData(formula);
 			diceList.forEach((die)=>{
-				let diePrompt = this.createDiePrompt(modulePath, die.name, die.dieFaces, die.diePlaceholder, die.index);
+				let diePrompt = this.createDiePrompt(die.name, die.dieFaces, die.diePlaceholder, die.index);
 				args.terms.push(diePrompt);
 			});
 			let r = document.querySelector(':root');
 			r.style.setProperty('--dice-grid', diceList.length<=maxDiceGrid?diceList.length:maxDiceGrid);
 			let template;
-			template = await renderTemplate(modulePath + templatePath, args);
+			template = await  renderTemplate(modulePath + templatePath, args);
 			let dialog = new Dialog({
 				id: id,
 				content: template,
@@ -52,7 +52,7 @@ export class DiceRollPrompt {
 		return newRolls;
 	}
 		
-	createDiePrompt(modulePath, name, dieFaces, diePlaceholder, index){
+	createDiePrompt(name, dieFaces, diePlaceholder, index){
 		let rtn = {
 				id: name+"-"+index,
 				image: goDiceExt.diceIcons["D"+dieFaces],

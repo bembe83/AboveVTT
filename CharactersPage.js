@@ -351,7 +351,7 @@ async function init_characters_pages(container = $(document)) {
   if(!is_abovevtt_page()){
     tabCommunicationChannel.addEventListener ('message', (event) => {
       if(event.data.msgType == 'setupObserver'){
-        if(event.data.tab == undefined && event.data.rpgRoller != true && window.self==window.top){
+        if(event.data.tab == undefined && event.data.rpgRoller != true && event.data.godiceRoller != true && window.self==window.top){
           $(`.integrated-dice__container:not('.above-aoe'):not(.avtt-roll-formula-button)`).off('click.rpg-roller'); 
           $(`.integrated-dice__container:not('.above-aoe'):not(.avtt-roll-formula-button)`).off('contextmenu.rpg-roller')
         }else{
@@ -359,6 +359,7 @@ async function init_characters_pages(container = $(document)) {
         }
 
         window.EXPERIMENTAL_SETTINGS['rpgRoller'] = event.data.rpgRoller;
+		window.EXPERIMENTAL_SETTINGS['godiceRoller'] = event.data.godiceRoller;
         if(window.sendToTab != false || event.data.tab == undefined){
           window.sendToTab = (window.self != window.top) ? event.data.iframeTab : event.data.tab;     
         }
@@ -370,6 +371,7 @@ async function init_characters_pages(container = $(document)) {
         $(`.integrated-dice__container:not('.above-aoe'):not(.avtt-roll-formula-button)`).off('click.rpg-roller'); 
         $(`.integrated-dice__container:not('.above-aoe'):not(.avtt-roll-formula-button)`).off('contextmenu.rpg-roller')
         delete window.EXPERIMENTAL_SETTINGS['rpgRoller'];
+		delete window.EXPERIMENTAL_SETTINGS['godiceRoller'] ;
         window.sendToTabRPGRoller = undefined;
         window.sendToTab = undefined;
         setTimeout(function(){
@@ -440,7 +442,7 @@ function convertToRPGRoller(){
     $(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`).off('click.rpg-roller').on('click.rpg-roller', function(e){
       let rollData = {} 
       rollData = getRollData(this);
-      if(!rollData.expression.match(allDiceRegex) && window.EXPERIMENTAL_SETTINGS['rpgRoller'] != true){
+      if(!rollData.expression.match(allDiceRegex) && (window.EXPERIMENTAL_SETTINGS['rpgRoller'] != true && window.EXPERIMENTAL_SETTINGS['godiceRoller'] != true)){
         return;
       }
       e.stopImmediatePropagation();
