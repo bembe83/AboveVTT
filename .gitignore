@@ -5,4 +5,4 @@
 .project
 .settings/*
 web-ext-artifacts/
-GoDiceLibrary/
+GoDiceLibrary/*
