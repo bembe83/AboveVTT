@@ -109,7 +109,7 @@
 			"peerVideo.js",
 			"peerDice.js",
 			"onedrive/*",
-			"GoDiceLibrary/*"
+			"godice-roller.bundle.js"
 			],
 			"matches": [ "*://*.dndbeyond.com/*" ]	
 		}
