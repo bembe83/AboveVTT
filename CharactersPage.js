@@ -103,33 +103,143 @@ const buffsDebuffs = {
       "tohit": "-d4",
       "dmg": "0",
       "save": "-d4",
-      "check": "0"
+      "check": "0",
+      "type": "spell"
   },
   "Bless": {
       "tohit": "+d4",
       "dmg": "0",
       "save": "+d4",
-      "check": "0"
+      "check": "0",
+      "type": "spell"
+  },
+  "Rage": {
+    "multiOptions": {
+      "+2": {
+        "tohit": "0",
+        "dmg": "+2",
+        "save": "0",
+        "check": "0"
+      },
+      "+3": {
+        "tohit": "0",
+        "dmg": "+3",
+        "save": "0",
+        "check": "0"
+      },
+      "+4": {
+        "tohit": "0",
+        "dmg": "+4",
+        "save": "0",
+        "check": "0"
+      },
+    },
+    "type": "class",
+    "class": "barbarian",
+  },
+  "Elemental Cleaver": {
+    "multiOptions": {
+      "1d6": {
+        "tohit": "0",
+        "dmg": "+d6",
+        "save": "0",
+        "check": "0"
+      },
+      "2d6": {
+        "tohit": "0",
+        "dmg": "+2d6",
+        "save": "0",
+        "check": "0"
+      },
+    },
+    "type": "class",
+    "class": "barbarian",
+  },
+  "Great Weapon Master (2024)": {
+    "tohit": "0",
+    "dmg": "+PB",
+    "save": "0",
+    "check": "0",
+    "type": "feat",
+  },
+  "Call the Hunt": {
+    "tohit": "0",
+    "dmg": "+d6",
+    "save": "0",
+    "check": "0",
+    "type": "class",
+    "class": "barbarian",
+  },
+  "Cosmic Omen":{
+    "multiOptions": {
+      "Weal": {
+        "tohit": "+d6",
+        "dmg": "0",
+        "save": "+d6",
+        "check": "+d6"
+      },
+      "Woe": {
+        "tohit": "+d6",
+        "dmg": "0",
+        "save": "+d6",
+        "check": "+d6"
+      },
+    },
+    "type": "class",
+    "class": "druid",
+  },
+  "Giant’s Might": {
+    "multiOptions": {
+      "1d6": {
+        "tohit": "0",
+        "dmg": "+d6",
+        "save": "0",
+        "check": "0"
+      },
+      "1d8": {
+        "tohit": "0",
+        "dmg": "+d8",
+        "save": "0",
+        "check": "0"
+      },
+      "1d10": {
+        "tohit": "0",
+        "dmg": "+1d10",
+        "save": "0",
+        "check": "0"
+      },
+    },
+    "type": "class",
+    "class": "fighter",
+  },
+  "-5 to hit, +10 damage":  {
+    "tohit": "-5",
+    "dmg": "+10",
+    "save": "0",
+    "check": "0",
+    "type": "feat"
   },
   "Guidance": {
       "tohit": "0",
       "dmg": "0",
       "save": "0",
-      "check": "+d4"
+      "check": "+d4",
+      "type": "spell"
   },
   "Enlarge": {
       "tohit": "0",
       "dmg": "+d4",
       "save": "0",
-      "check": "0"
+      "check": "0",
+      "type": "spell"
   },
   "Reduce": {
       "tohit": "0",
       "dmg": "-d4",
       "save": "0",
-      "check": "0"
+      "check": "0",
+      "type": "spell"
   },
-
   "Magic Weapon": {
     "multiOptions": {
       "+1": {
@@ -151,36 +261,37 @@ const buffsDebuffs = {
         "check": "0"
       },
     },
+    "type": "spell"
   },
   "Hunter's Mark": {
       "tohit": "0",
       "dmg": "+d6",
       "save": "0",
-      "check": "0"
+      "check": "0",
+      "type": "spell"
   },
   "Hex": {
       "tohit": "0",
       "dmg": "+d6",
       "save": "0",
-      "check": "0"
+      "check": "0",
+      "type": "spell"
   },
   "Hexblade's Curse": {
       "tohit": "0",
       "dmg": "+PB",
       "save": "0",
-      "check": "0"
+      "check": "0",
+      "type": "class",
+      "class": "warlock"
   },
   "Symbiotic Entity": {
       "tohit": "0",
       "dmg": "+d6",
       "save": "0",
-      "check": "0"
-  },
-  "Elemental Cleaver": {
-      "tohit": "0",
-      "dmg": "+d6",
-      "save": "0",
-      "check": "0"
+      "check": "0",
+      "type": "class",
+      "class": "druid"
   },
   "Strike of the Giants": {
     "multiOptions": {
@@ -203,45 +314,87 @@ const buffsDebuffs = {
         "check": "0"
       },
     },
+    "type": "feat"
   },
   "Gift of the Chromatic Dragon": {
-      "tohit": "0",
-      "dmg": "+d4",
-      "save": "0",
-      "check": "0"
+    "tohit": "0",
+    "dmg": "+d4",
+    "save": "0",
+    "check": "0",
+    "type": "feat"
+  },
+  "Emboldening Bond": {
+    "tohit": "+d4",
+    "dmg": "0",
+    "save": "+d4",
+    "check": "+d4",
+    "type": "class",
+    "class": "cleric"
+  },
+  "Divine Strike": {
+    "multiOptions": {
+      "1d8": {
+        "tohit": "0",
+        "dmg": "+1d8",
+        "save": "0",
+        "check": "0"
+      },
+      "2d8": {
+        "tohit": "0",
+        "dmg": "+2d8",
+        "save": "0",
+        "check": "0"
+      },
+    },
+    "type": "class",
+    "class": "cleric"
   },
   "Divine Favor": {
       "tohit": "0",
       "dmg": "+d4",
       "save": "0",
-      "check": "0"
+      "check": "0",
+      "type": "spell"
+  },
+  "Radiant Strikes (Improved Divine Smite)": {
+    "tohit": "0",
+    "dmg": "+d8",
+    "save": "0",
+    "check": "0",
+    "type": "class",
+    "class": "paladin"
   },
   "Crusader's Mantle": {
       "tohit": "0",
       "dmg": "+d4",
       "save": "0",
-      "check": "0"
+      "check": "0",
+      "type": "spell"
   },
   "Holy Weapon": {
       "tohit": "0",
       "dmg": "+2d8",
       "save": "0",
-      "check": "0"
+      "check": "0",
+      "type": "spell"
   },
   "Tenser's Transformation": {
       "tohit": "0",
       "dmg": "+2d12",
       "save": "0",
-      "check": "0"
+      "check": "0",
+      "type": "spell"
   },
   "Fount of Moonlight": {
       "tohit": "0",
       "dmg": "+2d6",
       "save": "0",
-      "check": "0"
+      "check": "0",
+      "type": "spell"
   }
 }
-
+let rollBuffFavorites = [];
+let rollBuffContext = [];
 
 /** @param changes {object} the changes that were observed. EX: {hp: 20} */
 function character_sheet_changed(changes) {
@@ -410,6 +563,10 @@ function read_current_hp(container = $(document)) {
   if(element.length){
     return parseInt(element.text())
   }
+  element = container.find(`[class*='styles_hitPointsBox'] h2~[aria-label*='Current']`)
+  if(element.length){
+    return parseInt(element.text())
+  }
   element = container.find(`.ct-health-summary__hp-number[aria-labelledby*='ct-health-summary-current-label']`);
   if (element.length) {
     return parseInt(element.text()) || 0;
@@ -434,6 +591,10 @@ function read_temp_hp(container = $(document)) {
   if(element.length){
     return parseInt(element.val())
   }
+  element = container.find(`[class*='styles_hitPointsBox'] h2~[aria-label*='Temporary']`)
+  if(element.length){
+    return parseInt(element.text())
+  }
   element = container.find(`.ct-health-summary__hp-number[aria-labelledby*='ct-health-summary-temp-label']`)
   if (element.length) {
     return parseInt(element.text()) || 0;
@@ -450,6 +611,10 @@ function read_temp_hp(container = $(document)) {
 
 function read_max_hp(currentMaxValue = 0, container = $(document)) {
   let element = container.find(`.ct-health-manager__health-item.ct-health-manager__health-item--max .ct-health-manager__health-item-value .ct-health-manager__health-max-current`)
+  if(element.length){
+    return parseInt(element.text())
+  }
+  element = container.find(`[class*='styles_hitPointsBox'] h2~[aria-label*='Max']`)
   if(element.length){
     return parseInt(element.text())
   }
@@ -472,16 +637,16 @@ function read_death_save_info(container = $(document)) {
     };
   }
   return {
-    failCount: container.find('.ct-health-summary__deathsaves--fail .ct-health-summary__deathsaves-mark--active').length || 0,
-    successCount: container.find('.ct-health-summary__deathsaves--success .ct-health-summary__deathsaves-mark--active').length || 0
+    failCount: container.find('.ct-health-summary__deathsaves--fail .ct-health-summary__deathsaves-mark--active, [class*="styles_activeMark-fail"]').length || 0,
+    successCount: container.find('.ct-health-summary__deathsaves--success .ct-health-summary__deathsaves-mark--active, [class*="styles_activeMark-success"]').length || 0
   };
 }
 
 function read_inspiration(container = $(document)) {
-  if (container.find(".ct-inspiration__status--active").length) {
+  if (container.find(".ct-inspiration__status--active, .ct-quick-info__inspiration svg.ddbc-inspiration-token-svg").length) {
     return true;
   }
-  if (container.find(".ct-status-summary-mobile__inspiration .ct-status-summary-mobile__button--active").length) {
+  if (container.find(".ct-status-summary-mobile__inspiration .ct-status-summary-mobile__button--active, [class*='styles_mobileWrapper'] [class*='styles_mobileButton'][role='checkbox'][aria-checked='true']").length) {
     return true
   }
   return false;
@@ -549,12 +714,16 @@ function convertToRPGRoller(){
         return;
       }
       e.stopImmediatePropagation();
-      
+      if(rollData.rollTitle == 'Initiative' && $(`[aria-label="Has advantage on initiative"]`).length){
+        rollData.expression = rollData.expression.replace(/^1d20/g, '2d20kh1');
+      }
       window.diceRoller.roll(new DiceRoll(rollData.expression, rollData.rollTitle, rollData.rollType));
     });
 }
 
-
+const debounceObserverSetup = mydebounce(function(){
+  observe_character_sheet_changes($('#site-main, .ct-sidebar__portal'));
+}, 200);
 
 /** actions to take on the character sheet when AboveVTT is NOT running */
 async function init_character_sheet_page() {
@@ -584,6 +753,7 @@ async function init_character_sheet_page() {
   // observe window resizing and injeect our join/exit button if necessary
   window.addEventListener('resize', function(event) {
     inject_join_exit_abovevtt_button();
+    debounceObserverSetup();
   }); 
 
   if(!is_abovevtt_page()){
@@ -752,7 +922,189 @@ function inject_dice_roll(element, clear=true) {
       }
   })
 }
+function register_buff_row_context_menu() {
+  $.contextMenu({
+    selector: ".dropdown-check-list li",
+    build: function(element, e) {
 
+      let menuItems = {};
+
+      let rowHtml = $(element);
+      let rowBuff = rowHtml.find('[data-buff]').attr('data-buff');
+
+      menuItems["favorite"] = {
+        name: rollBuffFavorites.includes(rowBuff) ? "Remove From Favorites" : "Move to Favorites",
+        callback: function(itemKey, opt, originalEvent) {
+            if(rollBuffFavorites.includes(rowBuff)){
+              rollBuffFavorites = rollBuffFavorites.filter(d=> d != rowBuff)
+            }
+            else{
+              rollBuffFavorites.push(rowBuff)
+            }
+            localStorage.setItem('rollFavoriteBuffs' + window.PLAYER_ID, JSON.stringify(rollBuffFavorites));
+            rebuild_buffs();
+
+        }
+      };
+      /**** To do: Allow select menus to be added to roll context menus for this to work. Checkbox inputs can just be added as list items ****/
+      /*
+      menuItems["addToContext"] = {
+        name: rollBuffContext.includes(rowBuff) ? "Remove from Roll Context Menu" : "Add to Roll Context Menu",
+        callback: function(itemKey, opt, originalEvent) {
+          if(rollBuffContext.includes(rowBuff)){
+            rollBuffContext = rollBuffContext.filter(d=> d != rowBuff)
+          }
+          else{
+            rollBuffContext.push(rowBuff)
+          }
+          rebuild_buffs();
+        }
+      };
+      */
+      return { items: menuItems };
+    }
+
+  })
+}
+function rebuild_buffs(fullBuild = false){
+  window.rollBuffs = JSON.parse(localStorage.getItem('rollBuffs' + window.PLAYER_ID)) || [];
+  rollBuffFavorites = JSON.parse(localStorage.getItem('rollFavoriteBuffs' + window.PLAYER_ID)) || [];
+  let avttBuffSelect;
+  if(fullBuild){
+    avttBuffSelect = $(`<div id="avtt-buff-options" class="dropdown-check-list">
+      <span class="clickHandle">Roll Buff/Debuffs</span>
+      <ul class="avttBuffItems">
+        <ul id='favoriteBuffs'><li>Favorite</li></ul>
+        <ul id='classBuffs'><li>Class</li>
+          <ul id='barbarianBuffs'><li>Barbarian</li></ul>
+          <ul id='bardBuffs'><li>Bard</li></ul>
+          <ul id='clericBuffs'><li>Cleric</li></ul>
+          <ul id='druidBuffs'><li>Druid</li></ul>
+          <ul id='fighterBuffs'><li>Fighter</li></ul>
+          <ul id='monkBuffs'><li>Monk</li></ul>
+          <ul id='paladinBuffs'><li>Paladin</li></ul>
+          <ul id='rangerBuffs'><li>Ranger</li></ul>
+          <ul id='rogueBuffs'><li>Rogue</li></ul>
+          <ul id='sorcererBuffs'><li>Sorcerer</li></ul>
+          <ul id='warlockBuffs'><li>Warlock</li></ul>
+          <ul id='wizardBuffs'><li>Wizard</li></ul>
+        </ul>
+        <ul id='spellBuffs'><li>Spells</li></ul>
+        <ul id='featBuffs'><li>Feats</li></ul>
+      </ul>
+    </div>`)
+  }
+  else{
+    avttBuffSelect = $(`#avtt-buff-options`);
+    avttBuffSelect.find('.avttBuffItems').html(`
+      <ul id='favoriteBuffs'><li>Favorite</li></ul>
+      <ul id='classBuffs'><li>Class</li>
+        <ul id='barbarianBuffs'><li>Barbarian</li></ul>
+        <ul id='bardBuffs'><li>Bard</li></ul>
+        <ul id='clericBuffs'><li>Cleric</li></ul>
+        <ul id='druidBuffs'><li>Druid</li></ul>
+        <ul id='fighterBuffs'><li>Fighter</li></ul>
+        <ul id='monkBuffs'><li>Monk</li></ul>
+        <ul id='paladinBuffs'><li>Paladin</li></ul>
+        <ul id='rangerBuffs'><li>Ranger</li></ul>
+        <ul id='rogueBuffs'><li>Rogue</li></ul>
+        <ul id='sorcererBuffs'><li>Sorcerer</li></ul>
+        <ul id='warlockBuffs'><li>Warlock</li></ul>
+        <ul id='wizardBuffs'><li>Wizard</li></ul>
+      </ul>
+      <ul id='spellBuffs'><li>Spells</li></ul>
+      <ul id='featBuffs'><li>Feats</li></ul>
+    `)
+  }
+
+  const avttBuffItems = avttBuffSelect.find('.avttBuffItems')
+  avttBuffSelect.off('click.clickHandle').on('click.clickHandle', '.clickHandle', function(){
+    avttBuffSelect.toggleClass('visible')
+    if(avttBuffSelect.hasClass('visible')){
+      $(document).on('click.blurHandle', function(e){
+        if($(e.target).closest('#avtt-buff-options, .context-menu-list').length == 0){
+          avttBuffSelect.toggleClass('visible')
+          $(document).off('click.blurHandle');
+        }
+      })  
+    }
+  })
+  avttBuffSelect.off('click.headers').on('click.headers', 'ul>ul', function(e){
+    e.stopPropagation();
+    if($(e.target).is('li:first-of-type'))
+      $(e.target).closest('ul').toggleClass('collapsed');
+  })
+  const sortedBuffs = Object.keys(buffsDebuffs).sort().reduce(
+    (obj, key) => { 
+      obj[key] = buffsDebuffs[key]; 
+      return obj;
+    }, 
+    {}
+  );
+  for(let i in sortedBuffs){
+    const headerRow = avttBuffItems.find(`ul#${buffsDebuffs[i].type == 'class' ? buffsDebuffs[i].class : buffsDebuffs[i].type}Buffs`);
+    const replacedName = i.replace("'", '');
+    const addToFavorite = rollBuffFavorites.includes(replacedName);
+
+    if(buffsDebuffs[i]['multiOptions'] != undefined){
+      const row = $(`<li><select id='buff_${replacedName}' data-buff='${replacedName}'/><option value='0'></option></select><label for='buff_${replacedName}'>${i}</label></li>`)
+      const select = row.find('select');
+      const currentSelected = window.rollBuffs.find(d => d.includes(i));
+
+      for(let j in buffsDebuffs[i]['multiOptions']){
+        const option = $(`<option value='${j}'>${j}</option>`);
+        select.append(option)
+      }
+      if(currentSelected != undefined){
+        select.val(currentSelected[1])
+      }
+      row.find('select').off('change.setRollBuff').on('change.setRollBuff', function(e){
+        if(typeof window.rollBuffs == 'undefined')
+          window.rollBuffs =[];
+        if($(this).val() != '0'){
+          window.rollBuffs = window.rollBuffs.filter(d => !d.includes(i)); 
+          window.rollBuffs.push([i, $(this).val()])
+        }
+        else{
+         window.rollBuffs = window.rollBuffs.filter(d => !d.includes(i)); 
+        }
+        localStorage.setItem('rollBuffs' + window.PLAYER_ID, JSON.stringify(window.rollBuffs));
+      })
+      if(addToFavorite)
+        avttBuffItems.find(`ul#favoriteBuffs`).append(row);  
+      else    
+        headerRow.append(row);
+    }else{
+      const row = $(`<li><input type="checkbox" id='buff_${replacedName}' data-buff='${replacedName}'/><label for='buff_${replacedName}'>${i}</label></li>`);
+      if(window.rollBuffs.includes(i))
+        row.find('input').prop('checked', true);
+      row.find('input').off('change.setRollBuff').on('change.setRollBuff', function(e){
+        if(typeof window.rollBuffs == 'undefined')
+          window.rollBuffs =[];
+        if($(this).is(':checked')){
+          window.rollBuffs.push(i)
+        }
+        else{
+         window.rollBuffs = window.rollBuffs.filter(d => d != i); 
+        }
+        localStorage.setItem('rollBuffs' + window.PLAYER_ID, JSON.stringify(window.rollBuffs));
+      })
+      if(addToFavorite)
+        avttBuffItems.find(`ul#favoriteBuffs`).append(row);
+      else   
+        headerRow.append(row);
+    }
+
+  }
+  avttBuffItems.find(`ul>ul`).each(function(){
+    if($(this).find('li').length < 2)
+      $(this).hide();
+  })
+
+  if(fullBuild)
+    $('.ct-primary-box__tab--actions .ct-actions h2, .ct-actions-mobile .ct-actions h2, .ct-actions-tablet .ct-tablet-box__header').after(avttBuffSelect)
+  register_buff_row_context_menu();
+}
 /**
  * Observes character sheet changes and:
  *     injects Dice Roll buttons when a slash command is in item notes.
@@ -1201,71 +1553,7 @@ function observe_character_sheet_changes(documentToObserve) {
 
 
       if($('#avtt-buff-options').length == 0){
-        window.rollBuffs = JSON.parse(localStorage.getItem('rollBuffs' + window.PLAYER_ID)) || [];
-        let avttBuffSelect = $(`<div id="avtt-buff-options" class="dropdown-check-list">
-          <span class="clickHandle">Roll Buff/Debuffs</span>
-          <ul class="avttBuffItems">
-          </ul>
-        </div>`)
-        const avttBuffItems = avttBuffSelect.find('.avttBuffItems')
-        avttBuffSelect.off('click.clickHandle').on('click.clickHandle', '.clickHandle', function(){
-          avttBuffSelect.toggleClass('visible')
-          if(avttBuffSelect.hasClass('visible')){
-            $(document).on('click.blurHandle', function(e){
-              if($(e.target).closest('#avtt-buff-options').length == 0){
-                avttBuffSelect.toggleClass('visible')
-                $(document).off('click.blurHandle');
-              }
-            })  
-          }
-        })
-       
-        for(let i in buffsDebuffs){
-          if(buffsDebuffs[i]['multiOptions'] != undefined){
-            const row = $(`<li><select id='buff_${i}' data-buff='${i}'/><option value='0'></option></select><label for='buff_${i}'>${i}</label></li>`)
-            const select = row.find('select');
-            const currentSelected = window.rollBuffs.find(d => d.includes(i));
-
-            for(let j in buffsDebuffs[i]['multiOptions']){
-              const option = $(`<option value='${j}'>${j}</option>`);
-              select.append(option)
-            }
-            if(currentSelected != undefined){
-              select.val(currentSelected[1])
-            }
-            row.find('select').off('change.setRollBuff').on('change.setRollBuff', function(e){
-              if(typeof window.rollBuffs == 'undefined')
-                window.rollBuffs =[];
-              if($(this).val() != '0'){
-                window.rollBuffs = window.rollBuffs.filter(d => !d.includes(i)); 
-                window.rollBuffs.push([i, $(this).val()])
-              }
-              else{
-               window.rollBuffs = window.rollBuffs.filter(d => !d.includes(i)); 
-              }
-              localStorage.setItem('rollBuffs' + window.PLAYER_ID, JSON.stringify(window.rollBuffs));
-            })
-            avttBuffItems.append(row);
-          }else{
-            const row = $(`<li><input type="checkbox" id='buff_${i}' data-buff='${i}'/><label for='buff_${i}'>${i}</label></li>`);
-            if(window.rollBuffs.includes(i))
-              row.find('input').prop('checked', true);
-            row.find('input').off('change.setRollBuff').on('change.setRollBuff', function(e){
-              if(typeof window.rollBuffs == 'undefined')
-                window.rollBuffs =[];
-              if($(this).is(':checked')){
-                window.rollBuffs.push(i)
-              }
-              else{
-               window.rollBuffs = window.rollBuffs.filter(d => d != i); 
-              }
-              localStorage.setItem('rollBuffs' + window.PLAYER_ID, JSON.stringify(window.rollBuffs));
-            })
-            avttBuffItems.append(row);
-          }
-
-        }
-        $('.ct-primary-box__tab--actions .ct-actions h2, .ct-actions-mobile .ct-actions h2, .ct-actions-tablet .ct-tablet-box__header').after(avttBuffSelect)
+        rebuild_buffs(true);
       }
 
       if($('#avtt-icon-roll-span').length == 0){
@@ -1394,6 +1682,9 @@ function observe_character_sheet_changes(documentToObserve) {
               .ct-character-sheet--dark-mode ul.avttBuffItems select{
                 background: #363636 !important;
               }
+              .ct-character-sheet--dark-mode .dropdown-check-list ul.avttBuffItems>ul>li:first-of-type:hover{
+                  backdrop-filter:brightness(3);
+              }
               .dropdown-check-list {
                 display: inline-block;
                 position: absolute;
@@ -1401,7 +1692,9 @@ function observe_character_sheet_changes(documentToObserve) {
                 font-size: 10px;
                 width: 200px;
               }
-
+              .ct-tablet-box__header ~ .dropdown-check-list {
+                left: unset;
+              }
               .dropdown-check-list .clickHandle {
                 position: relative;
                 cursor: pointer;
@@ -1426,8 +1719,6 @@ function observe_character_sheet_changes(documentToObserve) {
                 -webkit-transform: rotate(-135deg);
                 transform: rotate(-135deg);
               }
-
-
               .dropdown-check-list ul.avttBuffItems {
                 padding: 2px;
                 display: none;
@@ -1440,15 +1731,34 @@ function observe_character_sheet_changes(documentToObserve) {
                 scrollbar-width: thin;
                 width: 200px;
               }
-
-              .dropdown-check-list ul.avttBuffItems li {  
+              .dropdown-check-list ul.avttBuffItems>ul.collapsed,
+              .dropdown-check-list ul.avttBuffItems>ul>ul.collapsed {
+                height: 22px;
+                overflow: hidden;
+              }
+              .dropdown-check-list ul.avttBuffItems>ul>li,
+              .dropdown-check-list ul.avttBuffItems>ul>ul>li {  
                 list-style: none;
                 display: flex;
                 align-items: center;
                 justify-content: flex-start;
                 padding: 3px;
+                font-weight: normal;
+                margin-left:2px
               }
-
+              .dropdown-check-list ul.avttBuffItems>ul>li:first-of-type,
+              .dropdown-check-list ul.avttBuffItems>ul>ul>li:first-of-type {
+                font-size: 12px;
+                font-weight: bold;
+                position: relative;
+              }
+              .dropdown-check-list ul.avttBuffItems>ul>ul>li:first-of-type{
+                  font-size:10px;
+                  margin-left:5px;
+              }
+              .dropdown-check-list ul.avttBuffItems>ul>ul>li{
+                  margin-left: 7px;
+              }
               .dropdown-check-list.visible .clickHandle {
                 color: #0094ff;
               }
@@ -1465,9 +1775,39 @@ function observe_character_sheet_changes(documentToObserve) {
                 margin-right: 4px;
                 width: 16px;
                 height: 16px;
+                min-width: 16px;
+                min-height: 16px;
               }
-            .avttBuffItems li label{
+              .avttBuffItems li label{
                 font-size:12px;
+                padding: 3px;
+              }
+              .dropdown-check-list ul.avttBuffItems>ul>li:first-of-type:after,
+              .dropdown-check-list ul.avttBuffItems>ul>ul>li:first-of-type:after {
+                position: absolute;
+                content: "";
+                border-left: 2px solid var(--theme-contrast);
+                border-top: 2px solid var(--theme-contrast);
+                padding: 3px;
+                right: 3px;
+                top: 9px;
+                transform-origin:center;
+                -moz-transform: rotate(45deg);
+                -ms-transform: rotate(45deg);
+                -o-transform: rotate(45deg);
+                -webkit-transform: rotate(45deg);
+                transform: rotate(45deg);       
+              }
+              .dropdown-check-list ul.avttBuffItems>ul.collapsed>li:first-of-type:after,
+              .dropdown-check-list ul.avttBuffItems>ul>ul.collapsed>li:first-of-type:after {
+                top: 5px;
+                -webkit-transform: rotate(-135deg);
+                transform: rotate(-135deg);
+              }
+              .dropdown-check-list ul.avttBuffItems>ul>li:first-of-type:hover,
+              .dropdown-check-list ul.avttBuffItems>ul>ul>li:first-of-type:hover{
+                  backdrop-filter:brightness(0.9);
+                  border-radius:5px;
               }
               div#icon-roll-options input,
               div#icon-roll-options select{
@@ -1628,13 +1968,13 @@ function observe_character_sheet_changes(documentToObserve) {
 
 
 
-        if (mutationTarget.closest(".ct-game-log-pane").length == 0 && mutationTarget.find('.ct-game-log-pane').length == 0 && mutationTarget.find(".ct-sidebar__header").length > 0 && mutationTarget.find(".ddbc-html-content").length > 0 && mutationTarget.find("#castbutton").length == 0) {
+        if (mutationTarget.closest(".ct-game-log-pane").length == 0 && mutationTarget.find('.ct-game-log-pane').length == 0 && mutationTarget.find(".ct-sidebar__header").length > 0 && mutationTarget.find(".ddbc-html-content").length > 0 && $("#castbutton").length == 0) {
           // we explicitly don't want this to happen in `.ct-game-log-pane` because otherwise it will happen to the injected gamelog messages that we're trying to send here
           if(is_abovevtt_page() || (window.sendToTab !== undefined || window.sendToTabRPGRoller !== undefined)){
             if(mutationTarget.hasClass('ct-sidebar__pane-content')){
               inject_sidebar_send_to_gamelog_button(mutationTarget.children('div:first-of-type'));
             }else{
-              inject_sidebar_send_to_gamelog_button(mutationTarget.find('.ct-sidebar__inner [class*="styles_pane"]>[class*="styles_content"]>div:first-of-type'));
+              inject_sidebar_send_to_gamelog_button($('.ct-sidebar__inner [class*="styles_pane"]>[class*="styles_content"]>div:first-of-type'));
             }
             
           }
@@ -1683,7 +2023,8 @@ function observe_character_sheet_changes(documentToObserve) {
             if(
               mutationTarget.hasClass("ct-health-summary__deathsaves-mark") ||
               mutationTarget.hasClass("ct-health-manager__input") ||
-              mutationTarget.hasClass('ct-status-summary-mobile__deathsaves-mark')
+              mutationTarget.hasClass('ct-status-summary-mobile__deathsaves-mark') ||
+              mutationTarget.parents('[class*="styles_hitPointsBox"]').length>0
             ) {
               send_character_hp();
             } else if (mutationTarget.hasClass("ct-subsection--senses")) {
@@ -1700,15 +2041,17 @@ function observe_character_sheet_changes(documentToObserve) {
             if (mutationTarget.hasClass('ct-conditions-summary')) { // conditions update from sidebar
               const conditionsSet = read_conditions(documentToObserve);
               character_sheet_changed({conditions: conditionsSet});
-            } else if(firstRemoved.hasClass('ct-health-summary__hp-item') && firstRemoved.children('#ct-health-summary-max-label').length){ // this is to catch if the player just died look at the removed node to get value - to prevent 0/0 hp
-              let maxhp = parseInt(firstRemoved.find(`.ct-health-summary__hp-number`).text());
+            } else if((firstRemoved.hasClass('ct-health-summary__hp-item') && firstRemoved.children('#ct-health-summary-max-label').length) || firstRemoved.find('[aria-label*="Hit Points Adjustment"]').length){ // this is to catch if the player just died look at the removed node to get value - to prevent 0/0 hp
+              let maxhp = parseInt(firstRemoved.find(`.ct-health-summary__hp-number, [aria-label*='Max Hit']`).text());
               send_character_hp(maxhp);
             }else if (
               ($(mutation.addedNodes[0]).hasClass('ct-health-summary__hp-number')) ||
               (firstRemoved.hasClass('ct-health-summary__hp-item-input') && mutationTarget.hasClass('ct-health-summary__hp-item-content')) ||
               (firstRemoved.hasClass('ct-health-summary__deathsaves-label') && mutationTarget.hasClass('ct-health-summary__hp-item')) ||
               mutationTarget.hasClass('ct-health-summary__deathsaves') ||
-              mutationTarget.hasClass('ct-health-summary__deathsaves-mark')
+              mutationTarget.hasClass('ct-health-summary__deathsaves-mark') ||
+              mutationTarget.hasClass('[class*="styles_mark"]') ||
+              (mutationTarget.parents('[class*="styles_hitPointsBox"]').length>0 && mutationTarget.find("input[class*=styles_input]").length == 0)
             ) {
               send_character_hp();
             }
@@ -1746,7 +2089,8 @@ function observe_character_sheet_changes(documentToObserve) {
           case "characterData":
 
               if (mutationParent.parent().hasClass('ct-health-summary__hp-item-content') ||
-                mutationParent.hasClass("ct-health-manager__health-item-value") 
+                mutationParent.hasClass("ct-health-manager__health-item-value") ||
+                mutationTarget.parents('[class*="styles_hitPointsBox"]').length>0
               ) {
                 send_character_hp();          
               } else if (mutationParent.hasClass('ddbc-armor-class-box__value')) { // ac update from sidebar

@@ -277,7 +277,7 @@ function getRollData(rollButton){
     else if($(rollButton).hasClass('avtt-roll-button')){
       expression = `${$(rollButton).attr('data-exp')}${$(rollButton).attr('data-mod')}`
       rollTitle = $(rollButton).attr('data-actiontype');
-      rollType = $(rollButton).attr('data-rolltype');;
+      rollType = $(rollButton).attr('data-rolltype');
     }
     if($(rollButton).hasClass('avtt-roll-formula-button')){
       let slashCommand = DiceRoll.fromSlashCommand($(rollButton).attr('data-slash-command'))
@@ -307,7 +307,7 @@ function getRollData(rollButton){
     } else if($(rollButton).parents(`[class*='skills__col']`).length > 0){
       rollType = 'check';
       rollTitle = $(rollButton).closest(`.ct-skills__item`).find('.ct-skills__col--skill').text();
-    } else if($(rollButton).parents(`[class*='initiative-box']`).length > 0 || $(rollButton).parents(`.ct-combat__summary-group--initiative`).length > 0){
+    } else if($(rollButton).parents(`[class*='initiative-box'],  .ct-combat-tablet__extra--initiative, .ct-combat__summary-group--initiative`).length > 0 || $(rollButton).closest('[class*="styles_boxMobile"]').find('[class*="styles_labelMobile"]').text() == "Initiative"){
       rollTitle = 'Initiative';
       rollType = 'roll'
     } else if($(rollButton).parents(`[class*='__damage']`).length > 0){
@@ -345,11 +345,12 @@ function getRollData(rollButton){
             expression = `${expression}${window.CHARACTER_AVTT_SETTINGS.damageRoll.match(/[+-]/g) ? '': '+'}${window.CHARACTER_AVTT_SETTINGS.damageRoll.replace('PB', getPB())}`;
         if(typeof window.rollBuffs != 'undefined'){
             for(let i in window.rollBuffs){
-                if(Array.isArray(window.rollBuffs[i]) && buffsDebuffs[window.rollBuffs[i][0]].multiOptions[window.rollBuffs[i][1]].dmg != '0'){
+                const isMultiOption = Array.isArray(window.rollBuffs[i]);
+                if(isMultiOption && buffsDebuffs[window.rollBuffs[i][0]].multiOptions[window.rollBuffs[i][1]].dmg != '0'){
 
                     expression = `${expression}${buffsDebuffs[window.rollBuffs[i][0]].multiOptions[window.rollBuffs[i][1]].dmg.replace('PB', getPB())}`
                 }
-                else if(buffsDebuffs[window.rollBuffs[i]].dmg != '0'){
+                else if(!isMultiOption && buffsDebuffs[window.rollBuffs[i]].dmg != '0'){
                     expression = `${expression}${buffsDebuffs[window.rollBuffs[i]].dmg.replace('PB', getPB())}`
                 }
             }
@@ -362,10 +363,11 @@ function getRollData(rollButton){
             expression = `${expression}${window.CHARACTER_AVTT_SETTINGS.hitRoll.match(/[+-]/g) ? '': '+'}${window.CHARACTER_AVTT_SETTINGS.hitRoll.replace('PB', getPB())}`;
         if(typeof window.rollBuffs != 'undefined'){
             for(let i in window.rollBuffs){
-                if(Array.isArray(window.rollBuffs[i]) && buffsDebuffs[window.rollBuffs[i][0]].multiOptions[window.rollBuffs[i][1]].tohit != '0'){
+                const isMultiOption = Array.isArray(window.rollBuffs[i]);
+                if(isMultiOption && buffsDebuffs[window.rollBuffs[i][0]].multiOptions[window.rollBuffs[i][1]].tohit != '0'){
                     expression = `${expression}${buffsDebuffs[window.rollBuffs[i][0]].multiOptions[window.rollBuffs[i][1]].tohit.replace('PB', getPB())}`
                 }
-                else if(buffsDebuffs[window.rollBuffs[i]].tohit != '0'){
+                else if(!isMultiOption && buffsDebuffs[window.rollBuffs[i]].tohit != '0'){
                     expression = `${expression}${buffsDebuffs[window.rollBuffs[i]].tohit.replace('PB', getPB())}`
                 }
             }
@@ -378,10 +380,11 @@ function getRollData(rollButton){
             expression = `${expression}${window.CHARACTER_AVTT_SETTINGS.checkRoll.match(/[+-]/g) ? '': '+'}${window.CHARACTER_AVTT_SETTINGS.checkRoll.replace('PB', getPB())}`;
         if(typeof window.rollBuffs != 'undefined'){
             for(let i in window.rollBuffs){
-                if(Array.isArray(window.rollBuffs[i]) && buffsDebuffs[window.rollBuffs[i][0]].multiOptions[window.rollBuffs[i][1]].check != '0'){
+                const isMultiOption = Array.isArray(window.rollBuffs[i]);
+                if(isMultiOption && buffsDebuffs[window.rollBuffs[i][0]].multiOptions[window.rollBuffs[i][1]].check != '0'){
                     expression = `${expression}${buffsDebuffs[window.rollBuffs[i][0]].multiOptions[window.rollBuffs[i][1]].check.replace('PB', getPB())}`
                 }
-                else if(buffsDebuffs[window.rollBuffs[i]].check != '0'){
+                else if(!isMultiOption && buffsDebuffs[window.rollBuffs[i]].check != '0'){
                     expression = `${expression}${buffsDebuffs[window.rollBuffs[i]].check.replace('PB', getPB())}`
                 }
             }
@@ -394,10 +397,11 @@ function getRollData(rollButton){
             expression = `${expression}${window.CHARACTER_AVTT_SETTINGS.saveRoll.match(/[+-]/g) ? '': '+'}${window.CHARACTER_AVTT_SETTINGS.saveRoll.replace('PB', getPB())}`;
         if(typeof window.rollBuffs != 'undefined'){
             for(let i in window.rollBuffs){
-                if(Array.isArray(window.rollBuffs[i]) && buffsDebuffs[window.rollBuffs[i][0]].multiOptions[window.rollBuffs[i][1]].save != '0'){
+                const isMultiOption = Array.isArray(window.rollBuffs[i]);
+                if(isMultiOption && buffsDebuffs[window.rollBuffs[i][0]].multiOptions[window.rollBuffs[i][1]].save != '0'){
                     expression = `${expression}${buffsDebuffs[window.rollBuffs[i][0]].multiOptions[window.rollBuffs[i][1]].save.replace('PB', getPB())}`
                 }
-                else if(buffsDebuffs[window.rollBuffs[i]].save != '0'){
+                else if(!isMultiOption && buffsDebuffs[window.rollBuffs[i]].save != '0'){
                     expression = `${expression}${buffsDebuffs[window.rollBuffs[i]].save.replace('PB', getPB())}`
                 }
             }

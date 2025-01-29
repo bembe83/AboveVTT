@@ -81,11 +81,9 @@ class DDBApi {
     const token = await DDBApi.#refreshToken();
     const config = {
       method: 'DELETE',
-      credentials: 'include',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
+        'Accept': 'application/json'
       }
     }
     // Explicitly not calling `lookForErrors` here because we don't actually care if this succeeds.
@@ -223,7 +221,7 @@ class DDBApi {
     if(window.ddbConfigJson != undefined)
       return window.ddbConfigJson
     const url = "https://www.dndbeyond.com/api/config/json";
-    return await $.get(url);
+    return await DDBApi.fetchJsonWithTokenOmitCred(url);
   }
 
   static async fetchActiveCharacters(campaignId) {

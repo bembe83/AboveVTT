@@ -1520,7 +1520,7 @@ class Token {
 	}
 
 
-	build_conditions(parent) {
+	build_conditions(parent, singleRow = false) {
 		function badge_condition(condition, conditionContainer, conditionSymbolName) {
 			if(!isNaN(parseInt(condition.duration))) {
 				let expired = (parseInt(condition.duration) <= 0) ? "expired" : "";
@@ -1543,7 +1543,7 @@ class Token {
 			cond_bar.width(symbolSize);
 			cond_bar.height(this.sizeWidth() - bar_width); // height or width???
 		})
-		if (this.options.inspiration){
+		if (this.isPlayer() && (this.options.inspiration || find_pc_by_player_id(this.options.id).inspiration)){
 			if (!this.hasCondition("Inspiration")){
 				this.addCondition("Inspiration")
 			}
@@ -1580,7 +1580,7 @@ class Token {
 				symbolImage.width(symbolSize + "px");
 				conditionContainer.append(symbolImage);
 				badge_condition(condition, conditionContainer, conditionSymbolName);
-				if (conditionCount >= 3) {
+				if (conditionCount >= 3 && !singleRow) {
 					moreCond.append(conditionContainer);
 				} else {
 					cond.append(conditionContainer);
@@ -1715,7 +1715,7 @@ class Token {
 				symbolImage.width(symbolSize + "px");
 				conditionContainer.append(symbolImage);
 				badge_condition(this.options.custom_conditions[i], conditionContainer, conditionSymbolName);
-				if (conditionCount >= 3) {
+				if (conditionCount >= 3 && !singleRow) {
 					if (conditionSymbolName === "concentration") {
 						moreCond.prepend(conditionContainer);
 					} else {
@@ -1957,7 +1957,7 @@ class Token {
 				symbolImage.height(symbolSize + "px");
 				symbolImage.width(symbolSize + "px");
 				conditionContainer.append(symbolImage);
-				if (conditionCount >= 3) {
+				if (conditionCount >= 3 && !singleRow) {
 					moreCond.append(conditionContainer);
 				} else {
 					cond.append(conditionContainer);
@@ -2139,8 +2139,17 @@ class Token {
 
 
 				this.update_opacity(old);
-
 				this.build_conditions(old);
+				if(window.DM) {
+					const combatRow = $(`#combat_area tr[data-target='${this.options.id}']`);
+					if(combatRow.length){
+						this.build_conditions($(`#combat_area tr[data-target='${this.options.id}']`), true);
+					}
+				}
+
+				
+
+				
 
 				if (this.selected) {
 					old.addClass("tokenselected");
@@ -4875,6 +4884,10 @@ function paste_selected_tokens(x, y) {
 		let options = $.extend(true, {}, token.options);
 		let newId = token.isPlayer() ? id : uuid();
 		options.id = newId;
+		if(options.audioChannel != undefined){
+			options.audioChannel.token = newId;
+			options.audioChannel.audioId = uuid();
+		}
 		// TODO: figure out the location under the cursor and paste there instead of doing center of view
 		options.init = token.isPlayer() ? options.init : undefined;
 		options.ct_show = token.isPlayer() ? options.ct_show : undefined;

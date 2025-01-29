@@ -1570,22 +1570,26 @@ class MessageBroker {
 		let timestamp = d.toLocaleTimeString();
 		let datestamp = d.toLocaleDateString();
 
-		// hide message if PC doesn't speak this language
-		if (!window.DM && data.language != undefined) {
-			const knownLanguages = get_my_known_languages()
-			const messageLanguage = window.ddbConfigJson.languages.find(d => d.id == data.language)?.name;
-			if (!knownLanguages.includes(messageLanguage)) {
-				const container = $("<div>").html(data.text);
-				const elements = container.find("*").add(container);
-				const textNodes = elements.contents().not(elements);
-				textNodes.each(function () {
-					let newText = this.nodeValue.replaceAll(/[\w\d]/gi, (n) => String.fromCharCode(97 + Math.floor(Math.random() * 26)));
-					$(document.createTextNode(newText)).insertBefore(this);
-					$(this).remove();
-				});
-				data.text = container.html();
-			}
+		// scramble message if PC doesn't speak this language
+		if(data.language != undefined) {
+				const knownLanguages = get_my_known_languages()
+				const messageLanguage = window.ddbConfigJson.languages.find(d => d.id == data.language)?.name;
+				if (!window.DM && !knownLanguages.includes(messageLanguage)) {
+					const container = $("<div>").html(data.text);
+					const elements = container.find("*").add(container);
+					const textNodes = elements.contents().not(elements);
+					textNodes.each(function () {
+						let newText = this.nodeValue.replaceAll(/[\w\d]/gi, (n) => String.fromCharCode(97 + Math.floor(Math.random() * 26)));
+						$(document.createTextNode(newText)).insertBefore(this);
+						$(this).remove();
+					});
+					data.text = container.html();
+				}
+				else if(messageLanguage != 'Common'){
+					data.text = $(data.text).prepend(`${messageLanguage}: `)[0].outerHTML;
+				}
 		}
+
 
 		if (is_encounters_page() || is_characters_page() || is_campaign_page()) {
 			return $(`
@@ -2284,36 +2288,63 @@ class MessageBroker {
 		}
 	}
 
+	showDisconnectWarning(){
+	  let container = $("#above-vtt-error-message");
+	  let containerHTML = $(`
+	      <div id="above-vtt-error-message">
+	        <h2>You have Disconnected</h2>
+	        <div id="error-message-details"><p>You have disconnected from the AboveVTT websocket ${window.reconnectAttemptAbovews} times.</p><p>This could be caused by a VPN, anti-tracker, adblocker, firewall, school/work network settings, or other extention/program. It may also happen if the tab was in the background too long</p></div>
+	        <div class="error-message-buttons">
+	  		  	<button id="reconnect-button">Reconnect</button>
+	          <button id="close-error-button">Exit</button>
+	        </div>
+	      </div>
+	    `)
+	  if (container.length === 0) {
+	    container = containerHTML;
+	    $(document.body).append(container);
+	  }
+	  else {
+	    container.html(containerHTML);
+	  }
+	  $("#close-error-button").on("click", function(){
+	  	window.close();
+	  });
+	  $("#reconnect-button").on("click", function(){
+	  	window.MB.loadAboveWS(function(){ 
+	  		AboveApi.getScene(window.CURRENT_SCENE_DATA.id).then((response) => {
+	  			window.MB.handleScene(response, true);
+	  			setTimeout(
+	  				function(){
+	  					let msgdata = {
+	  							player: window.PLAYER_NAME,
+	  							img: window.PLAYER_IMG,
+	  							text: `${window.PLAYER_NAME} has reconnected.`
+	  					};
+
+	  					window.MB.inject_chat(msgdata);
+	  				}, 4000)
+	  			removeError();
+	  		}).catch((error) => {
+	  			console.error("Failed to download scene", error);
+	  		});
+  		}, true);	
+	  });
+	}
+
 	reconnectDisconnectedAboveWs(){
-		if (this.abovews.readyState != this.abovews.OPEN && !this.loadingAboveWS){
+		if (this.abovews.readyState != this.abovews.OPEN && !this.loadingAboveWS && $('#above-vtt-error-message').length == 0){
 			if(window.reconnectAttemptAbovews == undefined){
 				window.reconnectAttemptAbovews = 0;
+			}	
+			window.reconnectAttemptAbovews++;
+			if(get_avtt_setting_value('autoReconnect')){
+				this.loadAboveWS();	
+			}
+			else{
+				this.showDisconnectWarning();
 			}
 
-		
-			window.reconnectAttemptAbovews++;
-
-
-			alert("You have disconnected from the AboveVTT websocket.\n\nThis could be caused by a VPN, anti-tracker, adblocker, firewall, school/work network settings, or other extention/program.\n\nIt may also happen if the tab was in the background too long\n\nReconnect?",)
-			this.loadAboveWS(function(){ 
-				AboveApi.getScene(window.CURRENT_SCENE_DATA.id).then((response) => {
-					window.MB.handleScene(response, true);
-					setTimeout(
-						function(){
-							let msgdata = {
-									player: window.PLAYER_NAME,
-									img: window.PLAYER_IMG,
-									text: `${window.PLAYER_NAME} has reconnected.`
-							};
-
-							window.MB.inject_chat(msgdata);
-						}, 4000)
-				}).catch((error) => {
-					console.error("Failed to download scene", error);
-				});
-
-				}, true
-			);		
 		}
 	}
 }
