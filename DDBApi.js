@@ -56,6 +56,17 @@ class DDBApi {
     return await request.json();
   }
 
+  static async fetchHtmlWithToken(url, extraConfig = {}) {
+   const token = await DDBApi.#refreshToken();
+    const config = {...extraConfig,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      }
+    }
+    const request = await fetch(url, config).then(DDBApi.lookForErrors)
+    return await request.text();
+  }
+
     static async fetchJsonWithTokenOmitCred(url, extraConfig = {}) {
     const token = await DDBApi.#refreshToken();
     const config = {...extraConfig,
@@ -91,7 +102,10 @@ class DDBApi {
     return await fetch(url, config);
   }
 
-
+  static async fetchMoreInfo(url){
+    const response = await DDBApi.fetchHtmlWithToken(url);
+    return response;
+  }
 
   static async fetchCharacter(id) {
     if (typeof id !== "string" || id.length <= 1) {
@@ -186,6 +200,7 @@ class DDBApi {
     return response.data;
   }
 
+
   static async fetchCampaignCharacters(campaignId) {
     // This is what the campaign page calls to fetch characters
     if(window.playerUsers != undefined)
@@ -221,7 +236,7 @@ class DDBApi {
     if(window.ddbConfigJson != undefined)
       return window.ddbConfigJson
     const url = "https://www.dndbeyond.com/api/config/json";
-    return await DDBApi.fetchJsonWithTokenOmitCred(url);
+    return await DDBApi.fetchJsonWithToken(url);
   }
 
   static async fetchActiveCharacters(campaignId) {

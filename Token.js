@@ -1543,12 +1543,16 @@ class Token {
 			cond_bar.width(symbolSize);
 			cond_bar.height(this.sizeWidth() - bar_width); // height or width???
 		})
-		if (this.isPlayer() && (this.options.inspiration || find_pc_by_player_id(this.options.id).inspiration)){
+		if (this.isPlayer() && (this.options.inspiration || find_pc_by_player_id(this.options.id)?.inspiration, false)){
 			if (!this.hasCondition("Inspiration")){
 				this.addCondition("Inspiration")
 			}
 		} else{
-			array_remove_index_by_value(this.options.custom_conditions, "Inspiration");
+			this.removeCondition("Inspiration");
+		}
+
+		if(this.isPlayer() && find_pc_by_player_id(this.options.id, false)?.inspiration){
+			this.options.conditions = find_pc_by_player_id(this.options.id, false).conditions
 		}
 		
 		const conditions = this.conditions;
@@ -4182,6 +4186,9 @@ function setTokenLight (token, options) {
 				}
 				else{
 					token.parent().parent().find(".aura-element-container-clip[id='" + options.id +"']").attr('data-animation', '')
+				}
+				if(options.animation.customLightDarkvision != undefined){
+					token.parent().parent().find(".aura-element-container-clip[id='" + options.id +"']").toggleClass('darkvision-animation', options.animation.customLightDarkvision)
 				}
 				token.parent().parent().find(".aura-element-container-clip[id='" + options.id +"']").attr('data-custom-animation', 'true')
 				token.parent().parent().find(".aura-element-container-clip[id='" + options.id +"']").css('--custom-mask-image', `url('${parse_img(options.animation.customLightMask)}')`)

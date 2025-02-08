@@ -1710,11 +1710,7 @@ class MessageBroker {
 
 		}	
 		else if(data.left){
-			// SOLO PLAYER. PUNTO UNICO DI CREAZIONE DEI TOKEN
-			
-			if (window.DM) {
-				console.log("ATTENZIONEEEEEEEEEEEEEEEEEEE ATTENZIONEEEEEEEEEEEEEEEEEEE");
-			}
+
 			let t = new Token(data);
 			if(isNaN(parseFloat(t.options.left)) || isNaN(parseInt(t.options.top))){ // prevent errors with NaN positioned tokens - delete them as catch all. 
 				t.options.deleteableByPlayers = true;
@@ -1728,6 +1724,20 @@ class MessageBroker {
 			t.sync = mydebounce(function(e) { // VA IN FUNZIONE SOLO SE IL TOKEN NON ESISTE GIA					
 				window.MB.sendMessage('custom/myVTT/token', t.options);
 			}, 300);
+			if(t.isPlayer()){
+				const pc = find_pc_by_player_id(data.id, false);
+		    let token = window.TOKEN_OBJECTS[data.id]     
+		    if (token && pc) {
+		      let currentImage = token.options.imgsrc;
+		      token.hp = pc.hitPointInfo.current;
+		      token.options = {
+		        ...token.options,
+		        ...pc,
+		        imgsrc: (token.options.alternativeImages?.length == 0) ? pc.image : currentImage,
+		        id: pc.sheet // pc.id is DDB characterId, but we use the sheet as an id for tokens
+		      };
+				}
+			}
 			t.place();
 
 			let playerTokenId = $(`.token[data-id*='${window.PLAYER_ID}']`).attr("data-id");
@@ -2290,23 +2300,20 @@ class MessageBroker {
 
 	showDisconnectWarning(){
 	  let container = $("#above-vtt-error-message");
-	  let containerHTML = $(`
-	      <div id="above-vtt-error-message">
+	  container.remove();
+	  container = $(`
+	      <div id="above-vtt-error-message" class="small-error">
 	        <h2>You have Disconnected</h2>
-	        <div id="error-message-details"><p>You have disconnected from the AboveVTT websocket ${window.reconnectAttemptAbovews} times.</p><p>This could be caused by a VPN, anti-tracker, adblocker, firewall, school/work network settings, or other extention/program. It may also happen if the tab was in the background too long</p></div>
+	        <div id="error-message-details"><p>You have disconnected from the AboveVTT websocket ${window.reconnectAttemptAbovews} times.</p><p>This could be caused by a VPN, anti-tracker, adblocker, firewall, school/work network settings, or other extention/program. It may also happen if the tab was in the background too long</p><p>If disconnecting due to an unstable connection you can enable auto reconnect in settings. Note: Auto reconnect may cause tokens to reset or desync.</p></div>
 	        <div class="error-message-buttons">
 	  		  	<button id="reconnect-button">Reconnect</button>
 	          <button id="close-error-button">Exit</button>
 	        </div>
 	      </div>
 	    `)
-	  if (container.length === 0) {
-	    container = containerHTML;
-	    $(document.body).append(container);
-	  }
-	  else {
-	    container.html(containerHTML);
-	  }
+	  
+    $(document.body).append(container);
+
 	  $("#close-error-button").on("click", function(){
 	  	window.close();
 	  });

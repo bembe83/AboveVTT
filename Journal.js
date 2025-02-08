@@ -1308,9 +1308,15 @@ class JournalManager{
 				return;	
 			}
 			if(!$(self).attr('data-tooltip-href'))
+
+			if(self.href.match(/\/spells\/[0-9]|\/magic-items\/[0-9]|\/monsters\/[0-9]/gi)){
+				$(self).attr('data-moreinfo', `${self.href}/more-info`);
+			}	
+
 			window.JOURNAL.getDataTooltip(self.href, function(url, typeClass){
 				$(self).attr('data-tooltip-href', url);
 				$(self).toggleClass(`${typeClass}-tooltip`, true);
+
 			});
 		});
 	}
@@ -1418,7 +1424,7 @@ class JournalManager{
 		}
     	let data = $(target).clone().html();
 
-        let lines = data.split(/(<br \/>|<br>|<p>|\n)/g);
+        let lines = data.split(/(<br \/>|<br>|<p>|\n|<strong>)/g);
         lines = lines.map((line, li) => {
             let input = line;
             input = input.replace(/&nbsp;/g,' ')
@@ -1537,29 +1543,26 @@ class JournalManager{
             	let eachNumberFound = (input.match(/\d+\/day( each)?/gi)) ? parseInt(input.match(/[0-9]+(?![0-9]?px)/gi)[0]) : undefined;
             	let slotsNumberFound = (input.match(/\d+\w+ level \(\d slots?\)\:/gi)) ? parseInt(input.match(/[0-9]+/gi)[1]) : undefined;
             	let spellLevelFound = (slotsNumberFound) ? input.match(/\d+\w+ level/gi)[0] : undefined;
-                let parts = input.split(/:\s(?<!left:\s?)/g);
-                parts[1] = parts[1].split(/,\s(?![^(]*\))/gm);
-                for (let p in parts[1]) {
-                	parts[1][p] = parts[1][p].replace(/<(\/)?em>|<(\/)?b>|<(\/)?strong>/gi, '')
-                	let spellName = (parts[1][p].startsWith('<a')) ? $(parts[1][p]).text() : parts[1][p].replace(/<\/?p[a-zA-z'"0-9\s]+?>/g, '').replace(/\s?\[spell\]\s?|\s?\[\/spell\]\s?/g, '').replace('[/spell]', '').replace(/\s|&nbsp;/g, '');
+                let parts = input.split(/(:\s(?<!left:\s?)|:(?<!left:\s?)<\/strong>(\s)?)/g);
+                let i = parts.length - 1;
+                parts[i] = parts[i].split(/,\s(?![^(]*\))/gm);
+                for (let p in parts[i]) {
+                	parts[i][p] = parts[i][p].replace(/<(\/)?em>|<(\/)?b>|<(\/)?strong>/gi, '')
+                	let spellName = (parts[i][p].startsWith('<a')) ? $(parts[i][p]).text() : parts[i][p].replace(/<\/?p[a-zA-z'"0-9\s]+?>/g, '').replace(/\s?\[spell\]\s?|\s?\[\/spell\]\s?/g, '').replace('[/spell]', '').replace(/\s|&nbsp;/g, '');
 
-                	if(parts[1][p].startsWith('<') || parts[1][p].startsWith('[spell]') ){
-						parts[1][p] = parts[1][p]
-                            .replace(/^/gm, ``)
-                            .replace(/( \(|(?<!\))$)/gm, '');
-                	}
-                   	else if(parts[1][p] && typeof parts[1][p] === 'string') {
-                        parts[1][p] = parts[1][p].split('<')[0]
+                   	if( !(parts[i][p].startsWith('<') || parts[i][p].startsWith('[spell]')) && parts[i][p] && typeof parts[i][p] === 'string') {
+                        parts[i][p] = parts[i][p].split('<')[0]
                             .replace(/^/gm, `[spell]`)
                             .replace(/( \(|(?<!\))$)/gm, '[/spell]');
                     }
 
                     if(eachNumberFound){
-                    	parts[1][p] = `<span class="add-input each" data-number="${eachNumberFound}" data-spell="${spellName}">${parts[1][p]}</span>`
+                    	parts[i][p] = `<span class="add-input each" data-number="${eachNumberFound}" data-spell="${spellName}">${parts[i][p]}</span>`
                     }
                 }
-                parts[1] = parts[1].join(', ');
-                input = parts.join(': ');
+
+                parts[i] = parts[i].join(', ');
+               	input = parts.join('');
                 if(slotsNumberFound){
                 	input = `<span class="add-input slots" data-number="${slotsNumberFound}" data-spell="${spellLevelFound}">${input}</span>`
                 }
@@ -1594,9 +1597,10 @@ class JournalManager{
             })
             input = input.replace(/\[spell\](.*?)\[\/spell\]/g, function(m){
             	let spell = m.replace(/<\/?p>/g, '').replace(/\s?\[spell\]\s?|\s?\[\/spell\]\s?/g, '').replace('[/spell]', '');   	
-            	const spellUrl = spell.replace(/\s/g, '-').split(';')[0];;
+            	const spellUrl = spell.replace(/\s/g, '-').split(';')[0];
+            	const spellMoreInfo = spell;
             	spell = (spell.split(';')[1]) ? spell.split(';')[1] : spell;
-                return `<a class="tooltip-hover spell-tooltip" href="https://www.dndbeyond.com/spells/${spellUrl}" aria-haspopup="true" target="_blank">${spell}</a>`
+                return `<a class="tooltip-hover spell-tooltip" href="https://www.dndbeyond.com/spells/${spellUrl}" ${spellMoreInfo.includes(';') ? `data-moreinfo="https://www.dndbeyond.com/spells/${spellMoreInfo.split(';')[0]}/more-info"` : ''} aria-haspopup="true" target="_blank">${spell}</a>`
             })
              input = input.replace(/\[item\](.*?)\[\/item\]/g, function(m){
             	let item = m.replace(/<\/?p>/g, '').replace(/\s?\[item\]\s?|\s?\[\/item\]\s?/g, '').replace('[/item]', '');   	
@@ -1619,16 +1623,18 @@ class JournalManager{
 
             input = input.replace(/\[monster\](.*?)\[\/monster\]/g, function(m){
             	let spell = m.replace(/<\/?p>/g, '').replace(/\s?\[monster\]\s?|\s?\[\/monster\]\s?/g, '').replace('[/monster]', '');   	
-            	const spellUrl = spell.replace(/\s/g, '-').split(';')[0];;
+            	const spellUrl = spell.replace(/\s/g, '-').split(';')[0];
+            	const spellMoreInfo = spell;
             	spell = (spell.split(';')[1]) ? spell.split(';')[1] : spell;
-                return `<a class="tooltip-hover monster-tooltip" href="https://www.dndbeyond.com/monsters/${spellUrl}" aria-haspopup="true" target="_blank">${spell}</a>`
+                return `<a class="tooltip-hover monster-tooltip" href="https://www.dndbeyond.com/monsters/${spellUrl}" ${spellMoreInfo.includes(';') ? `data-moreinfo="https://www.dndbeyond.com/spells/${spellMoreInfo.split(';')[0]}/more-info"` : ''}  aria-haspopup="true" target="_blank">${spell}</a>`
             })
 
             input = input.replace(/\[magicItem\](.*?)\[\/magicItem\]/g, function(m){
             	let spell = m.replace(/<\/?p>/g, '').replace(/\s?\[magicItem\]\s?|\s?\[\/magicItem\]\s?/g, '').replace('[/magicItem]', '');   	
             	const spellUrl = spell.replace(/\s/g, '-').split(';')[0];
+            	const spellMoreInfo = spell;
             	spell = (spell.split(';')[1]) ? spell.split(';')[1] : spell;
-                return `<a class="tooltip-hover magic-item-tooltip" href="https://www.dndbeyond.com/magic-items/${spellUrl}" aria-haspopup="true" target="_blank">${spell}</a>`
+                return `<a class="tooltip-hover magic-item-tooltip" href="https://www.dndbeyond.com/magic-items/${spellUrl}" ${spellMoreInfo.includes(';') ? `data-moreinfo="https://www.dndbeyond.com/spells/${spellMoreInfo.split(';')[0]}/more-info"` : ''} aria-haspopup="true" target="_blank">${spell}</a>`
             })
 
             input = input.replace(/\[track\]([a-zA-Z\s]+)([\d]+)\[\/track\]/g, function(m, m1, m2){
