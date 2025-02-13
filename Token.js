@@ -1543,7 +1543,7 @@ class Token {
 			cond_bar.width(symbolSize);
 			cond_bar.height(this.sizeWidth() - bar_width); // height or width???
 		})
-		if (this.isPlayer() && (this.options.inspiration || find_pc_by_player_id(this.options.id)?.inspiration, false)){
+		if (this.isPlayer() && (this.options.inspiration || find_pc_by_player_id(this.options.id, false)?.inspiration)){
 			if (!this.hasCondition("Inspiration")){
 				this.addCondition("Inspiration")
 			}
@@ -3861,7 +3861,9 @@ function deselect_all_tokens(ignoreVisionUpdate = false) {
 	   	}
 	   	if($('#selected_token_vision .ddbc-tab-options__header-heading--is-active').length==0){
 	   		window.SelectedTokenVision = false;
-	   	}
+	   	}	   	
+  		
+  	
   	}
 }
 

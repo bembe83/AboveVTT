@@ -82,13 +82,44 @@ async function fetch_monsters(monsterIds, callback, open5e=false) {
 	}
 	if(!open5e){
 		let uniqueMonsterIds = [...new Set(monsterIds)];
-		const monsterData = await DDBApi.fetchMonsters(uniqueMonsterIds)
-		callback(monsterData);
+		const monsterData = await DDBApi.fetchMonsters(uniqueMonsterIds);
+		let promises = [];
+
+		for(let i in monsterData){
+	       promises.push(new Promise(async (resolve, reject) => {
+   		       let moreInfo = await DDBApi.fetchMoreInfo(`${monsterData[i].url}`);
+   			   let initiative = $(moreInfo)?.find('.mon-stat-block-2024__attribute:first-of-type .mon-stat-block-2024__attribute-data')?.text();
+   			   let treasure = $(moreInfo)?.find('.treasure-link').closest('.tags');
+   			   let treasureLinks = treasure.find('a');
+   			   treasureLinks.addClass('tooltip-hover');
+   			   treasureLinks.attr('data-moreinfo', function(){
+   			   	return this.href;
+   			   })
+   			   treasure = treasure.html();
+   			   let gear = $(moreInfo)?.find('.mon-stat-block-2024__tidbit-label:contains("Gear")').siblings('.mon-stat-block-2024__tidbit-data').html();
+   		       if(initiative.length>0){
+   		           initArray = initiative.trim().split(' ');
+   		           const initMod = initArray[0];
+   		           const initScore = initArray[1];
+   		           monsterData[i].initiativeMod = initMod;
+   		           monsterData[i].initiativeScore = initScore;
+   		           monsterData[i].treasure = treasure;
+   		           monsterData[i].gear = gear;
+   		       }
+   		       resolve();
+	       }))
+	       
+		}
+
+		Promise.all(promises).then(() => {
+			callback(monsterData);
+		});
 	}
 	else{
 		let uniqueMonsterIds = [...new Set(monsterIds)];
 		let queryParam = uniqueMonsterIds.map(id => `${id}`).join("%2C");
-		callback(await getGroupOpen5e(queryParam));	
+		let groupOpen5e = await getGroupOpen5e(queryParam);
+		callback(groupOpen5e);	
 	}
 }
 

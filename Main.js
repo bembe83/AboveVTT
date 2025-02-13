@@ -785,13 +785,13 @@ function load_monster_stat(monsterId, tokenId, customStatBlock=undefined) {
 	if(customStatBlock){
 		let container = build_draggable_monster_window();
 		display_stat_block_in_container(customStatBlock, container, tokenId, customStatBlock);
-		$(".sidebar-panel-loading-indicator").hide();
+		$(".sidebar-panel-loading-indicator").remove();
 		return;
 	}
 	if(window.all_token_objects[tokenId].options.monster == 'open5e'){
 		let container = build_draggable_monster_window();
 		build_and_display_stat_block_with_id(window.all_token_objects[tokenId].options.stat, container, tokenId, function () {
-			$(".sidebar-panel-loading-indicator").hide();
+			$(".sidebar-panel-loading-indicator").remove();
 		}, true);
 		return;
 	}
@@ -801,7 +801,7 @@ function load_monster_stat(monsterId, tokenId, customStatBlock=undefined) {
 	}
 	let container = build_draggable_monster_window();
 	build_and_display_stat_block_with_id(monsterId, container, tokenId, function () {
-		$(".sidebar-panel-loading-indicator").hide();
+		$(".sidebar-panel-loading-indicator").remove();
 	});
 }
 
@@ -1020,10 +1020,9 @@ function build_draggable_monster_window() {
 	// check if the monster pane is not open
 	if (! $("#resizeDragMon").length) {
 		$("body").append(draggable_resizable_div)
-		draggable_resizable_div.append(build_combat_tracker_loading_indicator())
 		draggable_resizable_div.show("slow")
 	}
-
+	$("#resizeDragMon").append(build_combat_tracker_loading_indicator())
 	let container = $("<div id='resizeDragMon'/>");
 
 	if($("#site #resizeDragMon").length>0){
