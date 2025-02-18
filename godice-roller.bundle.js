@@ -1112,13 +1112,21 @@ class Utils {
 		console.debug(dieField);
 		let remainRolls = parseInt(diceRollsPrompt[0].getAttribute("data-counter"));
 		
-		dieField.setAttribute('readonly', true);
-		dieField.parentElement.classList.add("fulfilled");
+		Utils.rollFieldFullfilled(dieField);
+		dieField.setAttribute("data-manual-roll", false);
 		
 		remainRolls--;
 		diceRollsPrompt[0].setAttribute("data-counter", remainRolls);
 		
 		Utils.sendRolls(diceRollsPrompt);
+	}
+	
+	static rollFieldFullfilled(dieField){
+		if(dieField.value && dieField.value != ""){
+			dieField.setAttribute('readonly', true);
+			dieField.parentElement.classList.add("fulfilled");
+			dieField.setAttribute("data-manual-roll", true);
+		}
 	}
 	
 	static sendRolls(diceRollsPrompt){
@@ -1739,10 +1747,13 @@ class DiceRollPrompt {
 				allowClose: false,
 				hideTitle: true
 			});
+			document.querySelectorAll(".dice-term-input").forEach((elem) => {elem.addEventListener("change", Utils.rollFieldFullfilled.bind(this, elem));});
 			let rollData = await dialog.show();
 			
 			rollData.querySelectorAll(".dice-term-input").forEach((input)=> {
-				newRolls.push(this.unwrap(input));
+				let roll = this.unwrap(input);
+				roll.manualRoll = this.unwrap(input.dataset).manualRoll;
+				newRolls.push(roll);
 			});
 			console.debug(newRolls);
 			
@@ -1782,7 +1793,7 @@ class DiceRollPrompt {
 		};
 	}
 	
-	unwrap({ name, valueAsNumber, placeholder }) { return { name, valueAsNumber, placeholder }; };
+	unwrap({ name, valueAsNumber, placeholder, manualRoll }) { return { name, valueAsNumber, placeholder, manualRoll }; };
 }
 
 /* @class
@@ -2052,11 +2063,11 @@ function roll(diceString, diceRolls = null) {
 
 class RollResult {
 	
-	static isEnabled(){
+	isEnabled(){
 		return true;
 	}
 	
-	static isAutoSendEnabled() {
+	isAutoSendEnabled() {
 		return false;
 	}
 	
@@ -2665,7 +2676,7 @@ var templateSource = `<!-- Template -->
 	                {{/if}}
 	                <p class="dice-term-faces"><b>d{{term.faces}}</b></p>
 	            {{/if}}
-	            <input type="number" class="dice-term-input no-spinner" name="{{term.id}}" min="1" max="{{term.faces}}" step="1" data-term="{{i}}" placeholder="{{term.placeholder}}" data-die="d{{term.faces}}"/>
+	            <input type="number" class="dice-term-input no-spinner" name="{{term.id}}" min="1" max="{{term.faces}}" step="1" data-term="{{i}}" placeholder="{{term.placeholder}}" data-die="d{{term.faces}}" data-manual-roll=false/>
 	        </div>
 	        {{/each}}
 	    </div>

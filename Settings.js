@@ -463,7 +463,8 @@ function avtt_settings() {
 			{ value: true, label: "GoDice Dice", description: `Disables DDB dice and uses manual/bluetooth number input` },
 			{ value: false, label: "DDB Dice", description: `Defaults to DDB dice` }
 		],
-		defaultValue: false
+		defaultValue: false,
+		class: 'performance'
 	})
 	settings.push(
 	{
