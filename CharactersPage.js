@@ -684,6 +684,8 @@ function convertToRPGRoller(){
     }
 
     $(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`).off('contextmenu.rpg-roller').on('contextmenu.rpg-roller', function(e){
+          if($(this).parent().hasClass('ct-reset-pane__hitdie-manager-dice')) // allow hit dice roll to go through ddb for auto heals - maybe setup our own message by put to https://character-service.dndbeyond.com/character/v5/life/hp/damage-taken later
+            return;
           let rollData = {} 
           if($(this).hasClass('avtt-roll-formula-button')){
              rollData = DiceRoll.fromSlashCommand($(this).attr('data-slash-command'))
@@ -708,6 +710,8 @@ function convertToRPGRoller(){
     })
  
     $(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`).off('click.rpg-roller').on('click.rpg-roller', function(e){
+      if($(this).parent().hasClass('ct-reset-pane__hitdie-manager-dice'))// allow hit dice roll to go through ddb for auto heals - maybe setup our own message by put to https://character-service.dndbeyond.com/character/v5/life/hp/damage-taken later
+        return;
       let rollData = {} 
       rollData = getRollData(this);
       if(!rollData.expression.match(allDiceRegex) && (window.EXPERIMENTAL_SETTINGS['rpgRoller'] != true && window.EXPERIMENTAL_SETTINGS['godiceRoller'] != true)){
@@ -831,7 +835,23 @@ function init_character_list_page_without_avtt() {
   }
   window.location_href_observer = new MutationObserver(function(mutationList, observer) {
     if (oldHref !== document.location.href) {
-      if (!is_characters_list_page()) {
+      if(is_characters_builder_page()){
+         window.oldHref = document.location.href;
+        if (window.location_href_observer) {
+          window.location_href_observer.disconnect();
+          delete window.location_href_observer;
+        }
+        $('#site-main').css({
+          'visibility':'',
+          'display': ''
+        });
+        setTimeout(function(){
+          $(".builder-sections-sheet-icon").off().on("click", function(){
+            window.location.href = `https://www.dndbeyond.com${$(".builder-sections-sheet-icon").attr("href")}?abovevtt=true`;
+          });
+        }, 1000)
+      }
+      else if (!is_characters_list_page()) {
         console.log("Detected location change from", oldHref, "to", document.location.href);
         window.oldHref = document.location.href;
         init_characters_pages();
