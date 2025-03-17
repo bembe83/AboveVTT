@@ -516,11 +516,9 @@ class DiceRoller {
                 self.#resetVariables();
             }, this.timeoutDuration);
             let msgdata = {}
-			let roll = {};
+			let roll = new rpgDiceRoller.DiceRoll(diceRoll.expression);
 			let logo = "";
 			console.debug (diceRoll.expression);
-			if (window.EXPERIMENTAL_SETTINGS['rpgRoller'] )
-				roll=new rpgDiceRoller.DiceRoll(diceRoll.expression); 
 			//Show GoDice Popup if enabled
 			if(window.EXPERIMENTAL_SETTINGS['godiceRoller'] == true) {
 				forceCritType = Number(window.CHARACTER_AVTT_SETTINGS.crit || 0);
