@@ -180,6 +180,9 @@ const debounce_scroll_event = mydebounce(function(){
 		}, 200)	
 }, 200)
 
+const debounce_font_change = mydebounce(function(){
+	$('#VTTWRAPPER').css({"--font-size-zoom": Math.max(12 * Math.max((3 - window.ZOOM), 0), 8.5) + "px"})
+}, 25);
 /**
  * Changes the zoom level.
  * @param {Number} newZoom new zoom value
@@ -210,8 +213,8 @@ function change_zoom(newZoom, x, y, reset = false) {
 
 	$('#VTTWRAPPER').css({
 		"--window-zoom": window.ZOOM,
-		"--font-size-zoom": Math.max(12 * Math.max((3 - window.ZOOM), 0), 8.5) + "px"
 	})
+	debounce_font_change();	
 	set_default_vttwrapper_size();
 	if(reset == true){
 		$("#scene_map")[0].scrollIntoView({
@@ -338,15 +341,73 @@ function apply_zoom_from_storage() {
 	console.groupEnd()
 }
 
-/**
- * Decreases zoom level by 10%.
- * Prevents zooming below MIN_ZOOM.
- */
-function decrease_zoom() {
-	if (window.ZOOM > MIN_ZOOM) {
-		change_zoom(window.ZOOM * 0.9);
+let zoomBusy = false;
+let zoomQ = [];
+let lastZoom;	  
+//each zoom event [amt, typ, off, x, y] typ = 0(relative) 1(absolute) 2(offset)
+//keep a queue - which can mostly be squashed except for some offset events
+function throttledZoom(amount, typeFlag, zx, zy)  {
+	if(typeFlag === 2) {
+		if(zoomQ.length == 0) {
+			zoomQ = [[1.0,0,amount,zx,zy]];				
+		} else {
+			last = zoomQ[zoomQ.length-1];
+			if(last[1] === 0) {
+				last[2] = amount;
+			} else { //last[1] == 1
+				last[0] += amount;
+			}
+		}
+	} else if(zoomQ.length == 0 || typeFlag === 1) {
+		zoomQ = [[amount,typeFlag, 0, zx, zy]];
+	} else { //relative
+		last = zoomQ[zoomQ.length-1];
+		if(last[2] === 0) { //no offset
+			last[0] = last[0] * amount;
+		} else { //complex case where we need sequence
+			zoomQ.push([amount,typeFlag, 0, zx, zy]);
+		}
+	}
+	if(!zoomBusy) {
+		zoomBusy = true;
+		function applyOrDone() {
+			if(zoomQ.length) { //add all the queue events together based on current zoom
+				let z = window.ZOOM;
+				let zoomX, zoomY;
+				let doit = false;
+				if(zoomQ.length) {
+					while(zoomQ.length) {
+						e = zoomQ.pop(0);
+						z = ((e[1] === 0) ? z * e[0] : e[0]) + e[2];
+						zoomX = e[3];
+						zoomY = e[4];
+					}
+					z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+					if(z != window.ZOOM) doit = true;
+					zoomQ = [];
+				}
+				if(doit && lastZoom && Date.now() - lastZoom < 2) {
+					//throttle by time
+					setTimeout(() => {
+						change_zoom(z, zoomX, zoomY);
+						lastZoom = Date.now();
+						requestAnimationFrame(applyOrDone)
+					}, 1);
+				} else {
+					if(doit) {
+						change_zoom(z, zoomX, zoomY);
+						lastZoom = Date.now();
+					}
+					requestAnimationFrame(applyOrDone);
+				} 
+			} else {
+				zoomBusy = false;
+			}
+		}
+		requestAnimationFrame(applyOrDone);
 	}
 }
+
 /**
 * Gets the zoom values that will fit the map to the viewport
 * @return {Number}
@@ -377,13 +438,6 @@ function reset_zoom() {
 	// Don't store any zoom for this scene as we default to map fit on load
 	remove_zoom_from_storage();
 	console.groupEnd();
-}
-
-/**
- * Increases zoom level by 10%.
- */
-function increase_zoom() {
-	change_zoom(window.ZOOM * 1.10);
 }
 
 /**
@@ -1301,57 +1355,78 @@ function init_mouse_zoom() {
 		if (e.ctrlKey) {
 			e.preventDefault();
 			e.stopPropagation();
-			let newScale;
 			if (e.deltaY > MAX_ZOOM_STEP) {
-				newScale = window.ZOOM * 0.9;
+				throttledZoom(0.9,0,e.clientX,e.clientY);
 			}
 			else if (e.deltaY < -MAX_ZOOM_STEP) { //-ve, zoom out
-				newScale = window.ZOOM * 1.10;
+				throttledZoom(1.1,0,e.clientX,e.clientY);
 			}
 			else {
-				newScale = window.ZOOM - 0.01 * e.deltaY;
-			}
-
-			if ((newScale > MIN_ZOOM || newScale > window.ZOOM) && (newScale < MAX_ZOOM || newScale < window.ZOOM)) {
-				change_zoom(newScale, e.clientX, e.clientY);
+				throttledZoom(- 0.01 * e.deltaY,2,e.clientX,e.clientY)
 			}
 		}
 	}, { passive: false } );
+	
 	let dist1=0;
-	function start_pinch(ev) {
-           if (ev.targetTouches.length == 2) {//check if two fingers touched screen
-               dist1 = Math.hypot( //get rough estimate of distance between two fingers
-                ev.touches[0].pageX - ev.touches[1].pageX,
-                ev.touches[0].pageY - ev.touches[1].pageY);                  
-           }
-    
-    }
-    function move_pinch(ev) {
-           if (ev.targetTouches.length == 2 && ev.changedTouches.length == 2) {
-                 // Check if the two target touches are the same ones that started
-              	let dist2 = Math.hypot(//get rough estimate of new distance between fingers
-                ev.touches[0].pageX - ev.touches[1].pageX,
-                ev.touches[0].pageY - ev.touches[1].pageY);
-              	let newScale;
-                //alert(dist);
-                if(dist1>dist2) {//if fingers are closer now than when they first touched screen, they are pinching
-                  newScale = window.ZOOM * 0.95;
-                }
-                if(dist1<dist2) {//if fingers are further apart than when they first touched the screen, they are making the zoomin gesture
-                  newScale = window.ZOOM * 1.05;
-                }
-
-                if ((newScale > MIN_ZOOM || newScale > window.ZOOM) && (newScale < MAX_ZOOM || newScale < window.ZOOM)) {
-				
-	                change_zoom(newScale);
-	            }
-            }
-           
-    }
-    window.addEventListener ('touchstart', start_pinch, false);
-    window.addEventListener('touchmove', move_pinch, false);
-
+	let start_scale=window.ZOOM;
+	let zsx=0, zsy=0;
+	let touchMode = 0;
+	let touchTimeout;
+	function getDist(ts) {
+  		const dx = ts[0].clientX - ts[1].clientX;
+		const dy = ts[0].clientY - ts[1].clientY;
+		return Math.sqrt(dx * dx + dy * dy);
 	}
+	function start_pinch(ev) {
+		if (ev.targetTouches.length == 2) {
+			ev.preventDefault()
+			ev.stopPropagation();
+			const ts = ev.targetTouches;
+			dist1 = getDist(ts);
+			start_scale = window.ZOOM;
+			zsx = (ts[0].clientX + ts[1].clientX)/2;
+			zsy = (ts[0].clientY + ts[1].clientY)/2;
+			touchMode = 2;
+		}
+	}
+	let suppressed = null;
+	function move_pinch(ev, busy) {
+		if(ev && touchMode == 2) {
+			ev.preventDefault()
+			ev.stopPropagation();
+			if (ev.targetTouches.length == 2) {
+				const dist2 = getDist(ev.targetTouches)
+              			const factor = dist2 / dist1;
+				const newScale = start_scale * factor;
+				throttledZoom(newScale, 1, zsx, zsy);
+			}
+	        }
+        }
+	window.addEventListener('touchstart', start_pinch, {passive: false});
+	window.addEventListener('touchmove', move_pinch, {passive: false});
+	window.addEventListener("touchend", function (e) {
+		if(touchTimeout) clearTimeout(touchTimeout);
+		if (e.touches.length === 0) {
+			touchTimeout = setTimeout(() => {
+				touchMode = 0;
+			}, 100);
+		}
+	});
+        window.addEventListener("touchcancel", function (e) {
+		//still needs to be tested - not sure how to trigger
+		if ((e.touches == undefined || e.touches.length === 0) && touchMode === 2) {
+			console.log("Touch interrupted. Resetting.");
+			touchMode = 0;
+			throttledZoom(start_scale,1); //todo: x,y?
+		}
+	});
+
+	//disable browser gestures (not sure: is there a more subtle way in CSS?)
+	function prevent(e) { e.preventDefault(); }
+	document.addEventListener("gesturestart", prevent);
+	document.addEventListener("gesturechange", prevent);
+	document.addEventListener("gestureend", prevent);
+}
 
 
 /**
@@ -1409,7 +1484,7 @@ function init_splash() {
 	ul.append("<li><a style='font-weight:bold;text-decoration: underline;' target='_blank' href='https://www.patreon.com/AboveVTT'>Patreon</a></li>");
 	cont.append(ul);*/
 	cont.append("");
-	cont.append("<div style='padding-top:10px'>Contributors: <b>SnailDice (Nadav),Stumpy, Palad1N, KuzKuz, Coryphon, Johnno, Hypergig, JoshBrodieNZ, Kudolpf, Koals, Mikedave, Jupi Taru, Limping Ninja, Turtle_stew, Etus12, Cyelis1224, Ellasar, DotterTrotter, Mosrael, Bain, Faardvark, Azmoria, Natemoonlife, Pensan, H2, CollinHerber, Josh-Archer, TachyonicSpace, TheRyanMC, j3f (jeffsenn), MonstraG, Wyrmwood</b></div>");
+	cont.append("<div style='padding-top:10px'>Contributors: <b>SnailDice (Nadav),Stumpy, Palad1N, KuzKuz, Coryphon, Johnno, Hypergig, JoshBrodieNZ, Kudolpf, Koals, Mikedave, Jupi Taru, Limping Ninja, Turtle_stew, Etus12, Cyelis1224, Ellasar, DotterTrotter, Mosrael, Bain, Faardvark, Azmoria, Natemoonlife, Pensan, H2, CollinHerber, Josh-Archer, TachyonicSpace, TheRyanMC, j3f (jeffsenn), MonstraG, Wyrmwood, Drenam1</b></div>");
 
 	cont.append("<br>AboveVTT is an hobby opensource project. It's completely free (like in Free Speech). The resources needed to pay for the infrastructure are kindly donated by the supporters through <a style='font-weight:bold;text-decoration: underline;' target='_blank' href='https://www.patreon.com/AboveVTT'>Patreon</a> , what's left is used to buy wine for cyruzzo");
 
@@ -1756,13 +1831,14 @@ function open_player_sheet(sheet_url, closeIfOpen = true) {
 		    { src: "jquery-3.6.0.min.js" },
 		    { src: "jquery.contextMenu.js" },
 		    // AboveVTT Files
-		    { src: "DiceContextMenu/DiceContextMenu.js" },	   
-		    { src: "MonsterDice.js" },	
-		    { src: "DiceRoller.js" },
+		    { src: "CoreFunctions.js" }, // Make sure CoreFunctions executes first
 		    { src: "DDBApi.js" },
+		    { src: "MonsterDice.js" },
+		    { src: "DiceRoller.js" },
+		    { src: "DiceContextMenu/DiceContextMenu.js" },
+		    { src: "MessageBroker.js" },
 		    { src: "rpg-dice-roller.bundle.min.js" },
 		    // AboveVTT files that execute when loaded
-		    { src: "CoreFunctions.js" }, // Make sure CoreFunctions executes first
 		    { src: "CharactersPage.js" } // Make sure CharactersPage executes last
 		]
 
@@ -1864,7 +1940,7 @@ function open_player_sheet(sheet_url, closeIfOpen = true) {
 			</style>
 		`);
 		console.log("removing headers");
-
+		$(event.target).contents().find("body").append(`<div id='extensionpath' data-path='${window.EXTENSION_PATH}'></div>`)
 
 		if (window.JOINTHEDICESTREAM) {
 			joinDiceRoom();
@@ -2183,8 +2259,6 @@ function inject_chat_buttons() {
 	
 	window.rollButtonObserver = new MutationObserver(function() {
         // Any time the DDB dice buttons change state, we want to synchronize our dice buttons to match theirs.
-
-		if (!window.EXPERIMENTAL_SETTINGS['rpgRoller']) {
 			$(".dice-die-button").each(function() {
 				let dieSize = $(this).attr("data-dice");
 				let ourDiceElement = $(`.dice-roller > div img[alt='${dieSize}']`);
@@ -2210,8 +2284,7 @@ function inject_chat_buttons() {
 				} else {
 					$(".roll-mod-container").removeClass("show");
 				}
-			}, 0);
-		}
+			}, 0);	
     })
 
 	let watchForDicePanel = new MutationObserver((mutations) => {
@@ -2328,19 +2401,30 @@ function inject_chat_buttons() {
 		});
 		rollButton.on("click", function (e) {
 			let modValue = parseInt($('.roll-input-mod').val())
-			if ($(".dice-toolbar").hasClass("rollable") && modValue == 0 && !window.EXPERIMENTAL_SETTINGS['rpgRoller']) {
-				let theirRollButton = $(".dice-toolbar__target").children().first();
-				if (theirRollButton.length > 0) {
-					// we found a DDB dice roll button. Click it and move on
-					theirRollButton.click();
-					return;
-				}
+			if ($(".dice-toolbar").hasClass("rollable") && modValue == 0 && !window.EXPERIMENTAL_SETTINGS['rpgRoller']) {			
+					let theirRollButton = $(".dice-toolbar__target").children().first();
+					if (theirRollButton.length > 0) {
+						// we found a DDB dice roll button. Click it and move on
+						theirRollButton.click();
+						return;
+					}
 			}
 
 			const rollExpression = [];
-			$(".dice-roller > div img[data-count]").each(function() {
-				rollExpression.push($(this).attr("data-count") + $(this).attr("alt"));
+			const diceToCount = $(".dice-roller > div img[data-count]").length>0 ? $(".dice-roller > div img[data-count]") : $('.dice-die-button__count')
+			diceToCount.each(function() {
+				let count, dieType;
+				if($(this).is('.dice-die-button__count')){
+					count = $(this).text();
+					dieType = $(this).closest('[data-dice]').attr("data-dice");
+				}
+				else{
+					count = $(this).attr("data-count");
+					dieType = $(this).attr("alt");
+				}
+				rollExpression.push(count + dieType);
 			});
+			$('.dice-toolbar__dropdown-selected>div:first-of-type')?.click();
 			let expression = `${rollExpression.join("+")}${modValue<0 ? modValue : `+${modValue}`}`
 			let sendToDM = window.DM || false;
 			let sentAsDDB = send_rpg_dice_to_ddb(expression, sendToDM);
@@ -2400,6 +2484,14 @@ function inject_chat_buttons() {
 function init_ui() {
 	console.log("init_ui");
 
+	// On iOS make sure browser zoom is zero-d out
+	if (isIOS()) { //might also be useful on other mobile. not sure.
+		var meta = document.createElement('meta');
+		meta.name = "viewport";
+		meta.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no";
+		document.getElementsByTagName('head')[0].appendChild(meta);
+	}
+	
 	window.VTTMargin = 1000;
 
 	// ATTIVA GAMELOG
@@ -2426,6 +2518,12 @@ function init_ui() {
 	background.css("left", "0");
 	background.css("position", "absolute");
 	background.css("z-index", "10");
+	
+	const drawOverlayUnderFogDarkness = $("<canvas id='draw_overlay_under_fog_darkness'></canvas>");
+	drawOverlayUnderFogDarkness.css("position", "absolute");
+	drawOverlayUnderFogDarkness.css("top", "0");
+	drawOverlayUnderFogDarkness.css("left", "0");
+	drawOverlayUnderFogDarkness.css("z-index", "18");
 
 	const mapItems = $("<div id='map_items'></div>");
 	mapItems.css("top", "0");
@@ -2455,7 +2553,7 @@ function init_ui() {
 	drawOverlay.css("position", "absolute");
 	drawOverlay.css("top", "0");
 	drawOverlay.css("left", "0");
-	drawOverlay.css("z-index", "18");
+	drawOverlay.css("z-index", "22");
 
 	const lightOverlay = $("<canvas id='light_overlay'></canvas>");
 	lightOverlay.css("position", "absolute");
@@ -2586,6 +2684,7 @@ function init_ui() {
 
 	VTT.append(mapContainer);
 	VTT.append(peerOverlay);
+	VTT.append(drawOverlayUnderFogDarkness);
 	VTT.append(fog);
 	VTT.append(grid);
 	VTT.append(drawOverlay);
@@ -2603,6 +2702,7 @@ function init_ui() {
 
 
 	mapItems.append(background);
+	mapItems.append(drawOverlayUnderFogDarkness);
 
 
 
@@ -2771,7 +2871,7 @@ function init_ui() {
 	init_mouse_zoom()
 
 	init_help_menu();
-
+  hide_or_unhide_scrollbar()
 
 }
 
@@ -2836,7 +2936,7 @@ function init_zoom_buttons() {
 	if ($("#zoom_buttons").length > 0) {
 		return;
 	}
-
+	let defaultValues = get_avtt_setting_value('quickToggleDefaults');
 	// ZOOM BUTTON
 	let zoom_section = $("<div id='zoom_buttons' />");
 	const youtube_controls_button = $(`<div id='youtube_controls_button' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Quick toggle youtube controls'></div>`);
@@ -2859,6 +2959,8 @@ function init_zoom_buttons() {
 	if(window.DM) {
 
 		const projector_toggle = $(`<div id='projector_toggle' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Quick toggle projector mode'></div>`);
+
+
 		projector_toggle.click(function (event) {
 			console.log("projector_toggle", event);
 			const iconWrapper = $(event.currentTarget).find(".ddbc-tab-options__header-heading");
@@ -2871,7 +2973,11 @@ function init_zoom_buttons() {
 			}
 		});
 		projector_toggle.append(`<div class="ddbc-tab-options__header-heading"><span style="font-size: 20px;" class="material-symbols-outlined">cast</span></div>`);
-		
+		if(defaultValues.projectorMode != undefined){
+			projector_toggle.find('.ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', defaultValues.projectorMode) 
+			window.ProjectorEnabled = defaultValues.projectorMode;
+		}
+				
 		const projector_zoom_lock = $(`<div id='projector_zoom_lock' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Quick toggle projector zoom lock'></div>`);
 		projector_zoom_lock.click(function (event) {
 			console.log("projector_toggle", event);
@@ -2890,7 +2996,9 @@ function init_zoom_buttons() {
 				expand_content
 			</span>
 		</div>`);
-		
+		if(defaultValues.projectorLock != undefined){
+			projector_zoom_lock.find('.ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', defaultValues.projectorLock) 
+		}
 
 		zoom_section.append(projector_zoom_lock, projector_toggle);
 		if (get_avtt_setting_value("projector")) {
@@ -2915,6 +3023,10 @@ function init_zoom_buttons() {
 		if (!get_avtt_setting_value("peerStreaming")) {
 			cursor_ruler_toggle.css("display", "none");
 		}
+		if(defaultValues.rulerToPlayers != undefined){
+			cursor_ruler_toggle.find('.ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', defaultValues.rulerToPlayers); 
+			window.PeerManager.allowCursorAndRulerStreaming = defaultValues.rulerToPlayers;
+		}
 
 		const ping_center = $(`<div id='ping_center' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Center Player View on Pings'> 
 		<div class="ddbc-tab-options__header-heading ddbc-tab-options__header-heading--is-active">
@@ -2935,7 +3047,9 @@ function init_zoom_buttons() {
 				$('#ping_center .ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', true)
 			}
 		});
-
+		if(defaultValues.centerPing != undefined){
+			ping_center.find('.ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', defaultValues.centerPing); 
+		}
 
 		let select_locked = $(`<div id='select_locked' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Toggle Locked Tokens Selectable'> 
 		<div class="ddbc-tab-options__header-heading ddbc-tab-options__header-heading--is-active">
@@ -3033,7 +3147,13 @@ function init_zoom_buttons() {
 				$('#tokens .lockedToken').draggable("enable");
 			}
 		});
-	
+		if(defaultValues.selectLocked != undefined){
+			select_locked.find('.ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', defaultValues.selectLocked); 
+			$('body').toggleClass('preventSelectDefinitelyNot', !defaultValues.selectLocked);
+			$('#tokens .lockedToken').draggable(!defaultValues.selectLocked ? "disable" : "enable");
+			$('#tokens .lockedToken').toggleClass("ui-state-disabled", defaultValues.selectLocked);	
+		}
+
 
 		let pause_players = $(`<div id='pause_players' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Pause players'> 
 		<div class="ddbc-tab-options__header-heading">
@@ -3065,14 +3185,15 @@ function init_zoom_buttons() {
 	}
 
 
-	let grid_snap_drawings = $(`<div id='grid_snap_drawings' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Grid Snap Drawings'> 
+	let grid_snap_drawings = $(`<div id='grid_snap_drawings' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Grid Snap Most Tools'> 
 	<div class="ddbc-tab-options__header-heading">
 			<span style="font-size: 20px;" class="material-symbols-outlined">
 				rebase_edit
 			</span>
 	</div></div>
 	`);
-
+	$('#grid_snap_drawings .ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', false)
+	window.toggleDrawingSnap = false;
 	grid_snap_drawings.click(async function(){
 		if ($('#grid_snap_drawings .ddbc-tab-options__header-heading').hasClass('ddbc-tab-options__header-heading--is-active')) {
 			$('#grid_snap_drawings .ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', false)
@@ -3082,7 +3203,12 @@ function init_zoom_buttons() {
 			window.toggleDrawingSnap = true;
 		}
 	});
+	if(defaultValues.snapTooltoGrid != undefined){
+		grid_snap_drawings.find('.ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', defaultValues.snapTooltoGrid); 
+		window.toggleDrawingSnap = defaultValues.snapTooltoGrid;
+	}
 	zoom_section.append(grid_snap_drawings)
+
 
 	let selected_token_vision = $(`<div id='selected_token_vision' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Selected Token Vision'> 
 	<div class="ddbc-tab-options__header-heading">
@@ -3118,7 +3244,7 @@ function init_zoom_buttons() {
 
 
 
-	selected_token_vision.click(async function(){
+	selected_token_vision.click(function(){
 		if ($('#selected_token_vision .ddbc-tab-options__header-heading').hasClass('ddbc-tab-options__header-heading--is-active')) {
 			$('#selected_token_vision .ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', false)
 			window.SelectedTokenVision = false;
@@ -3126,9 +3252,12 @@ function init_zoom_buttons() {
 			$('#selected_token_vision .ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', true)
 			window.SelectedTokenVision = true;
 		}
-		await redraw_light();	
+		redraw_light();	
 	});
-
+	if(defaultValues.selectedTokenVision != undefined){
+		selected_token_vision.find('.ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', defaultValues.selectedTokenVision); 
+		window.SelectedTokenVision = defaultValues.selectedTokenVision;
+	}
 	zoom_section.append(selected_token_vision);
 
 
@@ -3138,11 +3267,11 @@ function init_zoom_buttons() {
 
 	let zoom_minus = $("<div id='zoom_minus' class='ddbc-tab-options--layout-pill'><div class='ddbc-tab-options__header-heading hasTooltip button-icon hideable' data-name='zoom out (-)'><span class='material-icons button-icon'>zoom_out</span></div></div>");
 
-	zoom_minus.click(decrease_zoom)
+	zoom_minus.click(function() { throttledZoom(0.90, 0)});
 	zoom_section.append(zoom_minus);
 
 	let zoom_plus = $("<div id='zoom_plus' class='ddbc-tab-options--layout-pill'><div class='ddbc-tab-options__header-heading hasTooltip button-icon hideable' data-name='zoom in (+)'><span class='material-icons button-icon'>zoom_in</span></div></div>");
-	zoom_plus.click(increase_zoom);
+	zoom_plus.click(function() { throttledZoom(1.10, 0)});
 	zoom_section.append(zoom_plus);
 
 	let hide_interface = $(`<div id='hide_interface_button' class='ddbc-tab-options--layout-pill'><div class='ddbc-tab-options__header-heading hasTooltip button-icon' data-name='Unhide interface (shift+h)'><span class='material-icons md-16 button-icon'>visibility</span></div></div>`);
@@ -3234,8 +3363,12 @@ function init_help_menu() {
 							<dd>Show/hide character sheet (players only)</dd>
 						<dl>
 						<dl>
-							<dt>SHIFT+SPACE</dt>
+							<dt>${getShiftKeyName()}+SPACE</dt>
 							<dd>Center Player Token (players only)</dd>
+						<dl>
+						<dl>
+							<dt>${getCtrlKeyName()}+SPACE</dt>
+							<dd>Center Current Turn Token</dd>
 						<dl>
 						<dl>
 							<dt>Q</dt>
@@ -3279,58 +3412,94 @@ function init_help_menu() {
 						<dl>
 						<dl>
 							<dt>N</dt>
-							<dd>Next creature (if combat tracker is open)</dd>
+							<dd>Next creature in combat</dd>
 						<dl>
 						<dl>
-							<dt>- / CTRL+Mouse Wheel Down</dt>
+							<dt>P</dt>
+							<dd>Prev creature in combat</dd>
+						<dl>
+						<dl>
+							<dt>- / ${getCtrlKeyName()}+Mouse Wheel Down</dt>
 							<dd>Zoom out</dd>
 						<dl>
 						<dl>
-							<dt>= / CTRL+Mouse Wheel Up</dt>
+							<dt>= / + / ${getCtrlKeyName()}+Mouse Wheel Up</dt>
 							<dd>Zoom in</dd>
 						<dl>
 						<dl>
-							<dt>CTRL (held)</dt>
+							<dt>1-7</dt>
+							<dd> Add Dice to Dice Pool</dd>
+						<dl>
+							<dl>
+							<dt>${getModKeyName()}+1-7</dt>
+							<dd>Remove Dice from Dice Pool</dd>
+						<dl>
+						<dl>
+							<dt>- (with Dice Pool Mod visibile)</dt>
+							<dd>Subtract from Roll Mod</dd>
+						<dl>
+						<dl>
+							<dt>= / + (with Dice Pool Mod visibile)</dt>
+							<dd>Add to Roll Mod</dd>
+						<dl>
+						<dl>
+							<dt>Enter</dt>
+							<dd>Roll added dice pool</dd>
+						<dl>
+						<dl>
+							<dt>${getModKeyName()} (held)</dt>
 							<dd>Temporarily toggle grid snapping</dd>
 						<dl>
 						<dl>
-							<dt>ALT (held)</dt>
+							<dt>${getAltKeyName()} (held)</dt>
 							<dd>Temporarily activate ruler</dd>
 						<dl>
 						<dl>
-							<dt>SHIFT+H</dt>
+							<dt>${getShiftKeyName()}+H</dt>
 							<dd>Hide buttons from screen (spectator mode)</dd>
 						<dl>
 						<dl>
-							<dt>SHIFT+L</dt>
+							<dt>${getModKeyName()}+C</dt>
+							<dd>Copy Selected Token</dd>
+						<dl>
+						<dl>
+							<dt>${getModKeyName()}+V</dt>
+							<dd>Paste Selected Tokens</dd>
+						<dl>
+						<dl>
+							<dt>${getShiftKeyName()}+L</dt>
 							<dd>Enable/Disable locked token interation (DM only)</dd>
 						<dl>
 						<dl>
-							<dt>SHIFT+V</dt>
+							<dt>${getShiftKeyName()}+V</dt>
 							<dd>Temporary check token vision.</dd>
 						<dl>
 						<dl>
-							<dt>SHIFT+W</dt>
+							<dt>${getShiftKeyName()}+W</dt>
 							<dd>Toggle always show walls. Will also show 'hidden icon' doors/windows.</dd>
 						<dl>
 						<dl>
-							<dt>SHIFT+S</dt>
+							<dt>${getShiftKeyName()}+S</dt>
 							<dd>Toggle snap drawings to grid. This includes drawings from most menus - fog, draw, light, walls etc.</dd>
 						<dl>
 						<dl>
-							<dt>Hold CTRL while drawing</dt>
-							<dd>Temporary toggle snap drawings to grid on/off (opposite of the toggle set). This includes drawings from most menus - fog, draw, light, walls etc.</dd>
+							<dt>Hold ${getModKeyName()} while using most tools</dt>
+							<dd>Temporary toggle snap tools to grid on/off (opposite of the toggle set). This includes drawings from most menus - fog, draw, light, walls etc.</dd>
 						<dl>
 						<dl>
-							<dt>SHIFT+Click Token</dt>
+							<dt>${getShiftKeyName()}+Click Token</dt>
 							<dd>Select multiple tokens</dd>
 						<dl>
 						<dl>
-							<dt>SHIFT+Click Door/Window</dt>
+							<dt>${getShiftKeyName()}+Drag Token</dt>
+							<dd>If token is grouped or multiple tokens selected just move the one token</dd>
+						<dl>
+						<dl>
+							<dt>${getShiftKeyName()}+Click Door/Window</dt>
 							<dd>Quick toggle door/window locked</dd>
 						<dl>
 						<dl>
-							<dt>Hold SHIFT while drawing walls</dt>
+							<dt>Hold ${getShiftKeyName()} while drawing walls</dt>
 							<dd>Create Segemented Wall. This keeps walls from having pin point holes.</dd>
 						<dl>
 						<dl>
@@ -3338,7 +3507,7 @@ function init_help_menu() {
 							<dd>Will cycle through fog & draw options if menu open</dd>
 						<dl>
 						<dl>
-							<dt>SHIFT/CTRL Click on Character Sheet Icon Rolls</dt>
+							<dt>${getShiftKeyName()}/${getCtrlKeyName()} Click on Character Sheet Icon Rolls</dt>
 							<dd>Will roll with ADV/DIS respectively</dd>
 						<dl>
 					</div>

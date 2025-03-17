@@ -238,14 +238,17 @@ function disable_peer_manager() {
 
 /** when we receive catastrophic errors, we need to tear down and rebuild PeerManager */
 function rebuild_peerManager() {
-  console.warn("rebuild_peerManager is being ignored");
+  //DO NOT REBUILD - CAUSES MESSAGE SPAM through websocket
+  // Can maybe add limited retries.
   return;
-  console.log("rebuild_peerManager starting");
-  disable_peer_manager();
-  window.PeerManager.tearDown();
-  window.PeerManager = new PeerManager();
-  enable_peer_manager();
-  console.log("rebuild_peerManager finished");
+  /*
+    console.log("rebuild_peerManager starting");
+    disable_peer_manager();
+    window.PeerManager.tearDown();
+    window.PeerManager = new PeerManager();
+    enable_peer_manager();
+    console.log("rebuild_peerManager finished");
+  */
 }
 
 /** Called when a new connection is opened
@@ -481,14 +484,6 @@ function init_peer_fade_function(playerId) {
       noisy_log("executing PEER_FADE_RULER_FUNCTIONS", playerId);
       const waypointManager = get_peer_waypoint_manager(playerId, undefined);
       waypointManager.clearWaypoints();
-      redraw_peer_rulers(playerId);
-      if (window.PEER_TOKEN_DRAGGING[playerId]) {
-        const html = window.PEER_TOKEN_DRAGGING[playerId];
-        delete window.PEER_TOKEN_DRAGGING[playerId];
-        html.fadeOut(400, function() {
-          html.remove();
-        });
-      }
     });
   }
 }
@@ -526,7 +521,11 @@ const sendCursorPositionToPeers = throttle( (mouseMoveEvent) => {
 function handle_peer_cursor_event(eventData) {
   try {
     if (window.CURRENT_SCENE_DATA && window.CURRENT_SCENE_DATA.id !== eventData.sceneId) return; // they're on a different scene so don't show their cursor
-
+    if(eventData.tokenId){
+      const token = $(`.token[data-id='${eventData.tokenId}']:not(.underDarkness), #token_map_items .token[data-id='${eventData.tokenId}']`);
+      if(token.length>0 && (token.css('display') == 'none' || token.css('visibility') == 'hidden'))
+        return;
+    }
     // if they're drawing a ruler, don't bother drawing the cursor. For these cases, we return;
     // if we don't draw the ruler, see if we want to draw the cursor. For these cases, we break;
     if (eventData.coords && eventData.coords.length > 0) {
@@ -629,6 +628,7 @@ function fade_peer_cursor(playerId) {
   } catch (error) {
     console.debug("fade_peer_cursor is missing a fade function", playerId, typeof playerId, error);
     init_peer_fade_function(playerId);
+    window.PEER_FADE_CURSOR_FUNCTIONS[playerId]();
   }
 }
 
@@ -642,6 +642,7 @@ function fade_peer_ruler(playerId) {
   } catch (error) {
     console.debug("fade_peer_ruler is missing a fade function", playerId, typeof playerId, error);
     init_peer_fade_function(playerId);
+    window.PEER_FADE_RULER_FUNCTIONS[playerId]();
   }
 }
 
@@ -661,11 +662,10 @@ function update_peer_ruler(eventData) {
   // we're not checking receiveRulerFromPeers because we did that in handle_peer_cursor_event
 
   noisy_log("update_peer_ruler", eventData)
-  fade_peer_ruler(eventData.playerId);
+
   if (window.CURRENT_SCENE_DATA && window.CURRENT_SCENE_DATA.id !== eventData.sceneId) return; // they're on a different scene
   const waypointManager = get_peer_waypoint_manager(eventData.playerId, eventData.color);
-  clear_peer_canvas(eventData.playerId)
-  waypointManager.clearWaypoints()
+  waypointManager.clearWaypoints(false);
   waypointManager.numWaypoints = eventData.numWaypoints;
   waypointManager.coords = eventData.coords;
   redraw_peer_rulers(eventData.playerId);
@@ -682,6 +682,7 @@ function peer_is_dragging_token(eventData) {
     html.attr("data-clone-id", `dragging-${eventData.tokenId}`);
     html.attr("data-id", ``);
     html.removeClass('tokenselected underDarkness');
+    html.css('opaicty', '0.5')
     if (!html || html.length === 0) {
       noisy_log("peer_is_dragging_token no token on scene matching", `#tokens div[data-id='${eventData.tokenId}']`, eventData);
       return;
@@ -693,18 +694,15 @@ function peer_is_dragging_token(eventData) {
   noisy_log("peer_is_dragging_token updating drag token css", eventData, html);
   html.css({
     top: eventData.y,
-    left: eventData.x,
-    opacity: 0.5
+    left: eventData.x
   });
 }
 
 /** clears other player's rulers from our screen */
 function clear_peer_canvas(playerId) {
-  const canvas = document.getElementById("peer_overlay");
-  const context = canvas.getContext("2d");
-  context.clearRect(0, 0, canvas.width, canvas.height);
-
-  WaypointManager.clearWaypointDrawings(playerId)
+  window.PEER_RULERS[playerId].throttleDraw(function(){
+    window.PEER_RULERS[playerId].clearWaypointDrawings(playerId)
+  })
 }
 
 /** iterates over window.PEER_RULERS and draws any rulers that need to be drawn */
@@ -712,7 +710,7 @@ function redraw_peer_rulers(playerId) {
   //clear_peer_canvas(playerId); // make sure we clear the canvas first. Otherwise, we'll see every previous position of every ruler
   const waypointManager = window.PEER_RULERS[playerId];
   waypointManager.draw(undefined, undefined, undefined, playerId);
-  
+  waypointManager.fadeoutMeasuring(playerId);
 }
 
 /** finds or creates a {@link WaypointManagerClass} for the given player
@@ -730,6 +728,7 @@ function get_peer_waypoint_manager(playerId, color) {
   const waypointManager = new WaypointManagerClass();
   window.PEER_RULERS[playerId] = waypointManager;
   waypointManager.resetDefaultDrawStyle();
+  window.PEER_RULERS[playerId].playerId = playerId;
   if (color) {
     waypointManager.drawStyle.color = color;
   }

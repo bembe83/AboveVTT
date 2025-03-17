@@ -110,7 +110,7 @@ function token_context_menu_expanded(tokenIds, e) {
 
 	$("#tokenOptionsPopup").remove();
 	let tokenOptionsClickCloseDiv = $("<div id='tokenOptionsClickCloseDiv'></div>");
-	tokenOptionsClickCloseDiv.off().on("click", function(){
+	tokenOptionsClickCloseDiv.off("click").on("click", function(){
 		$("#tokenOptionsPopup").remove();
 		$('.context-menu-list').trigger('contextmenu:hide')
 		tokenOptionsClickCloseDiv.remove();
@@ -118,6 +118,10 @@ function token_context_menu_expanded(tokenIds, e) {
 		$("#tokenOptionsContainer .sp-container").remove();
 		$(`.context-menu-flyout`).remove(); 
 	});
+
+	tokenOptionsClickCloseDiv.off("contextmenu").on("contextmenu", function(e){
+		e.preventDefault();
+	})
 
 	let moveableTokenOptions = $("<div id='tokenOptionsPopup'></div>");
 
@@ -183,8 +187,9 @@ function token_context_menu_expanded(tokenIds, e) {
 
 
 				redraw_light_walls();
-				redraw_light();
 				redraw_drawn_light();
+				redraw_light();
+
 
 				sync_drawings();
 				if(window.TOKEN_OBJECTS[`${x1}${y1}${x2}${y2}${window.CURRENT_SCENE_DATA.id}`.replaceAll('.','')]  != undefined){
@@ -197,7 +202,7 @@ function token_context_menu_expanded(tokenIds, e) {
 			let notesRow = $(`<div class="token-image-modal-footer-select-wrapper flyout-from-menu-item"><div class="token-image-modal-footer-title">Note</div></div>`);
 			notesRow.hover(function (hoverEvent) {
 				context_menu_flyout("notes-flyout", hoverEvent, function(flyout) {
-					flyout.append(build_notes_flyout_menu(tokenIds));
+					flyout.append(build_notes_flyout_menu(tokenIds, flyout));
 				})
 			});
 			body.append(notesRow);
@@ -557,7 +562,7 @@ function token_context_menu_expanded(tokenIds, e) {
 			let notesRow = $(`<div class="token-image-modal-footer-select-wrapper flyout-from-menu-item"><div class="token-image-modal-footer-title">Token Note</div></div>`);
 			notesRow.hover(function (hoverEvent) {
 				context_menu_flyout("notes-flyout", hoverEvent, function(flyout) {
-					flyout.append(build_notes_flyout_menu(tokenIds));
+					flyout.append(build_notes_flyout_menu(tokenIds, flyout));
 				})
 			});
 			body.append(notesRow);
@@ -740,16 +745,25 @@ function token_context_menu_expanded(tokenIds, e) {
 					$(this).parent().trigger(ctrlClick);
 				});
 
-						clickedButton.find('#adv').click(function(e){
+				clickedButton.find('#adv').click(function(e){
 					e.stopPropagation();
 					$(this).parent().trigger(shiftClick);
 				});
 				const reset_init = getCombatTrackersettings().remove_init;
 				tokens.forEach(t =>{
+					if(t.options.combatGroup && Object.values(window.TOKEN_OBJECTS).filter(d=>d.options.combatGroup == t.options.combatGroup).length == 2 && window.TOKEN_OBJECTS[t.options.combatGroup]){
+						window.TOKEN_OBJECTS[t.options.combatGroup].delete()
+					}
+					if(window.all_token_objects[t.options.id] == undefined)
+						window.all_token_objects[t.options.id] = t;
 					t.options.ct_show = undefined;
 					t.options.combatGroup = undefined;
-					if(reset_init == true)
+					window.all_token_objects[t.options.id].options.ct_show = undefined;
+					window.all_token_objects[t.options.id].options.combatGroup = undefined;
+					if(reset_init == true){
 						t.options.init = undefined;
+						window.all_token_objects[t.options.id].options.init = undefined;
+					}
 					ct_remove_token(t, false);
 					t.update_and_sync();
 				});
@@ -759,9 +773,15 @@ function token_context_menu_expanded(tokenIds, e) {
 				const reset_init = getCombatTrackersettings().remove_init;
 
 				tokens.forEach(t => {
+					if(window.all_token_objects[t.options.id] == undefined)
+						window.all_token_objects[t.options.id] = t;
 					t.options.combatGroup = undefined;
-					if(reset_init == true)
+					window.all_token_objects[t.options.id].options.combatGroup = undefined;
+
+					if(reset_init == true){
 						t.options.init = undefined;
+						window.all_token_objects[t.options.id].options.init = undefined;
+					}
 					ct_add_token(t, false, undefined, clickEvent.shiftKey, clickEvent.ctrlKey)
 					t.update_and_sync();
 				});
@@ -781,19 +801,26 @@ function token_context_menu_expanded(tokenIds, e) {
 					e.stopPropagation();
 					$(this).parent().trigger(ctrlClick);
 				});
-						clickedButton.find('#adv').click(function(e){
+				clickedButton.find('#adv').click(function(e){
 					e.stopPropagation();
 					$(this).parent().trigger(shiftClick);
 				});
 				const reset_init = getCombatTrackersettings().remove_init;
 				tokens.forEach(t =>{
-					if(t.options.combatGroup && window.TOKEN_OBJECTS[t.options.combatGroup]){
+					if(t.options.combatGroup != undefined && Object.values(window.TOKEN_OBJECTS)?.filter(d=>d.options.combatGroup == t.options.combatGroup)?.length == 2 && window.TOKEN_OBJECTS[t.options.combatGroup]){
 						window.TOKEN_OBJECTS[t.options.combatGroup].delete()
 					}
-					if(reset_init == true)
+					if(window.all_token_objects[t.options.id] == undefined)
+						window.all_token_objects[t.options.id] = t;
+					if(reset_init == true){
 						t.options.init = undefined;
+						window.all_token_objects[t.options.id].options.init = undefined;
+					}
 					t.options.combatGroup = undefined;
 					t.options.ct_show = undefined;
+					
+					window.all_token_objects[t.options.id].options.combatGroup = undefined;
+					window.all_token_objects[t.options.id].options.ct_show = undefined;
 					ct_remove_token(t, false);
 					t.update_and_sync();
 				});
@@ -804,33 +831,47 @@ function token_context_menu_expanded(tokenIds, e) {
 				combatButton.html(removeButtonInternals);
 				let group = uuid();
 				let allHidden = true;
+				let allVisibleNames = true
 				const reset_init = getCombatTrackersettings().remove_init;
+	
+
 				tokens.forEach(t => {
-					if(t.options.combatGroup && window.TOKEN_OBJECTS[t.options.combatGroup]){
+					ct_remove_token(t, false);
+					if(t.options.combatGroup != undefined && Object.values(window.TOKEN_OBJECTS)?.filter(d=>d.options.combatGroup == t.options.combatGroup)?.length == 2 && window.TOKEN_OBJECTS[t.options.combatGroup]){
 						window.TOKEN_OBJECTS[t.options.combatGroup].delete()
 					}
 					if(t.options.hidden !== true){
 						allHidden = false
 					}
-					if(reset_init == true)
+					if(!t.isPlayer() && t.options.revealname == false){
+						allVisibleNames = false;
+					}
+					if(window.all_token_objects[t.options.id] == undefined)
+						window.all_token_objects[t.options.id] = t;
+					if(reset_init == true){
 						t.options.init = undefined;
+						window.all_token_objects[t.options.id].options.init = undefined;
+					}
 					t.options.combatGroup = group;
+					window.all_token_objects[t.options.id].options.combatGroup = group;
+
 					ct_add_token(t, false, undefined, clickEvent.shiftKey,  clickEvent.ctrlKey);
 					t.update_and_sync();
-				});		
+				});	
 				let t = new Token({
 					...tokens[0].options,
 					id: group,
 					combatGroupToken: group,
 					ct_show: !allHidden,
+					revealname: allVisibleNames,
 					name: `${tokens[0].options.name} Group`
 				});
 				window.TOKEN_OBJECTS[group] = t;
 				if(window.all_token_objects[group] == undefined){
 					window.all_token_objects[group] = t;
 				}
-				t.sync = mydebounce(function(e) { // VA IN FUNZIONE SOLO SE IL TOKEN NON ESISTE GIA					
-					window.MB.sendMessage('custom/myVTT/token', t.options);
+				t.sync = mydebounce(function(options) { // VA IN FUNZIONE SOLO SE IL TOKEN NON ESISTE GIA					
+					window.MB.sendMessage('custom/myVTT/token', options);
 				}, 300);
 				t.place_sync_persist();
 				ct_add_token(window.TOKEN_OBJECTS[group], false, clickEvent.shiftKey, clickEvent.ctrlKey)
@@ -1100,7 +1141,7 @@ function token_context_menu_expanded(tokenIds, e) {
 			let notesRow = $(`<div class="token-image-modal-footer-select-wrapper flyout-from-menu-item"><div class="token-image-modal-footer-title">Token Note</div></div>`);
 			notesRow.hover(function (hoverEvent) {
 				context_menu_flyout("notes-flyout", hoverEvent, function(flyout) {
-					flyout.append(build_notes_flyout_menu(tokenIds));
+					flyout.append(build_notes_flyout_menu(tokenIds, flyout));
 				})
 			});
 			body.append(notesRow);
@@ -2582,7 +2623,7 @@ function build_menu_stat_inputs(tokenIds) {
 
 
 
-function build_notes_flyout_menu(tokenIds) {
+function build_notes_flyout_menu(tokenIds, flyout) {
 	let tokens = tokenIds.map(id => window.TOKEN_OBJECTS[id]).filter(t => t !== undefined);
 	let body = $("<div></div>");
 	let id = tokenIds.length == 1 ? tokenIds[0] : tokens[0].options.id;
@@ -2604,6 +2645,7 @@ function build_notes_flyout_menu(tokenIds) {
 			body.append(viewNoteButton, noteLinkButton, editNoteButton, deleteNoteButton);	
 			viewNoteButton.off().on("click", function(){
 				window.JOURNAL.display_note(id);
+				$('#tokenOptionsClickCloseDiv').click();
 			});
 			noteLinkButton.off().on("click", function(){
 				let copyLink = `[note]${id};${window.JOURNAL.notes[id].title}[/note]`
@@ -2614,7 +2656,9 @@ function build_notes_flyout_menu(tokenIds) {
 					delete window.JOURNAL.notes[id];
 					window.JOURNAL.persist();
 					window.TOKEN_OBJECTS[id].place();	
-					build_notes_flyout_menu(tokenIds)		
+					body.remove();
+					if(flyout != undefined)
+						flyout.append(build_notes_flyout_menu(tokenIds, flyout))		
 				}
 			});
 		}
@@ -2631,8 +2675,8 @@ function build_notes_flyout_menu(tokenIds) {
 					plain: '',
 					player: false
 				}
-				build_notes_flyout_menu(tokenIds)
 			}
+			$('#tokenOptionsClickCloseDiv').click();
 			window.JOURNAL.edit_note(id);
 
 		});		
@@ -2894,7 +2938,12 @@ function build_adjustments_flyout_menu(tokenIds) {
 
 	let tokenSizes = [];
 	tokens.forEach(t => {
-		tokenSizes.push(t.numberOfGridSpacesWide());
+		if(t.isLineAoe()){
+			tokenSizes.push(t.numberOfGridSpacesTall());
+		}
+		else{
+			tokenSizes.push(t.numberOfGridSpacesWide());
+		}
 	});
 
 
@@ -2904,7 +2953,7 @@ function build_adjustments_flyout_menu(tokenIds) {
 	let sizeInputs = build_token_size_input(uniqueSizes, function (newSize) {
 		let tokenMultiplierAdjustment = (!window.CURRENT_SCENE_DATA.scaleAdjustment) ? 1 : (window.CURRENT_SCENE_DATA.scaleAdjustment.x > window.CURRENT_SCENE_DATA.scaleAdjustment.y) ? window.CURRENT_SCENE_DATA.scaleAdjustment.x : window.CURRENT_SCENE_DATA.scaleAdjustment.y;
 			
-		const hpps = Math.round(window.CURRENT_SCENE_DATA.hpps) * tokenMultiplierAdjustment;
+		const hpps = window.CURRENT_SCENE_DATA.hpps * tokenMultiplierAdjustment;
 		if (!isNaN(newSize)) {
 			newSize = hpps * newSize;
 		} else {

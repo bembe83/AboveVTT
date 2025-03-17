@@ -33,12 +33,62 @@ const charactersPageRegex = /\/characters\/\d+/;
 
 const tabCommunicationChannel = new BroadcastChannel('aboveVttTabCommunication');
 
-function mydebounce(func, timeout = 800){
+function isIOS() {
+  return (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
+	  (navigator?.platform === 'MacIntel' && navigator?.maxTouchPoints > 1));
+}
+function isMac() {
+  return (navigator?.userAgentData?.platform || navigator?.platform)?.toLowerCase()?.includes("mac");
+}
+function getModKeyName() {
+  return isMac() ? "&#8984;" : "CTRL";
+}
+function getCtrlKeyName() {
+  return isMac() ? "&#8963;" : "CTRL";
+}
+function getAltKeyName() {
+  return isMac() ? "&#8984;" : "ALT";
+}
+function getShiftKeyName() {
+  return isMac() ? "&#8679;" : "SHIFT";
+}
+
+
+function mydebounce(func, timeout = 800){  
   let timer;
   return (...args) => {
     clearTimeout(timer);
-    timer = setTimeout(async () => {await func.apply(this, args); }, timeout);
+    timer = setTimeout(() => { func.apply(this, args); }, timeout);
   };
+}
+
+function throttle(func, wait, option = {leading: true, trailing: true}) {
+  let waiting = false;
+  let lastArgs = null;
+  return function wrapper(...args) {
+    if(!waiting) {
+      waiting = true;
+      const startWaitingPeriod = () => setTimeout(() => {
+        if(option.trailing && lastArgs) {
+          func.apply(this, lastArgs);
+          lastArgs = null;
+          startWaitingPeriod();
+        }
+        else {
+          waiting = false;
+        }
+      }, wait);
+      if(option.leading) {
+        func.apply(this, args);
+      } else {
+        lastArgs = args; // if not leading, treat like another any other function call during the waiting period
+      }
+      startWaitingPeriod();
+    }
+    else {
+      lastArgs = args; 
+    }
+  }
 }
 function find_currently_open_character_sheet() {
   if (is_characters_page()) {
@@ -217,7 +267,20 @@ function deleteExploredScene(sceneId){
       }        
     };
 }
-
+function sanitize_aoe_shape(shape){
+     // normalize shape
+     switch(shape) {
+        case "cube":
+            shape = "square";
+            break;
+        case "sphere":
+            shape = "circle";
+            break;
+        case "cylinder":
+            shape = "circle";
+    }
+    return shape
+}
 function add_journal_roll_buttons(target, tokenId=undefined){
   console.group("add_journal_roll_buttons")
   
@@ -991,7 +1054,7 @@ const debounce_pc_token_update = mydebounce(() => {
         ...pc,
         imgsrc: (token.options.alternativeImages?.length == 0) ? pc.image : currentImage,
         id: pc.sheet // pc.id is DDB characterId, but we use the sheet as an id for tokens
-      };
+      };      
       if (window.DM) {
         token.place_sync_persist(); // update it on the server
       }
@@ -1008,6 +1071,10 @@ const debounce_pc_token_update = mydebounce(() => {
         imgsrc: (token.options.alternativeImages?.length == 0) ? pc.image : currentImage,
         id: pc.sheet // pc.id is DDB characterId, but we use the sheet as an id for tokens
       };
+      const unusedPlayerData = ['attacks', 'attunedItems', 'campaign', 'campaignSetting', 'castingInfo', 'classes', 'deathSaveInfo', 'decorations', 'extras', 'immunities', 'level', 'passiveInsight', 'passiveInvestigation', 'passivePerception', 'proficiencyBonus', 'proficiencyGroups', 'race', 'readOnlyUrl', 'resistances', 'senses', 'skills', 'speeds', 'vulnerabilities'];
+      for(let i in unusedPlayerData){
+        delete token.options[unusedPlayerData[i]];
+      }
     }     
   });
   if (window.DM) {
@@ -1036,7 +1103,8 @@ function update_pc_with_api_call(playerId) {
       window.PC_NEEDS_API_CALL[playerId] = Date.now();
     }
   }
-  debounce_fetch_character_from_api();
+  if(Object.keys(window.PC_NEEDS_API_CALL).length > 0)
+    debounce_fetch_character_from_api();
 }
 
 const debounce_fetch_character_from_api = mydebounce(() => {

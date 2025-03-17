@@ -116,10 +116,33 @@ function setup_aoe_button(buttons) {
         const style = $("#aoe_styles").val().toLowerCase()
         const options = build_aoe_token_options(style, shape, size)
 
-        place_aoe_token_in_centre(options)
+        //if single token selected, place there:
+        if(window.CURRENTLY_SELECTED_TOKENS.length == 1) {
+            place_aoe_token_at_token(options, window.TOKEN_OBJECTS[window.CURRENTLY_SELECTED_TOKENS[0]]);
+        } else {
+            place_aoe_token_in_centre(options);
+        }
         $('#select-button').click();
 
     });
+}
+
+function place_aoe_token_at_token(options, token){
+    const sc = parseFloat(window.CURRENT_SCENE_DATA.hpps);
+    const dx = options.imgsrc.includes("line") ? (- options.gridWidth * sc / 2) : 0;
+    const dy = options.imgsrc.includes("cone") || options.imgsrc.includes("square") ? (options.size / 2) : 0;
+    const half = sc * token.options.gridSquares/2;
+    const x = parseInt(token.options.left.slice(0,-2)) + half + dx;
+    const y = parseInt(token.options.top.slice(0,-2)) + half + dy;
+    if(window.DM){
+        place_token_at_map_point(options, x, y);
+    }
+    else{
+        options.left = x;
+        options.top = y;
+        window.MB.sendMessage("custom/myVTT/createtoken",options);
+    }
+    
 }
 
 function place_aoe_token_in_centre(options){
@@ -138,19 +161,31 @@ function place_aoe_token_in_centre(options){
 function restyle_aoe_class(cls, style){
     return cls.replace(/aoe-style-\w+ /gm, style)
 }
-function sanitize_aoe_shape(shape){
-     // normalize shape
-     switch(shape) {
-        case "cube":
-            shape = "square";
-            break;
-        case "sphere":
-            shape = "circle";
-            break;
-        case "cylinder":
-            shape = "circle";
-    }
-    return shape
+
+function getOrigin(token){
+    let tok = $(`div.token[data-id='${token.options.id}']`);
+    let tokImage = $(`div.token[data-id='${token.options.id}']>.token-image`);
+
+    let tokenImageClientPosition = tokImage[0].getBoundingClientRect();
+    let tokenImagePosition = tokImage.position();
+    let tokenImageWidth = (tokenImageClientPosition.width) / (window.ZOOM);
+    let tokenImageHeight = (tokenImageClientPosition.height) / (window.ZOOM);
+    let tokenTop = (tok.position().top + tokenImagePosition.top) / (window.ZOOM);
+    let tokenBottom = tokenTop + tokenImageHeight;
+    let tokenLeft = (tok.position().left  + tokenImagePosition.left) / (window.ZOOM);
+    let tokenRight = tokenLeft + tokenImageWidth;
+    
+    let rayAngle = 90;
+    let ray = new Ray({x: (tokenLeft + tokenRight)/2, y: (tokenTop + tokenBottom)/2}, degreeToRadian(parseFloat(tok.css('--token-rotation')) % 360 - rayAngle));   
+    let dir = ray.dir;
+    let tokenWidth = token.sizeWidth();
+    let tokenHeight = token.sizeHeight();
+    let widthAdded = tokenHeight; 
+
+    return  {
+                'x': (tokenLeft + tokenRight)/2 + (widthAdded*dir.x/2),
+                'y': (tokenTop + tokenBottom)/2 + (widthAdded*dir.y/2)
+            }                         
 }
 
 function set_spell_override_style(spellName){

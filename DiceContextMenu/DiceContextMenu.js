@@ -18,7 +18,7 @@ function standard_dice_context_menu(expression, modifierString = "", action = un
     let menu = new DiceContextMenu();
     
     menu.sendToSection();
-   
+    let additionalDiceExpression='';
     if (expression === "1d20" || /^1d20/g.test(expression)) {
         // only add advantage/disadvantage options if rolling 1d20
         menu.section("ROLL WITH:", s => s
@@ -30,6 +30,9 @@ function standard_dice_context_menu(expression, modifierString = "", action = un
             .expressionRow('Roll: ', expression, function(newExpression){
                 expression = newExpression;
             })
+            .additionalDiceRow('+', function(newExpression){
+                additionalDiceExpression = newExpression;
+            })
         )
     }
     
@@ -40,6 +43,7 @@ function standard_dice_context_menu(expression, modifierString = "", action = un
         let rollWithIndex = dcm.checkedRowIndex(1);
 
         let diceRoll;
+        expression = `${expression}${additionalDiceExpression}`
         if (rollWithIndex === 0) { // super advantage
             diceRoll = new DiceRoll(expression.replace(/^1d20/g, '3d20kh1'));
         } 
@@ -82,7 +86,7 @@ function damage_dice_context_menu(diceExpression, modifierString = "", action = 
    
         
         menu.sendToSection()
-        
+        let additionalDiceExpression='';
         menu.section("ROLL AS:", s => s
             .row("Crit Damage", "", false)
             .row("Perfect Crit", "", false)
@@ -91,23 +95,26 @@ function damage_dice_context_menu(diceExpression, modifierString = "", action = 
             .expressionRow('Roll: ', diceExpression, function(newExpression){
                 diceExpression = newExpression;
             })
+            .additionalDiceRow('+', function(newExpression){
+                additionalDiceExpression = newExpression;
+            })
         )
         menu.onRollClick(dcm => {
 
             let rollAsIndex = dcm.checkedRowIndex(1);
-
+            diceExpression = `${diceExpression}${additionalDiceExpression}`
             let diceRoll;
             if (rollAsIndex === 0) {
                 // crit damage
-                diceExpression = diceExpression.replaceAll(/([\d]+)d/gi, function(m, m1){
-                    return `${parseInt(m1)*2}d`
+                diceExpression = diceExpression.replaceAll(/([+-])?([\d]+)d/gi, function(m, m1, m2){
+                    return m1 == '-' ? `${m1}${parseInt(m2)}d` : `${m1 != undefined ? m1 : ''}${parseInt(m2)*2}d`
                 })
                 diceRoll = new DiceRoll(diceExpression)
             } 
              else if (rollAsIndex === 1) {
                 // perfect crit damage
-                diceExpression = diceExpression.replaceAll(/([\d]+)d([\d]+)/gi, function(m, m1, m2){
-                    return `${m}+${parseInt(m1)*parseInt(m2)}`
+                diceExpression = diceExpression.replaceAll(/([+-])?([\d]+)d([\d]+)/gi, function(m, m1, m2, m3){
+                    return `${m}${m1 == '-' ? '' : `+${parseInt(m2)*parseInt(m3)}`}`
                 })
                 diceRoll = new DiceRoll(diceExpression)
             } 
@@ -179,9 +186,12 @@ class DiceContextMenu {
                 </div>
 	        </div>
         `);
-        html.on("click", function (clickEvent) {
+        html.off('click').on("click", function (clickEvent) {
             $(".dcm-backdrop").remove();
         });
+        html.off('contextmenu').on('contextmenu', function(e) {
+            e.preventDefault();
+        })
         let sectionList = html.find("ul");
         this.sections.forEach(s => {
             let li = $(`<li></li>`);
@@ -281,6 +291,105 @@ class DiceContextMenuSection {
         return this;
 
     }
+    additionalDiceRow(rowTitle, callback = ()=>{}){
+        const row = {
+            build: function(){
+
+                const diceRoller = $(`
+                    <div class="context-add-dice-roller dcm-row-title">
+                        <div>
+                            <div title="d4" alt="d4" style="-webkit-mask: url('${window.EXTENSION_PATH + "assets/dice/d4.svg"}'); mask: url('${window.EXTENSION_PATH + "assets/dice/d4.svg"}')"></div>
+                        </div>
+                        <div>
+                            <div title="d6" alt="d6" style="-webkit-mask: url('${window.EXTENSION_PATH + "assets/dice/d6.png"}'); mask: url('${window.EXTENSION_PATH + "assets/dice/d6.png"}')"></div>   
+                        </div>
+                        <div>
+                            <div title="d8" alt="d8" style="-webkit-mask: url('${window.EXTENSION_PATH + "assets/dice/d8.svg"}'); mask: url('${window.EXTENSION_PATH + "assets/dice/d8.svg"}')"></div>
+                        </div>
+                        <div>
+                            <div title="d10" alt="d10" style="-webkit-mask: url('${window.EXTENSION_PATH + "assets/dice/d10.svg"}');mask: url('${window.EXTENSION_PATH + "assets/dice/d10.svg"}')"></div>
+                        </div>
+                        <div>
+                            <div title="d100" alt="d100" style="-webkit-mask: url('${window.EXTENSION_PATH + "assets/dice/d100.png"}');mask: url('${window.EXTENSION_PATH + "assets/dice/d100.png"}')"></div>
+                        </div>
+                        <div>
+                            <div title="d12" alt="d12" style="-webkit-mask: url('${window.EXTENSION_PATH + "assets/dice/d12.svg"}');mask: url('${window.EXTENSION_PATH + "assets/dice/d12.svg"}')"></div>
+                        </div>
+                        <div>
+                            <div title="d20" alt="d20" style="-webkit-mask: url('${window.EXTENSION_PATH + "assets/dice/d20.svg"}');mask: url('${window.EXTENSION_PATH + "assets/dice/d20.svg"}')"></div>                 
+                        </div>
+                    </div>
+                `) 
+
+                diceRoller.off('click.extraDice').on('click.extraDice', '>div>div[alt]', function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const targetDie = e.currentTarget;
+                    let dataCount = $(targetDie).attr("data-count");
+                    $(targetDie).parent().find("span").remove();
+                    if (dataCount === undefined) {
+                        $(targetDie).attr("data-count", 1);
+                        $(targetDie).parent().append(`<span class="dcm-dice-badge">1</span>`);
+                    } else {
+                        dataCount = parseInt(dataCount) + 1;
+                        if (dataCount === 0) {
+                            $(targetDie).removeAttr("data-count");
+                        } 
+                        else{
+                            $(targetDie).attr("data-count", dataCount);
+                            $(targetDie).parent().append(`<span class="dcm-dice-badge">${dataCount}</span>`);
+                        }
+                    }
+                    const newDice = $(diceRoller).find('[data-count]');
+                    let newExpression = ''
+                    newDice.each(function(){
+                        newExpression = `${newExpression}${parseInt($(this).attr('data-count'))<0 ? '' : '+'}${$(this).attr('data-count')}${$(this).attr('alt')}`;
+                    })
+                    callback(newExpression);
+                })
+                diceRoller.off('contextmenu.extraDice').on('contextmenu.extraDice', '>div>div[alt]', function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const targetDie = e.currentTarget;
+                    let dataCount = $(targetDie).attr("data-count");
+                    $(targetDie).parent().find("span").remove();
+                    if (dataCount !== undefined) {
+                        dataCount = parseInt(dataCount) - 1;
+                        if (dataCount === 0) {
+                            $(targetDie).removeAttr("data-count");
+                        } else {
+                            $(targetDie).attr("data-count", dataCount);
+                            $(targetDie).parent().append(`<span class="dcm-dice-badge">${dataCount}</span>`);
+                        }
+                    }
+                    else{
+                        $(targetDie).attr("data-count", -1);
+                        $(targetDie).parent().append(`<span class="dcm-dice-badge">-1</span>`);
+                    }
+                    const newDice = $(diceRoller).find('[data-count]');
+                    let newExpression = ''
+                    newDice.each(function(){
+                        newExpression = `${newExpression}${parseInt($(this).attr('data-count'))<0 ? '' : '+'}${$(this).attr('data-count')}${$(this).attr('alt')}`;
+                    })
+                    callback(newExpression);
+                })
+                let rowHtml = $(`
+                    <div class="dcm-row" role="additionalDice">
+                        <div class="dcm-row-icon">
+                            <span style='font-size: 20px;font-weight: bold;color: #fff;'>${rowTitle}</span>
+                        </div>
+                    </div>
+                `);
+                rowHtml.append(diceRoller);
+                return rowHtml;
+            }
+        }
+        this.rows.push(row);
+        return this;
+
+    }
+
+       
 
     build() {
         let sectionHtml = $(`

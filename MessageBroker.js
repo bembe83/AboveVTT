@@ -1,42 +1,3 @@
-// this shouln't be here...
- 
-function mydebounce(func, timeout = 800){   // This had to be in both core and here to get this to work due to load orders. I might look at this more later
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => { func.apply(this, args); }, timeout);
-  };
-}
-
-function throttle(func, wait, option = {leading: true, trailing: true}) {
-  let waiting = false;
-  let lastArgs = null;
-  return function wrapper(...args) {
-    if(!waiting) {
-      waiting = true;
-      const startWaitingPeriod = () => setTimeout(() => {
-        if(option.trailing && lastArgs) {
-          func.apply(this, lastArgs);
-          lastArgs = null;
-          startWaitingPeriod();
-        }
-        else {
-          waiting = false;
-        }
-      }, wait);
-      if(option.leading) {
-        func.apply(this, args);
-      } else {
-        lastArgs = args; // if not leading, treat like another any other function call during the waiting period
-      }
-      startWaitingPeriod();
-    }
-    else {
-      lastArgs = args; 
-    }
-  }
-}
-
 function clearFrame(){
 	$(".streamer-canvas").each(function() {
 		let canvas=$(this).get(0);
@@ -269,10 +230,17 @@ function addFloatingCombatText(id, damageValue, heal = false){
 class MessageBroker {
 
 	loadAboveWS(callback=null){
+		if(is_gamelog_popout())
+			return;
 		let self=this;
+
 		if (callback)
 			this.callbackAboveQueue.push(callback);
 		
+		if (this.loadingAboveWS) {
+			return;
+		}
+		this.loadingAboveWS=true;
 		// current dev wss://b2u1l4fzc7.execute-api.eu-west-1.amazonaws.com/v1
 		// current prod wss://blackjackandhookers.abovevtt.net/v1
 		let searchParams = new URLSearchParams(window.location.search)
@@ -293,11 +261,9 @@ class MessageBroker {
 
 		}
 		
-		if (this.loadingAboveWS) {
-			return;
-		}
 
-		this.loadingAboveWS=true;
+
+		
 		
 		this.abovews.onerror = function(errorEvent) {
 			self.loadingAboveWS = false;
@@ -674,25 +640,22 @@ class MessageBroker {
 			if (msg.eventType == "custom/myVTT/drawing") {
 				window.DRAWINGS.push(msg.data);
 				redraw_light_walls();		
-				redraw_drawn_light();
 				redraw_drawings();
 				redraw_elev();
 				redraw_text();
-				await redraw_light();
-				check_token_visibility();
+				redraw_drawn_light();
+				redraw_light();
+
 			}
 
 			if(msg.eventType=="custom/myVTT/drawdata"){
 				window.DRAWINGS=msg.data;
 				redraw_light_walls();
-				setTimeout(async function(){
-					redraw_drawn_light();
-					redraw_elev();
-					redraw_drawings();
-					redraw_text();
-					await redraw_light();
-				}, 100)
-				check_token_visibility();
+				redraw_elev();
+				redraw_drawings();
+				redraw_text();
+				redraw_drawn_light();
+				redraw_light();
 			}
 			if (msg.eventType == "custom/myVTT/chat") { // DEPRECATED!!!!!!!!!
 				if(!window.NOTIFIEDOLDVERSION){
@@ -788,10 +751,15 @@ class MessageBroker {
 					
 					if(msg.data.id in window.TOKEN_OBJECTS){
 						window.TOKEN_OBJECTS[msg.data.id].place();			
-					}				
-					if(msg.data.popup)
-						window.JOURNAL.display_note(msg.data.id);
+					}			
 					const openNote = $(`.note[data-id='${msg.data.id}']`);
+					// If the 'Open' button is clicked OR the note is already opened by a player and it is saved 
+					// by the DM, the note gets refreshed.
+					if (msg.data.popup == true || (msg.data.popup == undefined && openNote.length != 0)){
+						window.JOURNAL.display_note(msg.data.id);
+					} else if (msg.data.popup == false) {
+						openNote.remove();
+					}
 					
 
 					if(window.JOURNAL.notes[msg.data.id].abilityTracker && openNote.length>0){
@@ -1526,7 +1494,7 @@ class MessageBroker {
 
 	}
 
-  handleCT(data){
+  	handleCT(data){
 		ct_load(data);
 	}
 
@@ -1603,7 +1571,7 @@ class MessageBroker {
 					</p>
 					<div class="tss-1e6zv06-MessageContainer-Flex">
 						<div class="tss-dr2its-Line-Flex">
-							<span class="tss-1tj70tb-Sender">${data.player}</span>
+							<span class="tss-1tj70tb-Sender" title="${data.player}">${data.player}</span>
 						</div>
 						<div class="tss-8-Collapsed-ref tss-8-Other-ref tss-11w0h4e-Message-Collapsed-Other-Flex">${data.text}</div>
 						<time datetime="${datetime}" title="${datestamp} ${timestamp}" class="tss-1yxh2yy-TimeAgo-TimeAgo">${timestamp}</time>
@@ -1725,8 +1693,8 @@ class MessageBroker {
 			if(window.all_token_objects[data.id] == undefined){
 				window.all_token_objects[data.id] = t;
 			}
-			t.sync = mydebounce(function(e) { // VA IN FUNZIONE SOLO SE IL TOKEN NON ESISTE GIA					
-				window.MB.sendMessage('custom/myVTT/token', t.options);
+			t.sync = mydebounce(function(options) { // VA IN FUNZIONE SOLO SE IL TOKEN NON ESISTE GIA					
+				window.MB.sendMessage('custom/myVTT/token', options);
 			}, 300);
 			if(t.isPlayer()){
 				const pc = find_pc_by_player_id(data.id, false);
@@ -1872,10 +1840,21 @@ class MessageBroker {
 				if(data.UVTTFile == 1){
 					build_import_loading_indicator("Loading UVTT Map");
 					try{
-						data.map = await get_map_from_uvtt_file(data.player_map);
+						if(window.DM && data.dm_map && data.dm_map_usable){
+							data.map = await get_map_from_uvtt_file(data.map)
+						}
+						else{
+							data.map = await get_map_from_uvtt_file(data.player_map);
+						}			
 					}
 					catch{
-						data.UVTTFile = 0;
+						console.log('non-UVTT file found for map')
+						if(window.DM && data.dm_map && data.dm_map_usable){
+							data.map = data.dm_map;
+						}
+						else{
+							data.map = data.player_map;
+						}
 					}
 				}
 				else{
@@ -2293,6 +2272,8 @@ class MessageBroker {
 	}
 
 	sendAbovePing(){
+		if(is_gamelog_popout())
+			return;
 		let self = this;
 		if(this.abovews.readyState == this.abovews.OPEN){
 			this.abovews.send(JSON.stringify({action:"keepalive",eventType:"custom/myVTT/keepalive"}));
@@ -2344,6 +2325,8 @@ class MessageBroker {
 	}
 
 	reconnectDisconnectedAboveWs(){
+		if(is_gamelog_popout())
+			return;
 		if (this.abovews.readyState != this.abovews.OPEN && !this.loadingAboveWS && $('#above-vtt-error-message').length == 0){
 			if(window.reconnectAttemptAbovews == undefined){
 				window.reconnectAttemptAbovews = 0;

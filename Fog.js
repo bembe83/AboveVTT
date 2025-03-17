@@ -40,8 +40,6 @@ for(let i in doorColors){
 		doorColorsArray.push(doorColors[i][j])
 	}
 }
-
-
 function sync_fog(){
 	window.MB.sendMessage("custom/myVTT/fogdata",window.REVEALED);
 }
@@ -114,6 +112,8 @@ class WaypointManagerClass {
 			textColor: "black",
 			backgroundColor: "rgba(255, 255, 255, 0.7)"
 		}
+		this.playerId = window.PLAYER_ID;
+		this.throttleDraw = throttle((callback) => {requestAnimationFrame(callback)}, 1000/240);
 	}
 
 	resetDefaultDrawStyle(){
@@ -200,9 +200,8 @@ class WaypointManagerClass {
 		this.coords = [];
 		this.currentWaypointIndex = 0;
 		this.mouseDownCoords = { mousex: undefined, mousey: undefined };
-		clearTimeout(this.timeout);
-		this.timeout = undefined;
-		this.cancelFadeout()
+		if(cancelFadeout)
+			this.cancelFadeout();
 	}
 
 	// Helper function to convert mouse coordinates to 'snap' or 'centre of current grid cell' coordinates
@@ -234,7 +233,8 @@ class WaypointManagerClass {
 	* @param playerId {string | boolean}
 	*/
 	getOrCreateDrawingContainer(playerId) {
-		const rulerContainerId = `ruler-container-${playerId}`;
+		playerId = `${playerId}`;
+		const rulerContainerId = `ruler-container-${playerId.replace(' ','')}`;
 
 		let rulerContainer = document.getElementById(rulerContainerId)
 		if (!rulerContainer) {
@@ -253,15 +253,18 @@ class WaypointManagerClass {
 	* @param playerId
 	*/
 	clearWaypointDrawings(playerId) {
-		const rulerContainerId = `ruler-container-${playerId}`;
-
-		let rulerContainer = document.getElementById(rulerContainerId)
+		let rulerContainer = this.getOrCreateDrawingContainer(playerId)
 		if (!rulerContainer) {
 			// it's empty then
 			return;
 		}
 
 		rulerContainer.innerHTML = "";
+		if (window.PEER_TOKEN_DRAGGING[playerId]) {
+	        const html = window.PEER_TOKEN_DRAGGING[playerId];
+	        delete window.PEER_TOKEN_DRAGGING[playerId];
+	        $(html).remove();
+      	}
 	}
 
 	/**
@@ -280,11 +283,6 @@ class WaypointManagerClass {
 	* @param playerId {string | false | undefined} `window.PLAYER_ID` if unset
 	*/
 	draw(labelX = undefined, labelY = undefined, alpha = 1, playerId=window.PLAYER_ID) {
-		const rulerContainer = this.getOrCreateDrawingContainer(playerId);
-
-		// update alpha for the entire container
-		rulerContainer.style.setProperty("--svg-text-alpha", alpha.toString());
-
 		const sceneMapSize = this.getSceneMapSize();
 
 		let cumulativeDistance = 0;
@@ -294,11 +292,9 @@ class WaypointManagerClass {
 		const bobbles = $(`<svg viewbox='0 0 ${sceneWidth} ${sceneHeight}' width='${sceneWidth}' height='${sceneHeight}' class='ruler-svg-bobbles' style='top:0px; left:0px;'></svg>`);
 		const lines = $(`<svg viewbox='0 0 ${sceneWidth} ${sceneHeight}' width='${sceneWidth}' height='${sceneHeight}' class='ruler-svg-line' style='top:0px; left:0px;'></svg>`);
 
-
+		
 		for (let i = 0; i < this.coords.length; i++) {
-			// We do the beginPath here because otherwise the lines on subsequent waypoints get
-			// drawn over the labels...
-			this.ctx.beginPath();
+			
 			if (i < this.coords.length - 1) {
 				elementsToDraw += this.makeWaypointSegment(this.coords[i], cumulativeDistance, undefined, undefined, sceneMapSize, bobbles, lines);
 			} else {
@@ -309,7 +305,19 @@ class WaypointManagerClass {
 		}
 		elementsToDraw = `${lines[0].outerHTML}${elementsToDraw}${bobbles[0].outerHTML}`
 
-		rulerContainer.innerHTML = elementsToDraw;
+	
+		const rulerContainer = this.getOrCreateDrawingContainer(playerId);
+		const self = this;
+		this.throttleDraw(function(){
+			// update alpha for the entire container
+			if(alpha>0){
+				rulerContainer.style.setProperty("--svg-text-alpha", alpha.toString());
+				rulerContainer.innerHTML = elementsToDraw;	
+			}
+			else{
+				self.clearWaypointDrawings(playerId);
+			}
+		})
 	}
 
 	/**
@@ -326,7 +334,7 @@ class WaypointManagerClass {
 		let gridSize =  window.CURRENT_SCENE_DATA.hpps/window.CURRENT_SCENE_DATA.scale_factor;
 		let snapPointXStart = coord.startX;
 		let snapPointYStart = coord.startY;
-		this.ctx.moveTo(snapPointXStart, snapPointYStart);
+	
 
 		let snapPointXEnd = coord.endX;
 		let snapPointYEnd = coord.endY;
@@ -490,20 +498,14 @@ class WaypointManagerClass {
 	fadeoutMeasuring(playerID){
 		let alpha = 1.0
 		const self = this
-		if(self.ctx == undefined){
-				self.cancelFadeout()
-				self.clearWaypoints();
-				clear_temp_canvas(playerID)
-				return;
-		} 
+
 		// only ever allow a single fadeout to occur
-		// this stops weird flashing behaviour with interacting
-		// interval function calls
-		if (this.fadeoutAnimationId) {
-			return
+		if (self.fadeoutAnimationId) {
+			self.cancelFadeout(true);
 		}
 
-		let prevFrameTime, deltaTime;
+		let prevFrameTime= undefined;
+		let deltaTime = 0;
 		/**
 		* This is a function expression to make sure `this` is available.
 		* @type {FrameRequestCallback}
@@ -516,32 +518,43 @@ class WaypointManagerClass {
 			}
 			prevFrameTime = time;
 
-			self.ctx.clearRect(0,0, self.canvas.width, self.canvas.height);
-			self.ctx.globalAlpha = alpha;
-			self.draw(undefined, undefined, alpha, window.PLAYER_ID)
+
+			this.throttleDraw(function(){
+				self.draw(undefined, undefined, alpha, playerID)
+				if (window.PEER_TOKEN_DRAGGING[self.playerId]) {
+			        const html = window.PEER_TOKEN_DRAGGING[self.playerId];
+			        $(html).css('opacity', 0.5 * alpha);
+		      	}
+			})
+			
 			alpha = alpha - (0.08 * deltaTime / 100); // 0.08 per 100 ms
-			if (alpha <= 0.0) {
+			if (alpha <= 0.0 || this.fadeoutAnimationId == undefined) {
 				self.clearWaypoints();
-				clear_temp_canvas(playerID)
+				self.throttleDraw(function(){
+					self.clearWaypointDrawings(self.playerId)
+				})
 				return;
 			}
 
-			this.fadeoutAnimationId = requestAnimationFrame(fadeout)
+			self.fadeoutAnimationId = requestAnimationFrame(fadeout)
 		};
 
-		this.fadeoutAnimationId = requestAnimationFrame(fadeout);
+		self.fadeoutAnimationId = requestAnimationFrame(fadeout);
 	}
 
 	/**
 	 *
 	 */
-	cancelFadeout(){
-		if (this.fadeoutAnimationId !== undefined) {
-			clear_temp_canvas();
-			cancelAnimationFrame(this.fadeoutAnimationId);
-			this.ctx.globalAlpha = 1.0
-			this.fadeoutAnimationId = undefined
+	cancelFadeout(dontClearCanvas=false){
+		cancelAnimationFrame(this.fadeoutAnimationId);
+		this.fadeoutAnimationId = undefined	
+		const self = this
+		if(!dontClearCanvas){
+			self.throttleDraw(function(){
+				self.clearWaypointDrawings(self.playerId)
+			})
 		}
+
 	}
 };
 
@@ -710,7 +723,7 @@ async function check_token_visibility(){
 	}
 }
 
-function do_check_token_visibility(doorsOnly = false) {
+function do_check_token_visibility() {
 	console.log("do_check_token_visibility");
 	if(window.LOADING)
 		return;
@@ -739,61 +752,61 @@ function do_check_token_visibility(doorsOnly = false) {
 	const playerHasTruesight = (playerTokenId == undefined) ? false : window.TOKEN_OBJECTS[playerTokenId].options.sight == 'truesight';
 	
 
-	if(!doorsOnly){
-		let rayContext = $('#raycastingCanvas')[0].getContext('2d');
-		const truesightAuraExists = $(`.aura-element-container-clip.truesight`).length>0;
+	
+	let rayContext = $('#raycastingCanvas')[0].getContext('2d');
+	const truesightAuraExists = $(`.aura-element-container-clip.truesight`).length>0;
 
-		let truesightContext;
+	let truesightContext;
 
-		if(truesightAuraExists) 
-			truesightContext = window.truesightCanvas.getContext('2d');
-
-
-
-		for (let id in window.TOKEN_OBJECTS) {
-			if(window.TOKEN_OBJECTS[id].options.combatGroupToken || window.TOKEN_OBJECTS[id].options.type != undefined)
-				continue;
-			promises.push(new Promise(function(resolve) {
-				let auraSelectorId = id.replaceAll("/", "").replaceAll('.','');
-				let auraSelector = ".aura-element[id='aura_" + auraSelectorId + "']";
-				let tokenSelector = "div.token[data-id='" + id + "']";
-
-				//Combining some and filter cut down about 140ms for average sized picture
-				
-				const hideThisTokenInFogOrDarkness = (!window.TOKEN_OBJECTS[id].options.revealInFog); //we want to hide this token in fog or darkness
-				
-				const inFog = (playerTokenId != id && is_token_under_fog(id, fogContext)); // this token is in fog and not the players token
-
-				const notInLight = (inFog || (window.CURRENT_SCENE_DATA.disableSceneVision != 1 && playerTokenHasVision && !is_token_in_raycasting_context(id, rayContext)) || (playerTokenId != id && window.CURRENT_SCENE_DATA.disableSceneVision != 1 && playerTokenHasVision && !is_token_under_light_aura(id, lightContext))); // this token is not in light, the player is using vision/light and darkness > 0
-				
-				const dmSelected = window.DM && window.CURRENTLY_SELECTED_TOKENS.includes(id)
-
-				const showThisPlayerToken = window.TOKEN_OBJECTS[id].options.itemType == 'pc' && !window.DM && playerTokenId == undefined //show this token when logged in as a player without your own token
-
-				const hideInvisible = !dmSelected && window.TOKEN_OBJECTS[id].options.conditions.some(d=> d.name == 'Invisible') && playerTokenId != id && window.TOKEN_OBJECTS[id].options.share_vision != true && window.TOKEN_OBJECTS[id].options.share_vision != window.myUser 
+	if(truesightAuraExists) 
+		truesightContext = window.truesightCanvas.getContext('2d');
 
 
-				let inTruesight = false;
-				if(window.TOKEN_OBJECTS[id].conditions.includes('Invisible') && truesightAuraExists){
-					inTruesight = is_token_under_truesight_aura(id, truesightContext);
-				}
 
-				if (!showThisPlayerToken && (hideThisTokenInFogOrDarkness && notInLight && !dmSelected || (window.TOKEN_OBJECTS[id].options.hidden && !inTruesight && !dmSelected) || (hideInvisible && !inTruesight))) {
-					hideIds.push(tokenSelector, auraSelector)
-				}
-				else if (!window.TOKEN_OBJECTS[id].options.hidden || inTruesight) {
-					showTokenIds.push(tokenSelector);
-					if(!window.TOKEN_OBJECTS[id].options.hideaura || id == playerTokenId)
-						showAuraIds.push(auraSelector);
-				}else if(dmSelected){
-					dmSelectedTokens.push(tokenSelector);
-				}
-				
-				
-				resolve();
-			}));
-		}
+	for (let id in window.TOKEN_OBJECTS) {
+		if(window.TOKEN_OBJECTS[id].options.combatGroupToken || window.TOKEN_OBJECTS[id].options.type != undefined)
+			continue;
+		promises.push(new Promise(function(resolve) {
+			let auraSelectorId = id.replaceAll("/", "").replaceAll('.','');
+			let auraSelector = ".aura-element[id='aura_" + auraSelectorId + "']";
+			let tokenSelector = "div.token[data-id='" + id + "']";
+
+			//Combining some and filter cut down about 140ms for average sized picture
+			
+			const hideThisTokenInFogOrDarkness = (!window.TOKEN_OBJECTS[id].options.revealInFog); //we want to hide this token in fog or darkness
+			
+			const inFog = (playerTokenId != id && is_token_under_fog(id, fogContext)); // this token is in fog and not the players token
+
+			const notInLight = (inFog || (window.CURRENT_SCENE_DATA.disableSceneVision != 1 && playerTokenHasVision && !is_token_in_raycasting_context(id, rayContext)) || (playerTokenId != id && window.CURRENT_SCENE_DATA.disableSceneVision != 1 && playerTokenHasVision && !is_token_under_light_aura(id, lightContext))); // this token is not in light, the player is using vision/light and darkness > 0
+			
+			const dmSelected = window.DM && window.CURRENTLY_SELECTED_TOKENS.includes(id)
+
+			const showThisPlayerToken = window.TOKEN_OBJECTS[id].options.itemType == 'pc' && !window.DM && playerTokenId == undefined //show this token when logged in as a player without your own token
+
+			const hideInvisible = !dmSelected && window.TOKEN_OBJECTS[id].options.conditions.some(d=> d.name == 'Invisible') && playerTokenId != id && window.TOKEN_OBJECTS[id].options.share_vision != true && window.TOKEN_OBJECTS[id].options.share_vision != window.myUser 
+
+
+			let inTruesight = false;
+			if(window.TOKEN_OBJECTS[id].conditions.includes('Invisible') && truesightAuraExists){
+				inTruesight = is_token_under_truesight_aura(id, truesightContext);
+			}
+
+			if (!showThisPlayerToken && (hideThisTokenInFogOrDarkness && notInLight && !dmSelected || (window.TOKEN_OBJECTS[id].options.hidden && !inTruesight && !dmSelected) || (hideInvisible && !inTruesight))) {
+				hideIds.push(tokenSelector, auraSelector)
+			}
+			else if (!window.TOKEN_OBJECTS[id].options.hidden || inTruesight) {
+				showTokenIds.push(tokenSelector);
+				if(!window.TOKEN_OBJECTS[id].options.hideaura || id == playerTokenId)
+					showAuraIds.push(auraSelector);
+			}else if(dmSelected){
+				dmSelectedTokens.push(tokenSelector);
+			}
+			
+			
+			resolve();
+		}));
 	}
+	
 	
 
 	let doors = $('.door-button');
@@ -1172,14 +1185,16 @@ function draw_wizarding_box() {
 	}
 
 }
-function ctxScale(canvasid){
+function ctxScale(canvasid, doNotScale=false){
 	let canvas = document.getElementById(canvasid);
 	canvas.width = $("#scene_map").width();
   	canvas.height = $("#scene_map").height();
-	$(canvas).css({
-		'transform-origin': 'top left',
-		'transform': 'scale(var(--scene-scale))'
-	});
+  	if (!doNotScale) {
+		$(canvas).css({
+			'transform-origin': 'top left',
+			'transform': 'scale(var(--scene-scale))'
+		});
+	}
 }
 
 function reset_canvas(apply_zoom=true) {
@@ -1191,6 +1206,7 @@ function reset_canvas(apply_zoom=true) {
 
 	ctxScale('peer_overlay');
 	ctxScale('temp_overlay');
+	ctxScale('draw_overlay_under_fog_darkness', true);
 	ctxScale('fog_overlay');
 	ctxScale('grid_overlay');	
 	ctxScale('draw_overlay');
@@ -1440,23 +1456,31 @@ function redraw_text() {
 
 function redraw_drawings() {
 
-	let canvas = document.getElementById("draw_overlay");
-	let ctx = canvas.getContext("2d");
-	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	let canvasAboveFog = document.getElementById("draw_overlay");
+	let ctxAboveFog = canvasAboveFog.getContext("2d");
+	ctxAboveFog.clearRect(0, 0, canvasAboveFog.width, canvasAboveFog.height);
+
+	let canvasBelowFog = document.getElementById("draw_overlay_under_fog_darkness");
+	let ctxBelowFog = canvasBelowFog.getContext("2d");
+	ctxBelowFog.clearRect(0, 0, canvasBelowFog.width, canvasBelowFog.height);
 
 	const drawings = window.DRAWINGS.filter(d => !d[0].includes("text") && d[1] !==  "wall" && d[1] !== 'light' && d[1] !== 'elev')
 		
 	 
 
-	let offscreenDraw = document.createElement('canvas');
-	let offscreenContext = offscreenDraw.getContext('2d');
+	let offscreenDrawAboveFog = document.createElement('canvas');
+	let offscreenContextAboveFog = offscreenDrawAboveFog.getContext('2d');
+	let offscreenDrawBelowFog = document.createElement('canvas');
+	let offscreenContextBelowFog = offscreenDrawBelowFog.getContext('2d');
 
-	offscreenDraw.width = canvas.width;
-	offscreenDraw.height = canvas.height;
+	offscreenDrawAboveFog.width = canvasAboveFog.width;
+	offscreenDrawAboveFog.height = canvasAboveFog.height;
+	offscreenDrawBelowFog.width = canvasBelowFog.width;
+	offscreenDrawBelowFog.height = canvasBelowFog.height;
 
 	for (let i = 0; i < drawings.length; i++) {
 		let drawing_clone = $.extend(true, [], drawings[i]);
-		let [shape, fill, color, x, y, width, height, lineWidth, scale] = drawing_clone;
+		let [shape, fill, color, x, y, width, height, lineWidth, scale, location] = drawing_clone;
 		let isFilled = fill === 'filled';
 		
 		if(drawings[i][1] =='elev'){
@@ -1468,7 +1492,8 @@ function redraw_drawings() {
 		  color = numToColor(color, 0.8, max);
 		}
 
-		let targetCtx = offscreenContext;
+		// Will default to 'above fog' draw layer for existing drawings
+		let targetCtx = location == 'below' ? offscreenContextBelowFog : offscreenContextAboveFog;
 
 		if(fill == 'dot'){
 			targetCtx.setLineDash([lineWidth, 3*lineWidth])
@@ -1525,7 +1550,10 @@ function redraw_drawings() {
 		}
 	}
 
-	ctx.drawImage(offscreenDraw, 0, 0); // draw to visible canvas only once so we render this once
+	ctxAboveFog.drawImage(offscreenDrawAboveFog, 0, 0); // draw to visible canvas only once so we render this once
+
+	ctxBelowFog.drawImage(offscreenDrawBelowFog, 0, 0); // draw to visible canvas only once so we render this once
+	
 }
 function redraw_elev(openLegened = false) {
 	window.elevHeights = {};
@@ -1783,7 +1811,6 @@ function redraw_light_walls(clear=true){
 		$('#VTT').css('--walls-up-shadow-percent', '0%');
 	}
 
-	
 	for (let i = 0; i < drawings.length; i++) {
 		let drawing_clone = $.extend(true, [], drawings[i]);
 		let [shape, fill, color, x, y, width, height, lineWidth, scale, hidden, wallBottom, wallTop] = drawing_clone;
@@ -1838,7 +1865,7 @@ function redraw_light_walls(clear=true){
         let doorButton = $(`.door-button[data-x1='${x}'][data-y1='${y}'][data-x2='${width}'][data-y2='${height}']`);
         let hiddenDoor = hidden ? ` hiddenDoor` : ``;
         let dataHidden = hidden;
-
+        let notVisible = doorButton?.hasClass('notVisible') ? true : false;
 
         let doorType = (type == 1 || type == 3 || type == 6 || type == 7) ? `window` : `door`;
 
@@ -1931,11 +1958,13 @@ function redraw_light_walls(clear=true){
 		if(doorButton.length ==1){
 			let id = `${x}${y}${width}${height}${window.CURRENT_SCENE_DATA.id}`.replaceAll('.','') 
 			doorButton.attr('data-id', `${x}${y}${width}${height}${window.CURRENT_SCENE_DATA.id}`.replaceAll('.',''))
+			
+        	doorButton.toggleClass('notVisible', notVisible)
 			doorButton.removeAttr('removeAfterDraw');
 
 			door_note_icon(id);
 		}
-		do_check_token_visibility(true);
+		
 		
 
 		if((/rgba.*0\.5\)/g).test(color))
@@ -2126,8 +2155,8 @@ function open_close_door(x1, y1, x2, y2, type=0){
 		redo: [[...doors[0]]]
 	})
 	redraw_light_walls();
-	redraw_light();
 	redraw_drawn_light();
+	redraw_light();
 	checkAudioVolume();
 	sync_drawings();						
 }
@@ -2228,13 +2257,11 @@ function numToColor(num, alpha, max) {
  * @returns
  */
 function drawing_mousedown(e) {
-
 	// perform some cleanup of the canvas/objects
 	if(e.button !== 2 && !window.MOUSEDOWN){
 		clear_temp_canvas()
 		WaypointManager.resetDefaultDrawStyle()
-		WaypointManager.cancelFadeout()
-		WaypointManager.clearWaypoints()
+		WaypointManager.clearWaypoints(false)
 	}
 	const mousePosition = {
 		clientX: (e.touches) ? e.touches[0].clientX : e.clientX,
@@ -2257,6 +2284,7 @@ function drawing_mousedown(e) {
 	window.LINEWIDTH = data.draw_line_width
 	window.DRAWTYPE = (data.from == 'vision_menu') ? 'light' : data.fill
 	window.DRAWCOLOR = data.background_color
+	window.DRAWLOCATION = data.location
 	window.DRAWSHAPE = data.shape;
 	window.DRAWFUNCTION = data.function;
 
@@ -2473,13 +2501,14 @@ function drawing_mousedown(e) {
  */
 function drawing_mousemove(e) {
 
-	if (window.MOUSEMOVEWAIT) {
+	if (window.MOUSEMOVEWAIT || (window.DRAWFUNCTION === "select" && e.touches != undefined) ) {
 		return;
 	}
 	// don't perform any drawing when dragging a token
 	if ($(".ui-draggable-dragging").length > 0){
 		return
 	}
+	 
 	const [mouseX, mouseY] = get_event_cursor_position(e)
 
 	
@@ -2501,7 +2530,8 @@ function drawing_mousemove(e) {
 	}
 
 	if (window.MOUSEDOWN) {
-		clear_temp_canvas()
+		if(window.DRAWFUNCTION != "measure" && !window.DRAGGING)
+			clear_temp_canvas()
 		const width = mouseX - window.BEGIN_MOUSEX;
 		const height = mouseY - window.BEGIN_MOUSEY;
 		// bain todo why is this here?
@@ -2592,13 +2622,12 @@ function drawing_mousemove(e) {
 		}
 		else if (window.DRAWSHAPE == "line") {
 			if(window.DRAWFUNCTION === "measure"){
-				if(e.which === 1 || e.touches){
+				if(e.which === 1 || e.touches){					
+					WaypointManager.cancelFadeout(true);
 					WaypointManager.setCanvas(window.temp_canvas);
-					WaypointManager.cancelFadeout()
 					WaypointManager.registerMouseMove(mouseX, mouseY);
 					WaypointManager.storeWaypoint(WaypointManager.currentWaypointIndex, window.BEGIN_MOUSEX/window.CURRENT_SCENE_DATA.scale_factor, window.BEGIN_MOUSEY/window.CURRENT_SCENE_DATA.scale_factor, mouseX/window.CURRENT_SCENE_DATA.scale_factor, mouseY/window.CURRENT_SCENE_DATA.scale_factor);
 					WaypointManager.draw();
-					window.temp_context.fillStyle = '#f50';
 					sendRulerPositionToPeers();
 				}
 			}else{
@@ -2718,7 +2747,9 @@ function drawing_mousemove(e) {
  * @returns
  */
 function drawing_mouseup(e) {
-	if(!window.MOUSEDOWN)
+
+
+	if(!window.MOUSEDOWN || (window.DRAWFUNCTION === "select" && e.touches != undefined))
 		return;
 	// ignore this if we're dragging a token
 	if ($(".ui-draggable-dragging").length > 0){
@@ -2784,9 +2815,10 @@ function drawing_mouseup(e) {
 		 width,
 		 height,
 		 window.LINEWIDTH,
-		 window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion];
+		 window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion,
+		 window.DRAWLOCATION];
 
-	if ((window.DRAWFUNCTION !== "select" || window.DRAWFUNCTION !== "measure") &&
+	if ((window.DRAWFUNCTION !== "select" && window.DRAWFUNCTION !== "measure") &&
 		(window.DRAWFUNCTION === "draw" || window.DRAWFUNCTION === "elev" || window.DRAWFUNCTION === 'wall' || window.DRAWFUNCTION == 'wall-door' || window.DRAWFUNCTION == 'wall-window' )){
 		switch (window.DRAWSHAPE) {
 			case "line":
@@ -3283,37 +3315,30 @@ function drawing_mouseup(e) {
 
 
 		if(intersectingWalls.length>0 && window.DRAWFUNCTION == 'wall-door-convert'){
-			let wallLine = [intersectingWalls[0]]
+			
 			let x1;
 			let x2;
 			let y1;
 			let y2;
-			let bottom = intersectingWalls[0].bottom;
-			let top = intersectingWalls[0].top;
-			let left = intersectingWalls[0].left;
-			let right = intersectingWalls[0].right;
+
 
 			for(let i = 0; i < intersectingWalls.length; i++){
-				wallLine[0].bottom.x = (wallLine[0].bottom.x < intersectingWalls[i].bottom.x) ?  intersectingWalls[i].bottom.x : wallLine[0].bottom.x;
-				wallLine[0].bottom.y = (wallLine[0].bottom.y < intersectingWalls[i].bottom.y) ?  intersectingWalls[i].bottom.y : wallLine[0].bottom.y;
 
-				wallLine[0].top.x = (wallLine[0].top.x > intersectingWalls[i].top.x) ?  intersectingWalls[i].top.x : wallLine[0].top.x;
-				wallLine[0].top.y = (wallLine[0].top.y > intersectingWalls[i].top.y) ?  intersectingWalls[i].top.y : wallLine[0].top.y;
-
-				wallLine[0].left.x = (wallLine[0].left.x > intersectingWalls[i].left.x) ?  intersectingWalls[i].left.x : wallLine[0].left.x;
-				wallLine[0].left.y = (wallLine[0].left.y > intersectingWalls[i].left.y) ?  intersectingWalls[i].left.y : wallLine[0].left.y;
-
-				wallLine[0].right.x = (wallLine[0].right.x < intersectingWalls[i].right.x) ?  intersectingWalls[i].right.x : wallLine[0].right.x;
-				wallLine[0].right.y = (wallLine[0].right.y < intersectingWalls[i].right.y) ?  intersectingWalls[i].right.y : wallLine[0].right.y;
-
-				bottom = (intersectingWalls[i].bottom != false) ? intersectingWalls[i].bottom : bottom;
-				top = (intersectingWalls[i].top != false) ? intersectingWalls[i].top : top;
-				left = (intersectingWalls[i].left != false) ? intersectingWalls[i].left : left;
-				right = (intersectingWalls[i].right != false) ? intersectingWalls[i].right : right;
+				let bottom = intersectingWalls[i].bottom;
+				let top = intersectingWalls[i].top;
+				let left = intersectingWalls[i].left;
+				let right = intersectingWalls[i].right ;
 
 				if(bottom != false && !Array.isArray(bottom?.x)){
-					x1 = bottom.x;
-					y1 = bottom.y;
+					if(x1 == undefined){
+						x1 = bottom.x;
+						y1 = bottom.y;
+					}
+					else{
+						x2 = bottom.x;
+						y2 = bottom.y;
+					}
+					
 				}
 				if(left != false && !Array.isArray(right?.y)){
 					if(x1 == undefined){
@@ -3339,17 +3364,16 @@ function drawing_mouseup(e) {
 					if(x1 == undefined){
 						x1 = top.x;
 						y1 = top.y;
-						x2 = top.x;
-						y2 = top.y;
 					}
 					else{
 						x2 = top.x;
 						y2 = top.y;	
-					}						
-											
-				}
-				
-				let data = ['line',
+					}																
+				}				
+			}
+			
+			if(x1 != undefined && x2 != undefined && y1 != undefined && y2 != undefined){
+					let data = ['line',
 				 'wall',
 				 window.DRAWCOLOR,
 				 x1,
@@ -3364,11 +3388,7 @@ function drawing_mouseup(e) {
 				 ];	
 				window.DRAWINGS.push(data);
 				undoArray.push([...data]);
-
-			}
-
-			
-							
+			}					
 		}
  		window.wallUndo.push({
 			undo: [...undoArray],
@@ -3957,7 +3977,7 @@ function drawPolygon (
 	mouseY = null,
 	scale = window.CURRENT_SCENE_DATA.scale_factor,
 	replacefog = false,
-	islight = false
+	islight = false,location = 'above'
 ) {
 	ctx.save();
 	ctx.beginPath();
@@ -4094,7 +4114,6 @@ function calculateFourthPoint(point1, point2, point3) {
 }
 function clear_temp_canvas(playerId=window.PLAYER_ID){
 	window.temp_context.clearRect(0, 0, window.temp_canvas.width, window.temp_canvas.height); 
-	WaypointManager.clearWaypointDrawings(playerId)
 }
 
 function bucketFill(ctx, mouseX, mouseY, fogStyle = 'rgba(0,0,0,0)', fogType=0, islight=false, distance1=10000, distance2){
@@ -4206,7 +4225,8 @@ function save3PointRect(e){
 			null,
 			null,
 			window.LINEWIDTH,
-			window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion
+			window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion,
+			window.DRAWLOCATION
 		];
 		window.DRAWINGS.push(data);	
 		redraw_drawn_light();
@@ -4265,7 +4285,8 @@ function savePolygon(e) {
 			null,
 			null,
 			window.LINEWIDTH,
-			window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion
+			window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion,
+			window.DRAWLOCATION
 		];
 		window.DRAWINGS.push(data);
 		redraw_drawn_light();
@@ -4689,11 +4710,27 @@ function init_draw_menu(buttons){
 				DOTTED
 			</button>
 		</div>`);
-			draw_menu.append(
+		draw_menu.append(
 		`<div class='ddbc-tab-options--layout-pill'>
 			<button class='drawbutton menu-option ddbc-tab-options__header-heading'
 				data-key="fill" data-value='dash' data-toggle='true' data-unique-with="fill">
 				DASHED
+			</button>
+		</div>`);
+		
+	draw_menu.append("<div class='menu-subtitle'>Draw Location</div>");
+	draw_menu.append(
+		`<div class='ddbc-tab-options--layout-pill'>
+			<button class='drawbutton menu-option ddbc-tab-options__header-heading button-enabled ddbc-tab-options__header-heading--is-active'
+				data-key="location" data-value='above' data-toggle='true' data-unique-with="location">
+				ABOVE FOG
+			</button>
+		</div>`);
+	draw_menu.append(
+		`<div class='ddbc-tab-options--layout-pill'>
+			<button class='drawbutton menu-option ddbc-tab-options__header-heading'
+				data-key="location" data-value='below' data-toggle='true' data-unique-with="location">
+				BELOW FOG
 			</button>
 		</div>`);
 
@@ -5415,13 +5452,9 @@ function particleUpdate(x, y) {
 };
 
 function particleLook(ctx, walls, lightRadius=100000, fog=false, fogStyle, fogType=0, draw=true, islight=false, auraId=undefined) {
-	if(auraId != undefined && window.TOKEN_OBJECTS[auraId].options.underDarkness){
-		lightPolygon = [{x: window.PARTICLE.pos.x, y: window.PARTICLE.pos.y}];
-		movePolygon = [{x: window.PARTICLE.pos.x, y: window.PARTICLE.pos.y}];
-	}else{
-		lightPolygon = [{x: window.PARTICLE.pos.x*window.CURRENT_SCENE_DATA.scale_factor, y: window.PARTICLE.pos.y*window.CURRENT_SCENE_DATA.scale_factor}];
-		movePolygon = [{x: window.PARTICLE.pos.x*window.CURRENT_SCENE_DATA.scale_factor, y: window.PARTICLE.pos.y*window.CURRENT_SCENE_DATA.scale_factor}];
-	}
+
+	lightPolygon = [];
+	movePolygon = [];
 	let tokenElev = window.TOKEN_OBJECTS[auraId]?.options?.elev && window.TOKEN_OBJECTS[auraId]?.options?.elev != '' ? parseInt(window.TOKEN_OBJECTS[auraId].options.elev) : 0;
 	tokenElev += window.TOKEN_OBJECTS[auraId]?.options?.mapElev ? parseInt(window.TOKEN_OBJECTS[auraId]?.options?.mapElev) : 0;
 
@@ -5494,14 +5527,14 @@ function particleLook(ctx, walls, lightRadius=100000, fog=false, fogStyle, fogTy
 	      }
 
 	    }	    
-	    if (closestLight && closestWall != prevClosestWall) {
-	    	if(prevClosestWall != null && prevClosestPoint != null){	    		
+	    if (closestLight && (closestWall != prevClosestWall || i == 359)) {
+	    	if(closestWall != prevClosestWall && prevClosestWall != null && prevClosestPoint != null){	    		
 	    		lightPolygon.push({x: prevClosestPoint.x*window.CURRENT_SCENE_DATA.scale_factor, y: prevClosestPoint.y*window.CURRENT_SCENE_DATA.scale_factor}) 		
 	    	}
 	    	lightPolygon.push({x: closestLight.x*window.CURRENT_SCENE_DATA.scale_factor, y: closestLight.y*window.CURRENT_SCENE_DATA.scale_factor})
 	    } 
-	    if (closestMove && closestBarrier != prevClosestBarrier) {
-	    	if(prevClosestBarrierPoint){
+	    if (closestMove && (closestBarrier != prevClosestBarrier || i == 359)) {
+	    	if(closestBarrier != prevClosestBarrier && prevClosestBarrierPoint){
 	    		 movePolygon.push({x: prevClosestBarrierPoint.x*window.CURRENT_SCENE_DATA.scale_factor, y: prevClosestBarrierPoint.y*window.CURRENT_SCENE_DATA.scale_factor})
 	    	}
 	    	movePolygon.push({x: closestMove.x*window.CURRENT_SCENE_DATA.scale_factor, y: closestMove.y*window.CURRENT_SCENE_DATA.scale_factor})
@@ -5519,10 +5552,6 @@ function particleLook(ctx, walls, lightRadius=100000, fog=false, fogStyle, fogTy
 	    prevClosestBarrierPoint = closestMove;
 	    prevClosestBarrier = closestBarrier;
 	}
-	if(lightPolygon[1] != undefined)
-  		lightPolygon.push(lightPolygon[1]);
-  	if(movePolygon[1] != undefined)
-  		movePolygon.push(movePolygon[1]);
   	if(draw == true){
 		if(!fog){
 			  drawPolygon(ctx, lightPolygon, 'rgba(255, 255, 255, 1)', true);
@@ -5716,9 +5745,37 @@ function redraw_light(){
 	 		});
 
 		 	$('#exploredCanvas').css('opacity', '0');
-		 
-		 	
 	  	}
+	  	else {
+  			let darknessFilter = (window.CURRENT_SCENE_DATA.darkness_filter != undefined) ? window.CURRENT_SCENE_DATA.darkness_filter : 0;
+  			let darknessPercent = window.DM ? Math.max(40, 100 - parseInt(darknessFilter)) : 100 - parseInt(darknessFilter); 	
+
+  		 	if(window.DM && darknessPercent < 40){
+  		 		darknessPercent = 40;
+  		 		$('#raycastingCanvas').css('opacity', '0');
+  		 	}
+  		 	else if(window.DM){
+  		 		$('#raycastingCanvas').css('opacity', '');
+  		 	}
+  			$('#VTT').css('--darkness-filter', darknessPercent + "%");
+  		   	if(window.DM){
+  		   		$("#light_container [id^='light_']").css('visibility', "visible");
+  		   		$(`.token`).show();
+  				$(`.door-button`).css('visibility', '');
+  				$(`.aura-element`).show();
+  		   	}
+	  		if(!parseInt(window.CURRENT_SCENE_DATA.darkness_filter) && window.walls.length>4){
+			 	$('#light_container').css({
+		 			'opacity': '0.3'
+			 	});
+		  	}
+		  	else{
+		  		$('#light_container').css({
+		 			'opacity': ''
+		 		});
+  			}
+  			$('#exploredCanvas').css('opacity', '');
+  		}
 	  	
 	  
 	  	
@@ -5939,9 +5996,11 @@ function redraw_light(){
 					  	let img = new Image;
 
 						img.onload = function(){
-						  window.exploredCanvasContext.drawImage(img,0,0); 
-						  window.exploredCanvasContext.globalCompositeOperation='lighten';
-						  window.exploredCanvasContext.drawImage(window.lightInLos, 0, 0);
+							requestAnimationFrame(function(){
+							  window.exploredCanvasContext.drawImage(img,0,0); 
+							  window.exploredCanvasContext.globalCompositeOperation='lighten';
+							  window.exploredCanvasContext.drawImage(window.lightInLos, 0, 0);
+							});
 						};
 						img.src = event.target.result.exploredData;
 					}
@@ -5951,9 +6010,10 @@ function redraw_light(){
 				if(window.exploredCanvasContext == undefined){
 					window.exploredCanvasContext = exploredCanvas.getContext('2d');
 				}
-				window.exploredCanvasContext.globalCompositeOperation='lighten';
-				window.exploredCanvasContext.drawImage(window.lightInLos, 0, 0);
-
+				requestAnimationFrame(function(){
+					window.exploredCanvasContext.globalCompositeOperation='lighten';
+					window.exploredCanvasContext.drawImage(window.lightInLos, 0, 0);
+				});
 				debounceStoreExplored(exploredCanvas);
 			}
 		

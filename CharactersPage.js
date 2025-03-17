@@ -405,24 +405,48 @@ function character_sheet_changed(changes) {
 
 function send_character_hp(maxhp) {
   const pc = find_pc_by_player_id(find_currently_open_character_sheet(), false); // use `find_currently_open_character_sheet` in case we're not on CharactersPage for some reason
+
+
+  let current, maximum, temp, deathsaves;
+  if(window.CurrentPcHp == undefined)
+    window.CurrentPcHp = {};
   if(maxhp > 0){ //the player just died and we are sending removed node max hp data
-    character_sheet_changed({
-      hitPointInfo: {
-        current: 0,
-        maximum: maxhp,
-        temp: 0
-      },
-      deathSaveInfo: read_death_save_info()
-    });
+    current = 0;
+    maximum = maxhp;
+    temp = 0;
   }
   else{
+    current = read_current_hp();
+    maximum = read_max_hp(window.CurrentPcHp?.hitPointInfo?.maximum);
+    temp = read_temp_hp();  
+  }
+  deathSaves = read_death_save_info();
+  
+
+
+  if(window.CurrentPcHp?.hitPointInfo?.current != current || 
+    window.CurrentPcHp?.hitPointInfo?.maximum != maximum || 
+    window.CurrentPcHp?.hitPointInfo?.temp != temp || 
+    window.CurrentPcHp?.deathSaveInfo?.successCount != deathSaves.successCount || 
+    window.CurrentPcHp?.deathSaveInfo?.failCount != deathSaves.failCount ){
+    window.CurrentPcHp = {
+      hitPointInfo: {
+        current: current,
+        maximum: maximum,
+        temp: temp
+      },
+      deathSaveInfo:{
+        successCount: deathSaves.successCount,
+        failCount: deathSaves.failCount
+      }
+    }
     character_sheet_changed({
       hitPointInfo: {
-        current: read_current_hp(),
-        maximum: read_max_hp(pc?.hitPointInfo?.maximum),
-        temp: read_temp_hp()
+        current: current,
+        maximum: maximum,
+        temp: temp
       },
-      deathSaveInfo: read_death_save_info()
+      deathSaveInfo: deathSaves
     });
   }
 
@@ -524,7 +548,7 @@ function read_speeds(container = $(document), speedManagePage) {
     speedManagePage.find(".ct-speed-manage-pane__speed").each(function() {
       const container = $(this);
       const name = container.find(".ct-speed-manage-pane__speed-label").text();
-      const distance = parseInt(container.find(".ddbc-distance-number__number").text());
+      const distance = parseInt(container.find(".ddbc-distance-number__number, [class*='styles_numberDisplay']>span:first-of-type").text());
       speeds.push({name: name, distance: distance});
     });
     if (speeds.length) {
@@ -534,7 +558,7 @@ function read_speeds(container = $(document), speedManagePage) {
 
   // just update the primary speed
   const name = container.find(".ct-speed-box__heading").text();
-  const distance = parseInt( container.find(".ct-speed-box__box-value .ddbc-distance-number .ddbc-distance-number__number").text() ) || 0;
+  const distance = parseInt( container.find(".ct-speed-box__box-value .ddbc-distance-number .ddbc-distance-number__number, .ct-speed-box__box-value [class*='styles_numberDisplay']>span:first-of-type").text() ) || 0;
   return [ { name: name, distance: distance } ];
 }
 
@@ -1125,6 +1149,7 @@ function rebuild_buffs(fullBuild = false){
     $('.ct-primary-box__tab--actions .ct-actions h2, .ct-actions-mobile .ct-actions h2, .ct-actions-tablet .ct-tablet-box__header').after(avttBuffSelect)
   register_buff_row_context_menu();
 }
+
 /**
  * Observes character sheet changes and:
  *     injects Dice Roll buttons when a slash command is in item notes.
@@ -1164,12 +1189,11 @@ function observe_character_sheet_changes(documentToObserve) {
       }
     }
 
-    if(is_abovevtt_page() || window.self != window.top){
+    if(is_abovevtt_page() || window.self != window.top || window.sendToTab != undefined){
       const icons = documentToObserve.find(".ddbc-note-components__component--aoe-icon:not('.above-vtt-visited')");
       if (icons.length > 0) {
         icons.wrap(function() {
-          if(!window.top?.CURRENT_SCENE_DATA?.fpsq)
-            return;
+          
 
           $(this).addClass("above-vtt-visited");
           const button = $("<button class='above-aoe integrated-dice__container'></button>");
@@ -1187,7 +1211,7 @@ function observe_character_sheet_changes(documentToObserve) {
           button.attr("title", "Place area of effect token")
           button.attr("data-shape", shape);
           button.attr("data-style", color);
-          button.attr("data-size", Math.round(feet / window.top.CURRENT_SCENE_DATA.fpsq));
+          button.attr("data-size", feet);
           button.attr("data-name", name);
 
           // Players need the token side panel for this to work for them.
@@ -1198,18 +1222,34 @@ function observe_character_sheet_changes(documentToObserve) {
           button.click(function(e) {
             e.stopPropagation();
             // hide the sheet, and drop the token. Don't reopen the sheet because they probably  want to position the token right away
-           
-            window.top.hide_player_sheet();
-            window.top.minimize_player_sheet();
+            if(is_abovevtt_page() || window.self != window.top){
+              window.top.hide_player_sheet();
+              window.top.minimize_player_sheet();
 
-            let options = window.top.build_aoe_token_options(color, shape, feet / window.top.CURRENT_SCENE_DATA.fpsq, name)
-            if(name == 'Darkness' || name == 'Maddening Darkness' ){
-              options = {
-                ...options,
-                darkness: true
+
+              let options = window.top.build_aoe_token_options(color, shape, feet / window.top.CURRENT_SCENE_DATA.fpsq, name)
+              if(name == 'Darkness' || name == 'Maddening Darkness' ){
+                options = {
+                  ...options,
+                  darkness: true
+                }
               }
+              //if single token selected, place there:
+              if(window.top.CURRENTLY_SELECTED_TOKENS.length == 1) {
+                window.top.place_aoe_token_at_token(options, window.top.TOKEN_OBJECTS[window.top.CURRENTLY_SELECTED_TOKENS[0]]);
+              } else {
+                window.top.place_aoe_token_in_centre(options)
+              }
+              
             }
-            window.top.place_aoe_token_in_centre(options)
+            else if(window.sendToTab != undefined){
+              const data = {color: color, shape: shape, feet: feet, name: name}
+              tabCommunicationChannel.postMessage({
+                msgType: 'placeAoe',
+                data: data,
+                sendTo: window.sendToTab
+              });
+            }
             // place_token_in_center_of_view only works for the DM
             // place_token_in_center_of_view(options)
           });
@@ -1219,6 +1259,7 @@ function observe_character_sheet_changes(documentToObserve) {
         console.log(`${icons.length} aoe spells discovered`);
       }    
     }
+    
     //for character page snippets and sidebar text. Can add anything else that's text isn't modified without removing parent.
     const snippets = documentToObserve.find(`
       .ddbc-snippet__content p:not('.above-vtt-visited'), 
@@ -2044,12 +2085,10 @@ function observe_character_sheet_changes(documentToObserve) {
               mutationTarget.hasClass("ct-health-summary__deathsaves-mark") ||
               mutationTarget.hasClass("ct-health-manager__input") ||
               mutationTarget.hasClass('ct-status-summary-mobile__deathsaves-mark') ||
-              mutationTarget.parents('[class*="styles_hitPointsBox"]').length>0 ||
+              (mutationTarget.parents('[class*="styles_hitPointsBox"]').length>0 && mutationTarget.closest('[class*="styles_container"]').find("input[class*='styles_input']").length == 0 && mutationTarget.is('button, span'))||
               mutationTarget.closest('[class*="styles_pane"]')?.find('[class*="styles_healingContainer"]').length
             ) {
               send_character_hp();
-            } else if (mutationTarget.hasClass("ct-subsection--senses")) {
-              send_senses();
             } else if (mutationTarget.hasClass("ct-status-summary-mobile__button--interactive") && mutationTarget.text() === "Inspiration") {
               character_sheet_changed({inspiration: mutationTarget.hasClass("ct-status-summary-mobile__button--active")});
             } else if(mutationParent.find('[class*="ct-extras"]').length>0 && mutationParent.find('.add-monster-token-to-vtt').length==0){
@@ -2072,7 +2111,7 @@ function observe_character_sheet_changes(documentToObserve) {
               mutationTarget.hasClass('ct-health-summary__deathsaves') ||
               mutationTarget.hasClass('ct-health-summary__deathsaves-mark') ||
               mutationTarget.hasClass('[class*="styles_mark"]') ||
-              (mutationTarget.parents('[class*="styles_hitPointsBox"]').length>0 && mutationTarget.find("input[class*=styles_input]").length == 0) ||
+              (mutationTarget.parents('[class*="styles_hitPointsBox"]').length>0 && mutationTarget.closest('[class*="styles_container"]').find("input[class*='styles_input']").length == 0 && mutationTarget.is('button, span')) ||
               mutationTarget.closest('[class*="styles_pane"]')?.find('[class*="styles_healingContainer"]').length
             ) {
               send_character_hp();
@@ -2112,7 +2151,7 @@ function observe_character_sheet_changes(documentToObserve) {
 
               if (mutationParent.parent().hasClass('ct-health-summary__hp-item-content') ||
                 mutationParent.hasClass("ct-health-manager__health-item-value") ||
-                mutationTarget.parents('[class*="styles_hitPointsBox"]').length>0 ||
+                (mutationTarget.parents('[class*="styles_hitPointsBox"]').length>0 && mutationTarget.closest('[class*="styles_container"]').find("input[class*='styles_input']").length == 0 && mutationTarget.is('button, span')) ||
                 mutationTarget.closest('[class*="styles_pane"]')?.find('[class*="styles_healingContainer"]').length
               ) {
                 send_character_hp();          
@@ -2127,6 +2166,13 @@ function observe_character_sheet_changes(documentToObserve) {
               ){
                 send_abilities();
               }
+              else  if (mutationTarget.closest('.ct-conditions-summary').length>0) { // conditions update from sidebar
+                const conditionsSet = read_conditions(documentToObserve);
+                character_sheet_changed({conditions: conditionsSet});
+              }
+              else if (mutationTarget.closest(".ct-subsection--senses").length>0) {
+                send_senses();
+              } 
             if (typeof mutation.target.data === "string") {
               if (mutation.target.data.match(multiDiceRollCommandRegex)?.[0]) {
                 try {
@@ -2221,7 +2267,7 @@ function set_window_name_and_image(callback) {
   window.PLAYER_NAME = $(".ddbc-character-tidbits__heading [class*=ddb-character-app]").text();
   try {
     // This should be just fine, but catch any parsing errors just in case
-    window.PLAYER_IMG = get_higher_res_url($(".ddbc-character-avatar__portrait").css("background-image").slice(4, -1).replace(/"/g, "")) || defaultAvatarUrl;
+    window.PLAYER_IMG = get_higher_res_url($(".ddbc-character-avatar__portrait").css("background-image").slice(4, -1).replace(/"/g, "")) || get_higher_res_url($(".ddbc-character-avatar__portrait").attr('src')) || defaultAvatarUrl;
   } catch {}
 
   if (typeof window.PLAYER_NAME !== "string" || window.PLAYER_NAME.length <= 1 || typeof window.PLAYER_IMG !== "string" || window.PLAYER_IMG.length <= 1) {

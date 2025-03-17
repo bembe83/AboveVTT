@@ -616,6 +616,13 @@ function openCombatTrackerSettings(){
 	if(window.DM)
 		form.append(removeInitRow);
 
+	let highlightSelectedTokensToggle = form_toggle('ct_selected_token', `Adds a selected highlight to tokens in the combat tracker`, combatSettingData['ct_selected_token'] == '1', function(e){
+		handle_basic_form_toggle_click(e)
+	});
+	let highlightSelectedTokensRow = form_row(`ct_selected_token`, `${window.DM ? 'Highlight Selected Token Image' : 'Highlight Selected Token Image'}`, highlightSelectedTokensToggle)
+	form.append(highlightSelectedTokensRow);
+
+
 	const cancel = $("<button type='button' id='cancel_importer'>Cancel</button>");
 	cancel.click(function() {
 		$("#sources-import-main-container").remove();
@@ -664,7 +671,7 @@ function ct_reorder(persist=true) {
 
 	$("#combat_area").append(items);
 
-	let groupLines = $("#combat_area>tr[skipTurn]");
+	let groupLines = $("#combat_area>tr[skipTurn]").get().reverse();
 	for(let i = 0; i<groupLines.length; i++){
 		let targetToken = window.all_token_objects[$(groupLines[i]).attr('data-target')];
 		if(window.all_token_objects[$(groupLines[i]).attr('data-target')])
@@ -695,7 +702,8 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 	entry.attr("ishidden", token.options.hidden);
 	if(token.options.combatGroup && !token.options.combatGroupToken){
 		entry.attr("skipTurn", token.options.combatGroup);
-		entry.css('display', 'none');
+		if(window.expandedGroupIds != undefined && window.expandedGroupIds.includes(token.options.combatGroup))
+			entry.toggleClass('showGroupTokens', true)	
 	}
 	entry.addClass("CTToken");
 	if(window.DM && !token.options.combatGroupToken){
@@ -803,8 +811,8 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 			init.change(function(){	
 
 					window.all_token_objects[token.options.id].options.init = init.val()
-					window.all_token_objects[token.options.id].sync = mydebounce(function(e) {				
-						window.MB.sendMessage('custom/myVTT/token', window.all_token_objects[token.options.id].options);
+					window.all_token_objects[token.options.id].sync = mydebounce(function(options) {				
+						window.MB.sendMessage('custom/myVTT/token', options);
 					}, 300);
 				
 					token.options.init = init.val();
@@ -967,8 +975,7 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 		buttons.append(find);
 	}
 	else{
-
-			find=$('<button class="findTokenCombatButton expandgroup collapsed" style="font-size:10px;"><svg class="findSVG" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed"><path d="M480-120 300-300l58-58 122 122 122-122 58 58-180 180ZM358-598l-58-58 180-180 180 180-58 58-122-122-122 122Z"/></svg></button>');
+			find=$(`<button class="findTokenCombatButton expandgroup ${window.expandedGroupIds != undefined && window.expandedGroupIds.includes(token.options.combatGroup) ? '': 'collapsed'}" style="font-size:10px;"><svg class="findSVG" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed"><path d="M480-120 300-300l58-58 122 122 122-122 58 58-180 180ZM358-598l-58-58 180-180 180 180-58 58-122-122-122 122Z"/></svg></button>`);
 			find.click(function(){
 				if($(this).hasClass('collapsed')){
 					$(this).toggleClass('collapsed', false);
@@ -1001,9 +1008,10 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 				if(window.all_token_objects[token.options.id] != undefined){
 					window.all_token_objects[token.options.id].options.ct_show = undefined;
 				}
+				ct_remove_token(token);
 			}
-			ct_remove_token(token);
-			if(token.options.combatGroupToken){
+			
+			if(token.options.combatGroupToken != undefined){
 				token.delete();
 			}
 			
@@ -1093,6 +1101,10 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 	}
 	
 		entry.append(buttons);
+
+		
+
+
 	
 	$("#combat_area").append(entry);
 
@@ -1180,6 +1192,12 @@ function ct_update_popout(){
 function ct_load(data=null){
 	// any time the combat tracker changes, we need to make sure we adjust our cursor streaming for anyone that only wants streaming during "combatTurn"
 	// make sure we do this before the `data` object gets changed below
+	
+	window.expandedGroupIds = [];
+	$(`.findTokenCombatButton.expandgroup:not(.collapsed)`).each(function(){
+  	window.expandedGroupIds.push($(this).closest('tr').attr('data-group'))
+  })	
+
 	$("#combat_area").empty();
 	update_peer_communication_with_combat_tracker_data(data);
 
@@ -1200,8 +1218,8 @@ function ct_load(data=null){
 			else if(data[i]['data-target'] !== undefined){
 				if (window.all_token_objects[data[i]['data-target']] == undefined) {
 					window.all_token_objects[data[i]['data-target']] = new Token(data[i]['options']);
-					window.all_token_objects[data[i]['data-target']].sync = mydebounce(function(e) {				
-						window.MB.sendMessage('custom/myVTT/token', this.options);
+					window.all_token_objects[data[i]['data-target']].sync = mydebounce(function(options) {				
+						window.MB.sendMessage('custom/myVTT/token', options);
 					}, 300);
 				}
 				window.all_token_objects[data[i]['data-target']].options = data[i]['options'];
@@ -1330,7 +1348,7 @@ function ct_load(data=null){
 		}
 	}
 
-	
+	delete window.expandedGroupIds;
 
 	debounceCombatReorder()
 

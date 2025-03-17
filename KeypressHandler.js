@@ -1,15 +1,58 @@
 let altHeld = false;
 let ctrlHeld = false;
 let shiftHeld = false;
-let toggleSnap = false;
 let cursor_x = -1;
 let cursor_y = -1;
 let arrowKeysHeld = [0, 0, 0, 0];
+
+const sb_scroll_style = "avtt-scroll-hidden"
+function hide_scrollbar() {
+    if (!document.getElementById(sb_scroll_style)) {
+        const style = document.createElement("style");
+        style.id = sb_scroll_style
+        style.textContent = `
+    body::-webkit-scrollbar {
+        width: 0px;
+        height: 0px;
+    }
+    body::-webkit-scrollbar-track {
+        background: transparent !important;
+    }
+    body::-webkit-scrollbar-thumb {
+        background-color: transparent;
+        border-radius: 6px;
+        border: none;
+    }
+    body::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+    .sidebar__pane-content {
+        box-shadow: none;
+    }
+    html {
+        scrollbar-width: none;
+    }
+        `;
+        document.head.appendChild(style);
+    }
+}
+function allow_scrollbar() {
+    e = document.getElementById(sb_scroll_style);
+    if(e) e.remove();
+}
+function hide_or_unhide_scrollbar() {
+    if (get_avtt_setting_value("alwaysHideScrollbar")) {
+        hide_scrollbar();
+    } else {
+        allow_scrollbar();        
+    }
+}
 function unhide_interface() {
     if ($('#hide_interface_button').hasClass('unhidden')) {
         $('#hide_interface_button').hide().removeClass('unhidden');
         $('.hideable').show();
-        $(".dice-toolbar").show();
+        $(".dice-toolbar").css({'visibility': '', 'pointer-events': ''});
+        hide_scrollbar();
     } else {
         if ($('#hide_rightpanel').hasClass('point-right')) {
             $('#hide_rightpanel').click();
@@ -17,9 +60,33 @@ function unhide_interface() {
         if (is_characters_page()) {
             hide_player_sheet();
         }
-        $(".dice-toolbar").hide();
+        $(".dice-toolbar").css({'visibility': 'hidden', 'pointer-events': 'none'});
         $('#hide_interface_button').show().addClass('unhidden');
         $('.hideable').hide();
+        if (!get_avtt_setting_value("alwaysHideScrollbar")) {        
+            allow_scrollbar();        
+        }
+    }
+}
+
+//for number key binds that aren't enabled yet
+function hotkeyDice(nthDice){
+
+    if (!$(".dice-toolbar__dropdown").hasClass("dice-toolbar__dropdown-selected")) {
+        $(".dice-toolbar__dropdown-die").click();
+    }
+    const dieButton = $(`.dice-toolbar__dropdown-top>.dice-die-button:nth-of-type(${8-nthDice})`); 
+    if(ctrlHeld){
+        dieButton.triggerHandler('contextmenu');
+            let element = dieButton[0];
+            let e = element.ownerDocument.createEvent('MouseEvents');
+            e.initMouseEvent('contextmenu', true, true,
+                    element.ownerDocument.defaultView, 1, 0, 0, 0, 0, false,
+                    false, false, false, 2, null);
+            element.dispatchEvent(e);
+    }
+    else{
+        dieButton.click();
     }
 }
 
@@ -82,20 +149,66 @@ Mousetrap.bind('v', function () {       //video toggle
 });
 
 Mousetrap.bind('shift+v', function () {       //check token vision
-   window.SelectedTokenVision = true;
+    if(window.SelectedTokenVision == true && $('#selected_token_vision .ddbc-tab-options__header-heading--is-active').length==0)
+        window.SelectedTokenVision = false;
+    else
+        window.SelectedTokenVision = true;
+
    redraw_light();
 });
 
 Mousetrap.bind('=', function () {       //zoom plus
-    $('#zoom_plus').click()
+    if($('.roll-mod-container').hasClass('show'))
+        $('.roll-button-mod.plus').click();
+    else
+        $('#zoom_plus').click()
 });
 
+Mousetrap.bind(["1","2","3","4","5","6","7","mod+1","mod+2","mod+3","mod+4","mod+5","mod+6","mod+7",], function (e, combo) {
+    e.preventDefault();  
+    let numberPressed = parseInt(combo.replace('mod+',''));
+    hotkeyDice(numberPressed);
+});
+
+Mousetrap.bind("n", function (e) {
+    $('#combat_next_button').click();
+});
+Mousetrap.bind("p", function (e) {
+    $('#combat_prev_button').click();
+});
+/*menu specific shortcuts, select the nth element of menu when it's open
+function handle_menu_number_press(e) {
+    const visibleMenuId = `#${$('[id*="_menu"].visible').attr("id")}`
+    const button = $(`${visibleMenuId} .menu-option:eq(${parseInt(e.key) -1})`)
+    $(button).click()
+    $(button).children().first().focus()
+}
+Mousetrap.bind(["1","2","3","4","5","6","7","8","9"], function (e) {
+    handle_menu_number_press(e)
+});*/
+
 Mousetrap.bind('+', function () {       //zoom plus
-    $('#zoom_plus').click()
+    if($('.roll-mod-container').hasClass('show'))
+        $('.roll-button-mod.plus').click(); 
+    else
+        $('#zoom_plus').click()
 });
 
 Mousetrap.bind('-', function () {       //zoom minus
-    $('#zoom_minus').click()
+    if($('.roll-mod-container').hasClass('show'))
+        $('.roll-button-mod.minus').click();
+    else
+        $('#zoom_minus').click()
+});
+Mousetrap.bind('enter', function () {       //zoom minus
+    if(!$('.roll-mod-container').hasClass('show'))
+        return;
+    $('.roll-mod-container>.roll-button').click(); 
+});
+
+Mousetrap.bind('ctrl+space', function (e) {    
+    e.preventDefault();
+    $('#combat_area tr[data-current=1] .findTokenCombatButton').click();
 });
 
 Mousetrap.bind('0', function () {   
@@ -191,16 +304,7 @@ Mousetrap.bind('esc', function () {     //deselect all buttons
     removeError();
 });
 
-//menu specific shortcuts, select the nth element of menu when it's open
-function handle_menu_number_press(e) {
-    const visibleMenuId = `#${$('[id*="_menu"].visible').attr("id")}`
-    const button = $(`${visibleMenuId} .menu-option:eq(${parseInt(e.key) -1})`)
-    $(button).click()
-    $(button).children().first().focus()
-}
-Mousetrap.bind(["1","2","3","4","5","6","7","8","9"], function (e) {
-    handle_menu_number_press(e)
-});
+
 const moveLoop = function(callback = function(){}){
     for (let i = 0; i < window.CURRENTLY_SELECTED_TOKENS.length; i++) {
         let id = window.CURRENTLY_SELECTED_TOKENS[i];
@@ -302,18 +406,17 @@ Mousetrap.bind('right', function (e) {
 }, 'keyup');
 
 Mousetrap.bind('alt', function () {
-    if (altHeld) {
-        return false;
-    } else {
-        altHeld = true;
-    }
+    if (altHeld) 
+        return;
+    
+    altHeld = true;
     window.selectedMenuButton = $('#VTTWRAPPER ~ .ddbc-tab-options--layout-pill>button.button-enabled')
     if (!($('#ruler_button').hasClass('button-enabled'))) {
         $('#ruler_button').click()
     }
 
     $(window).off('blur.altCheck').one('blur.altCheck', function(){
-      window.altHeld = false;
+      altHeld = false;
         if ($('#ruler_button').hasClass('button-enabled')) {
             window.selectedMenuButton.click()
         }
@@ -332,13 +435,12 @@ Mousetrap.bind('alt', function () {
 
 
 Mousetrap.bind('shift', function () {
-    if (shiftHeld == true) {
+    if (shiftHeld == true) 
         return;
-    } else {
-        shiftHeld = true;
-    }
+    
+    shiftHeld = true;   
     $(window).off('blur.shiftCheck').one('blur.shiftCheck', function(){
-      window.shiftHeld = false;
+      shiftHeld = false;
     })
 }, 'keydown');
 
@@ -347,44 +449,45 @@ Mousetrap.bind('shift', function () {
 }, 'keyup');
 
 
-Mousetrap.bind('ctrl', function () {
-	ctrlHeld=true;
-	window.toggleSnap=true;
+Mousetrap.bind('mod', function () {
+    if (ctrlHeld == true && window.toggleSnap == true) 
+        return;
+    
+    ctrlHeld=true;
+    window.toggleSnap=true;
+    $(window).off('blur.ctrlCheck').one('blur.ctrlCheck', function(){
+      ctrlHeld = false;
+      window.toggleSnap = false;
+    })
 }, 'keydown');
 
-Mousetrap.bind('ctrl', function () {
-	ctrlHeld=false;
-	window.toggleSnap=false;
+Mousetrap.bind('mod', function () {
+    ctrlHeld=false;
+    window.toggleSnap=false;
 }, 'keyup');
 
-Mousetrap.bind(['ctrl+shift', 'shift+ctrl'], function () {
+Mousetrap.bind(['mod+shift', 'shift+mod'], function () {
     ctrlHeld=true;
     shiftHeld=true;
     $(window).off('blur.shiftCheck').one('blur.shiftCheck', function(){
-      window.shiftHeld = false;
+      shiftHeld = false;
     })
     window.toggleSnap=true;
 }, 'keydown');
 
-Mousetrap.bind(['ctrl+shift', 'shift+ctrl'], function () {
-    ctrlHeld=false;
-    shiftHeld = false;
-    window.toggleSnap=false;
-}, 'keyup');
+
 
 Mousetrap.bind('shift+h', function () {
     unhide_interface();
 });
 
-Mousetrap.bind('ctrl+c', function(e) {
+Mousetrap.bind('mod+c', function(e) {
     if (window.navigator.userAgent.indexOf("Mac") != -1) return; // Mac/iOS use command
-    copy_selected_tokens();
-});
-Mousetrap.bind('command+c', function(e) {
     copy_selected_tokens();
 });
 
-Mousetrap.bind('ctrl+v', function(e) {
+
+Mousetrap.bind('mod+v', function(e) {
     if (window.navigator.userAgent.indexOf("Mac") != -1) return; // Mac/iOS use command
     if($('#temp_overlay:hover').length>0){
         paste_selected_tokens(window.cursor_x, window.cursor_y);
@@ -394,15 +497,7 @@ Mousetrap.bind('ctrl+v', function(e) {
         paste_selected_tokens(center.x, center.y);
     }
 });
-Mousetrap.bind('command+v', function(e) {
-    if($('#temp_overlay:hover').length>0){
-        paste_selected_tokens(window.cursor_x, window.cursor_y);
-    } 
-    else {
-        let center = center_of_view();
-        paste_selected_tokens(center.x, center.y);
-    }
-});
+
 
 document.onmousemove = function(event)
 {
@@ -413,18 +508,13 @@ document.onmousemove = function(event)
 Mousetrap.bind(['backspace', 'del'], function(e) {
     delete_selected_tokens();
 });
-Mousetrap.bind('ctrl+z', function(e) {
+Mousetrap.bind('mod+z', function(e) {
     if($('input:focus').length ==0){
         e.preventDefault();
     }
     handle_undo();
 });
-Mousetrap.bind('command+z', function(e) {
-    if($('input:focus').length ==0){
-        e.preventDefault();
-    }
-    handle_undo();
-});
+
 Mousetrap.bind(']', function(e) {
     select_next_tab();
 });

@@ -173,8 +173,12 @@ function rebuild_ability_trackers(target, tokenId){
  * @returns 
  */
 function createCountTracker(token, key, remaining, foundDescription, descriptionPostfix, callback) {
-	const input = $(`<input class="injected-input" data-token-id="${token.id}" data-tracker-key="${key}" type="number" value="${remaining}" style="font-size: 14px; width: 40px; appearance: none; border: 1px solid #d8e1e8; border-radius: 3px;"> ${foundDescription} ${descriptionPostfix}</input>`);
+	const input = $(`<input class="injected-input" data-token-id="${token.id}" data-tracker-key="${key}" type="number" value="${remaining}"> ${foundDescription} ${descriptionPostfix}</input>`);
+	input.off('input').on('input', function(){
+		resizeInput(input[0]);
+	})
 	input.off("change").on("change", function(changeEvent) {
+		resizeInput(input[0]);
 		const updatedValue = changeEvent.target.value;
 		console.log(`add_ability_tracker_inputs ${key} changed to ${updatedValue}`);
 		if(callback)
@@ -182,9 +186,12 @@ function createCountTracker(token, key, remaining, foundDescription, description
 		else
 			token.track_ability(key, updatedValue);
 	});
+	resizeInput(input[0]);
 	return input
 }
-
+function resizeInput(input) {
+  input.style.width = `${input.value.length+3}ch`;
+}
 /**
  * Adds spell/feature/legendary tracker inputs to a monster block
  * @param {$} target 
@@ -327,9 +334,13 @@ function scan_player_creature_pane(target) {
 		roll_button_contextmenu_handler(contextmenuEvent, displayName, creatureAvatar, "monster");
 	}
 
+	
 
 	replace_ability_scores_with_avtt_rollers(target, ".ddbc-creature-block__ability-stat, [class*='styles_stats']>[class*='styles_stat']", ".ddbc-creature-block__ability-heading, [class*='styles_statHeading']")
 	replace_saves_skill_with_avtt_rollers(target, ".ddbc-creature-block__tidbit, [class*='styles_tidbit']",".ddbc-creature-block__tidbit-label, [class*='styles_tidbitLabel']", ".ddbc-creature-block__tidbit-data, p" )
+
+	if(target.closest('[class*="styles_v2024"]').length>0)
+		add_journal_roll_buttons(target);
 
 	// replace all "to hit" and "damage" rolls
 	$(target).find("p, .ddbc-creature-block__attribute-data-extra").each(function() {
