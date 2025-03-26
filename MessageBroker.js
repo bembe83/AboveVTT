@@ -36,6 +36,7 @@ const debounceHandleInjected = mydebounce(() => {
 				add_journal_roll_buttons(li);
 				window.JOURNAL.add_journal_tooltip_targets(li);
 				add_stat_block_hover(li)
+				add_aoe_statblock_click(li);
 				let rollType = current.data.injected_data?.rollType?.toLowerCase();
 				let rollAction = current.data.injected_data?.rollTitle?.toLowerCase();
 				if(rollType != undefined && rollAction != 'initiative' && rollType != "tohit" && rollType != "attack" && rollType != "to hit" && rollType != "save" && rollType != "skill" && rollType != "check" && window.DM){
@@ -371,58 +372,66 @@ class MessageBroker {
 			let entityid = data.data.injected_data?.entityId ? data.data.injected_data?.entityId : data.data.injected_data?.playerId;
 
 
-			if(data.data.injected_data?.entityId){
-				let monsterid = window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.monster
-				if(monsterid =='open5e')
-				{
-					window.StatHandler.getStat(monsterid, function(data) {
-						total = parseFloat(total + data.stats[1].value/100).toFixed(2);
-					}, window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.itemId);
-				}
-				else if(monsterid =='customStat'){
-					let decimalAdd = (window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.customInit != undefined || (window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.customStat != undefined && window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.customStat[1]?.mod != undefined)) ? ((window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.customStat[1]?.mod*2)+10)/100 : 0
-					total = parseFloat(total + decimalAdd).toFixed(2);
-				}
-				else{
-					window.StatHandler.getStat(monsterid, function(stat) {
-							total = parseFloat(total + stat.data.stats[1].value/100).toFixed(2);
-					}, window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.itemId);
-				}
-			}
-			else{
-				let dexScore = window.pcs.filter(d=> d.characterId == entityid)[0].abilities[1].score;		
-				if(dexScore){
-					total = parseFloat(total + dexScore/100).toFixed(2);
-				}
-			}
+			let monsterTokenExists = window.TOKEN_OBJECTS[entityid] != undefined;
+			let playerExists = window.pcs.filter(d=> d.characterId == entityid).length>0;
+			
 
-
-			let combatSettingData = getCombatTrackersettings();
-			if(combatSettingData['tie_breaker'] !='1'){
-				total = parseInt(total);
-			}
-			$("#tokens .VTTToken").each(
-				function(){
-					let converted = $(this).attr('data-id').replace(/^.*\/([0-9]*)$/, "$1"); // profiles/ciccio/1234 -> 1234
-					if(converted==entityid){
-						ct_add_token(window.TOKEN_OBJECTS[$(this).attr('data-id')]);
-						window.all_token_objects[$(this).attr('data-id')].options.init = total;
-						window.TOKEN_OBJECTS[$(this).attr('data-id')].options.init = total;
-						window.TOKEN_OBJECTS[$(this).attr('data-id')].update_and_sync();
+			if(monsterTokenExists || playerExists){
+				if(data.data.injected_data?.entityId){
+					let monsterid = window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.monster
+					if(monsterid =='open5e')
+					{
+						window.StatHandler.getStat(monsterid, function(data) {
+							total = parseFloat(total + data.stats[1].value/100).toFixed(2);
+						}, window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.itemId);
+					}
+					else if(monsterid =='customStat'){
+						let decimalAdd = (window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.customInit != undefined || (window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.customStat != undefined && window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.customStat[1]?.mod != undefined)) ? ((window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.customStat[1]?.mod*2)+10)/100 : 0
+						total = parseFloat(total + decimalAdd).toFixed(2);
+					}
+					else{
+						window.StatHandler.getStat(monsterid, function(stat) {
+								total = parseFloat(total + stat.data.stats[1].value/100).toFixed(2);
+						}, window.TOKEN_OBJECTS[data.data.injected_data?.entityId]?.options?.itemId);
 					}
 				}
-			);
-
-			$("#combat_area tr").each(function() {
-				let converted = $(this).attr('data-target').replace(/^.*\/([0-9]*)$/, "$1"); // profiles/ciccio/1234 -> 1234
-				if (converted == entityid) {
-					$(this).find(".init").val(total);
-					window.all_token_objects[$(this).attr('data-target')].options.init = total;
-					window.TOKEN_OBJECTS[$(this).attr('data-target')].options.init = total;
-					window.TOKEN_OBJECTS[$(this).attr('data-target')].update_and_sync();
+				else{
+					let dexScore = window.pcs.filter(d=> d.characterId == entityid)[0].abilities[1].score;		
+					if(dexScore){
+						total = parseFloat(total + dexScore/100).toFixed(2);
+					}
 				}
-			});
-			debounceCombatReorder(true);
+
+
+				let combatSettingData = getCombatTrackersettings();
+				if(combatSettingData['tie_breaker'] !='1'){
+					total = parseInt(total);
+				}
+				$("#tokens .VTTToken").each(
+					function(){
+						let converted = $(this).attr('data-id').replace(/^.*\/([0-9]*)$/, "$1"); // profiles/ciccio/1234 -> 1234
+						if(converted==entityid){
+							ct_add_token(window.TOKEN_OBJECTS[$(this).attr('data-id')]);
+							window.all_token_objects[$(this).attr('data-id')].options.init = total;
+							window.TOKEN_OBJECTS[$(this).attr('data-id')].options.init = total;
+							window.TOKEN_OBJECTS[$(this).attr('data-id')].update_and_sync();
+						}
+					}
+				);
+
+				$("#combat_area tr").each(function() {
+					let converted = $(this).attr('data-target').replace(/^.*\/([0-9]*)$/, "$1"); // profiles/ciccio/1234 -> 1234
+					if (converted == entityid) {
+						$(this).find(".init").val(total);
+						window.all_token_objects[$(this).attr('data-target')].options.init = total;
+						window.TOKEN_OBJECTS[$(this).attr('data-target')].options.init = total;
+						window.TOKEN_OBJECTS[$(this).attr('data-target')].update_and_sync();
+					}
+				});
+				debounceCombatReorder(true);
+			}
+
+			
 		}
 
 		// start the task
@@ -1357,61 +1366,65 @@ class MessageBroker {
 					console.log(msg.data);
 					let total = parseFloat(msg.data.rolls[0].result.total);
 					let entityid = msg.data.context.entityId;
-
-
-					if(msg.data.context?.entityType == 'monster'){
-						let monsterid = window.TOKEN_OBJECTS[entityid]?.options?.monster
-						if(monsterid =='open5e')
-						{
-							window.StatHandler.getStat(monsterid, function(data) {
-								total = parseFloat(total + data.stats[1].value/100).toFixed(2);
-							}, window.TOKEN_OBJECTS[entityid]?.options?.itemId);
-						}
-						else if(monsterid =='customStat'){
-							let decimalAdd = (window.TOKEN_OBJECTS[entityid]?.options?.customInit != undefined || (window.TOKEN_OBJECTS[entityid]?.options?.customStat != undefined && window.TOKEN_OBJECTS[entityid]?.options?.customStat[1]?.mod != undefined)) ? ((window.TOKEN_OBJECTS[entityid]?.options?.customStat[1]?.mod*2)+10)/100 : 0
-							total = parseFloat(total + decimalAdd).toFixed(2);
-						}
-						else{
-							window.StatHandler.getStat(monsterid, function(stat) {
-									total = parseFloat(total + stat.data.stats[1].value/100).toFixed(2);
-							}, window.TOKEN_OBJECTS[entityid]?.options?.itemId);
-						}
-					}
-					else{
-						let dexScore = window.pcs.filter(d=> d.characterId == entityid)[0].abilities[1].score;		
-						if(dexScore){
-							total = parseFloat(total + dexScore/100).toFixed(2);
-						}
-					}
-		
-					let combatSettingData = getCombatTrackersettings();
-					if(combatSettingData['tie_breaker'] !='1'){
-						total = parseInt(total);
-					}
-					console.log("cerco " + entityid);
 					
-					$("#tokens .VTTToken").each(
-						function(){
-							let converted = $(this).attr('data-id').replace(/^.*\/([0-9]*)$/, "$1"); // profiles/ciccio/1234 -> 1234
-							if(converted==entityid){
-								ct_add_token(window.TOKEN_OBJECTS[$(this).attr('data-id')]);
-								window.all_token_objects[$(this).attr('data-id')].options.init = total;
-								window.TOKEN_OBJECTS[$(this).attr('data-id')].options.init = total;
-								window.TOKEN_OBJECTS[$(this).attr('data-id')].update_and_sync();
+					let monsterTokenExists = window.TOKEN_OBJECTS[entityid] != undefined;
+					let playerExists = window.pcs.filter(d=> d.characterId == entityid).length>0;
+					if(monsterTokenExists || playerExists){
+						if(msg.data.context?.entityType == 'monster'){
+							let monsterid = window.TOKEN_OBJECTS[entityid]?.options?.monster
+							if(monsterid =='open5e')
+							{
+								window.StatHandler.getStat(monsterid, function(data) {
+									total = parseFloat(total + data.stats[1].value/100).toFixed(2);
+								}, window.TOKEN_OBJECTS[entityid]?.options?.itemId);
+							}
+							else if(monsterid =='customStat'){
+								let decimalAdd = (window.TOKEN_OBJECTS[entityid]?.options?.customInit != undefined || (window.TOKEN_OBJECTS[entityid]?.options?.customStat != undefined && window.TOKEN_OBJECTS[entityid]?.options?.customStat[1]?.mod != undefined)) ? ((window.TOKEN_OBJECTS[entityid]?.options?.customStat[1]?.mod*2)+10)/100 : 0
+								total = parseFloat(total + decimalAdd).toFixed(2);
+							}
+							else{
+								window.StatHandler.getStat(monsterid, function(stat) {
+										total = parseFloat(total + stat.data.stats[1].value/100).toFixed(2);
+								}, window.TOKEN_OBJECTS[entityid]?.options?.itemId);
 							}
 						}
-					);
-
-					$("#combat_area tr").each(function() {
-						let converted = $(this).attr('data-target').replace(/^.*\/([0-9]*)$/, "$1"); // profiles/ciccio/1234 -> 1234
-						if (converted == entityid) {
-							$(this).find(".init").val(total);
-							window.all_token_objects[$(this).attr('data-target')].options.init = total;
-							window.TOKEN_OBJECTS[$(this).attr('data-target')].options.init = total;
-							window.TOKEN_OBJECTS[$(this).attr('data-target')].update_and_sync();
+						else{
+							let dexScore = window.pcs.filter(d=> d.characterId == entityid)[0].abilities[1].score;		
+							if(dexScore){
+								total = parseFloat(total + dexScore/100).toFixed(2);
+							}
 						}
-					});
-					debounceCombatReorder(true);
+						
+						let combatSettingData = getCombatTrackersettings();
+						if(combatSettingData['tie_breaker'] !='1'){
+							total = parseInt(total);
+						}
+						console.log("cerco " + entityid);
+						
+						$("#tokens .VTTToken").each(
+							function(){
+								let converted = $(this).attr('data-id').replace(/^.*\/([0-9]*)$/, "$1"); // profiles/ciccio/1234 -> 1234
+								if(converted==entityid){
+									ct_add_token(window.TOKEN_OBJECTS[$(this).attr('data-id')]);
+									window.all_token_objects[$(this).attr('data-id')].options.init = total;
+									window.TOKEN_OBJECTS[$(this).attr('data-id')].options.init = total;
+									window.TOKEN_OBJECTS[$(this).attr('data-id')].update_and_sync();
+								}
+							}
+						);
+
+						$("#combat_area tr").each(function() {
+							let converted = $(this).attr('data-target').replace(/^.*\/([0-9]*)$/, "$1"); // profiles/ciccio/1234 -> 1234
+							if (converted == entityid) {
+								$(this).find(".init").val(total);
+								window.all_token_objects[$(this).attr('data-target')].options.init = total;
+								window.TOKEN_OBJECTS[$(this).attr('data-target')].options.init = total;
+								window.TOKEN_OBJECTS[$(this).attr('data-target')].update_and_sync();
+							}
+						});
+						debounceCombatReorder(true);
+					}
+					
 				}
 				// CHECK FOR SELF ROLLS ADD SEND TO EVERYONE BUTTON
 				if (msg.messageScope === "userId") {
@@ -1528,7 +1541,7 @@ class MessageBroker {
 		//Security logic to prevent content being sent which can execute JavaScript.
 		data.player = DOMPurify.sanitize( data.player,{ALLOWED_TAGS: []});
 		data.img = DOMPurify.sanitize( data.img,{ALLOWED_TAGS: []});
-		data.text = DOMPurify.sanitize( data.text,{ALLOWED_TAGS: ['video','img','div','p', 'b', 'button', 'span', 'style', 'path', 'svg', 'a', 'hr', 'ul', 'li', 'h3', 'h2', 'h4', 'h1', 'table', 'tr', 'td', 'th'], ADD_ATTR: ['target']}); //This array needs to include all HTML elements the extension sends via chat.
+		data.text = DOMPurify.sanitize( data.text,{ALLOWED_TAGS: ['video','img','div','p', 'b', 'button', 'span', 'style', 'path', 'rect', 'svg', 'a', 'hr', 'ul', 'li', 'h3', 'h2', 'h4', 'h1', 'table', 'tr', 'td', 'th'], ADD_ATTR: ['target']}); //This array needs to include all HTML elements the extension sends via chat.
 
 		if(data.dmonly && !(window.DM) && !local) // /dmroll only for DM of or the user who initiated it
 			return $("<div/>");

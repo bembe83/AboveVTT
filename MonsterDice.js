@@ -35,6 +35,7 @@ function scan_monster(target, stats, tokenId) {
 	$(target).find(".mon-stat-block p, .stat-block p").each(function() {
 		if ($(this).find(".avtt-roll-button").length == 0) {
 				$($(this)).find("span[data-dicenotation]").each(function (){
+
 				// clone the element as if it came from an iframe these variables won't be freed from memory
 				let currentElement = $(this).clone()
 				const modMatch = $(currentElement).attr("data-dicenotation")?.match(/(\+|-).*/gm)
@@ -45,8 +46,23 @@ function scan_monster(target, stats, tokenId) {
 				const text = $(currentElement)?.text()
 				const followingText = $(this)[0].nextSibling?.textContent?.trim()?.split(' ')[0]
 
-
-				$(this).replaceWith(`<button data-exp='${dice}' data-mod='${modifier}' data-rolltype='${rollType}' ${followingText && window.ddbConfigJson.damageTypes.some(d => d.name.toLowerCase() == followingText.toLowerCase()) ? `data-damagetype='${followingText}'` : ''} data-actiontype='${actionType}' class='avtt-roll-button' title="${actionType} ${rollType}">${text}</button>`)
+				const button = `<button data-exp='${dice}' data-mod='${modifier}' data-rolltype='${rollType}' ${followingText && window.ddbConfigJson.damageTypes.some(d => d.name.toLowerCase() == followingText.toLowerCase()) ? `data-damagetype='${followingText}'` : ''} data-actiontype='${actionType}' class='avtt-roll-button' title="${actionType} ${rollType}">${text}</button>`
+				
+				if(rollType == 'recharge'){
+					const rechargeRegEx = /(Recharge [0-6]?\s?[—–-]?\s?[0-6])/gi
+					$(this).closest('p>strong:first-of-type:has(em), p>em:first-of-type:has(strong)').replaceWith($($(this).closest('p>strong:first-of-type:has(em), p>em:first-of-type:has(strong)').text().replace(
+                /^(([a-z0-9]+[\s]?){1,7})(\([^\)]+\))?(\.)([\s])?( (Melee|Ranged|Melee or Ranged) (Weapon Attack:|Spell Attack:|Attack Roll:))?/gi,
+                /(lair|legendary) actions/g.test(data)
+                    ? '<strong>$1$4</strong>$3$5$6'
+                    : '<em><strong>$1$4</strong></em>$3$5$6'
+            
+            ).replaceAll(/[\s]+\./gi, '.').replaceAll(rechargeRegEx, button))
+					);
+				}
+				else{
+					$(this).replaceWith(button)
+				}
+				
 				// terminate the clones reference, overkill but rather be safe when it comes to memory
 				currentElement = null
 			})
@@ -334,13 +350,19 @@ function scan_player_creature_pane(target) {
 		roll_button_contextmenu_handler(contextmenuEvent, displayName, creatureAvatar, "monster");
 	}
 
-	
 
 	replace_ability_scores_with_avtt_rollers(target, ".ddbc-creature-block__ability-stat, [class*='styles_stats']>[class*='styles_stat']", ".ddbc-creature-block__ability-heading, [class*='styles_statHeading']")
 	replace_saves_skill_with_avtt_rollers(target, ".ddbc-creature-block__tidbit, [class*='styles_tidbit']",".ddbc-creature-block__tidbit-label, [class*='styles_tidbitLabel']", ".ddbc-creature-block__tidbit-data, p" )
 
-	if(target.closest('[class*="styles_v2024"]').length>0)
+	if(target.closest('[class*="styles_v2024"]').length>0){
 		add_journal_roll_buttons(target);
+	}
+	else{
+		target.html(function(index, html){
+			return add_aoe_to_statblock(html);
+		});
+	}
+
 
 	// replace all "to hit" and "damage" rolls
 	$(target).find("p, .ddbc-creature-block__attribute-data-extra").each(function() {
@@ -480,12 +502,32 @@ function roll_button_contextmenu_handler(contextmenuEvent, displayName, imgUrl, 
  */
 function roll_button_clicked(clickEvent, displayName, imgUrl, entityType = undefined, entityId = undefined) {
 	let pressedButton = $(clickEvent.currentTarget).clone();
-	const expression = pressedButton.attr('data-exp');
+	let expression = pressedButton.attr('data-exp');
 	let modifier = pressedButton.attr('data-mod')?.replaceAll("(", "")?.replaceAll(")", "");
 	let rollType = pressedButton.attr('data-rolltype');
 	const action = pressedButton.attr('data-actiontype');
 	const damageType = pressedButton.attr('data-damagetype');
 	modifier = modifier == 0 ? '+0' : modifier;
+
+	
+  if (/^1d20/g.test(expression)) {
+     if(clickEvent.altKey){
+        if(clickEvent.shiftKey){
+          expression = `3d20kh1`;
+         }
+         else if((!isMac() && clickEvent.ctrlKey) || clickEvent.metaKey){
+          expression = `3d20kl1`;
+         }
+     }
+     else if(clickEvent.shiftKey){
+      expression = `2d20kh1`;
+     }
+     else if((!isMac() && clickEvent.ctrlKey) || clickEvent.metaKey){
+      expression = `2d20kl1`;
+     }
+  }
+ 
+	
 
 	window.diceRoller.roll(new DiceRoll(
 		`${expression}${modifier}`,

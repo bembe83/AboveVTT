@@ -281,10 +281,101 @@ function sanitize_aoe_shape(shape){
     }
     return shape
 }
+function get_available_styles(){
+    return [
+        "Acid",
+        "Bludgeoning",
+        "Cold",
+        "Darkness",
+        "Default",
+        "Fire",
+        "Force",
+        "Lightning",
+        "Nature",
+        "Necrotic",
+        "Piercing",
+        "Poison",
+        "Psychic",
+        "Radiant",
+        "Slashing",
+        "Thunder",
+        "Water"
+    ]
+}
+function add_aoe_to_statblock(html){
+
+  const aoeRegEx = /(([\d]+)-foot(-long ([\d]+)-foot-wide|-long, ([\d]+)-foot-wide|-radius, [\d]+-foot-high|-radius)? ([a-zA-z]+))(.*?[\>\s]([a-zA-Z]+) damage)?/gi
+
+
+  return html.replaceAll(aoeRegEx, function(m, m1, m2,m3, m4, m5, m6, m7, m8){
+    const shape = m6.toLowerCase();
+
+    if(shape != 'cone' && shape != 'sphere' && shape != 'cube' && shape != 'cylinder' && shape != 'line')
+      return `${m}`
+
+    if(shape == 'emanation')
+      return `${m}` // potentially set a button for aura being set on these if an aura doesn't already exist
+    else
+      return `<button class='avtt-aoe-button' border-width='1px' title='Place area of effect token' 
+          data-shape='${shape}' 
+          data-style='${m8 != undefined && get_available_styles().some(shape => shape.toLowerCase().includes(m8.toLowerCase())) ? m8.toLowerCase() : 'default'}' 
+          data-size='${m2}' 
+          data-name='${m6} AoE' 
+          ${shape == 'line' ? `data-line-width=${m4 != undefined ? `'${m4}'` : m5 != undefined ? `'${m5}'` : '5'}` : ''}>
+          ${m1}
+        </button>
+        ${m7 != undefined? m7 : ''}
+      `
+       
+  })
+}
+
+function add_aoe_statblock_click(target, tokenId = undefined){
+  target.find(`button.avtt-aoe-button`).off('click.aoe').on('click.aoe', function(e) {
+    e.stopPropagation();
+    const color = $(this).attr('data-style');
+    const shape = $(this).attr('data-shape');
+    const feet = $(this).attr('data-size');
+    const name = $(this).attr('data-name');
+    const lineWidth = $(this).attr('data-line-width');
+
+    if(is_abovevtt_page() || window.self != window.top){
+      window.top.hide_player_sheet();
+      window.top.minimize_player_sheet();
+
+
+      let options = window.top.build_aoe_token_options(color, shape, feet / window.top.CURRENT_SCENE_DATA.fpsq, name, lineWidth / window.top.CURRENT_SCENE_DATA.fpsq)
+      if(name == 'Darkness' || name == 'Maddening Darkness' ){
+        options = {
+          ...options,
+          darkness: true
+        }
+      }
+      //if single token selected, place there:
+      if(window.top.CURRENTLY_SELECTED_TOKENS.length == 1) {
+        window.top.place_aoe_token_at_token(options, window.top.TOKEN_OBJECTS[window.top.CURRENTLY_SELECTED_TOKENS[0]]);
+      } 
+      else if(window.top.TOKEN_OBJECTS[tokenId] != undefined){
+        window.top.place_aoe_token_at_token(options, window.top.TOKEN_OBJECTS[tokenId]);
+      }else {
+        window.top.place_aoe_token_in_centre(options)
+      }
+    }
+    else if(window.sendToTab != undefined){
+      const data = {color: color, shape: shape, feet: feet, name: name, lineWidth: lineWidth, tokenId: tokenId}
+      tabCommunicationChannel.postMessage({
+        msgType: 'placeAoe',
+        data: data,
+        sendTo: window.sendToTab
+      });
+    }
+  })
+}
+
 function add_journal_roll_buttons(target, tokenId=undefined){
   console.group("add_journal_roll_buttons")
   
-  let pastedButtons = target.find('.avtt-roll-button').add(target.find('.integrated-dice__container'));
+  let pastedButtons = target.find('.avtt-roll-button, .integrated-dice__container, .avtt-aoe-button');
 
   for(let i=0; i<pastedButtons.length; i++){
     $(pastedButtons[i]).replaceWith($(pastedButtons[i]).text());
@@ -315,16 +406,16 @@ function add_journal_roll_buttons(target, tokenId=undefined){
   // matches "1d10", " 1d10 ", "1d10+1", " 1d10+1 ", "1d10 + 1" " 1d10 + 1 "
   const strongRoll = /(<strong>)(([0-9]+d[0-9]+)\s?([+-]\s?[0-9]+)?)(<\/strong>)/gi
   const damageRollRegexBracket = /(\()(([0-9]+d[0-9]+)\s?([+-]\s?[0-9]+)?)(\))/gi
-  const damageRollRegex = /([:\s>])(([0-9]+d[0-9]+)\s?([+-]\s?[0-9]+)?)([\.\):\s<,])/gi
+  const damageRollRegex = /([:\s>])(([0-9]+d[0-9]+)\s?([+-]\s?[0-9]+)?)([\.\):\s<,]|$)/gi
   // matches " +1 " or " + 1 "
   const hitRollRegexBracket = /(?<![0-9]+d[0-9]+)(\()([+-]\s?[0-9]+)(\))/gi
-  const hitRollRegex = /(?<![0-9]+d[0-9]+)([:\s>])([+-]\s?[0-9]+)([:\s<,])/gi
+  const hitRollRegex = /(?<![0-9]+d[0-9]+)([:\s>])([+-]\s?[0-9]+)([:\s<,]|$)/gi
   const dRollRegex = /\s(\s?d[0-9]+)\s/gi
   const tableNoSpaceRollRegex = />(\s?d[0-9]+\s?)</gi
-  const rechargeRegEx = /(Recharge [0-6]?\s?[–-]?\s?[0-6])/gi
+  const rechargeRegEx = /(Recharge [0-6]?\s?[—–-]?\s?[0-6])/gi
   const actionType = "roll"
   const rollType = "AboveVTT"
-  const updated = currentElement.html()
+  let updated = currentElement.html()
     .replaceAll(strongRoll, `$2`)
     .replaceAll(dashToMinus, `$1-$2`)
     .replaceAll(damageRollRegexBracket, ` <button data-exp='$3' data-mod='$4' data-rolltype='damage' data-actiontype='${actionType}' class='avtt-roll-button' title='${actionType}'>$1$2$5</button>`)
@@ -333,8 +424,10 @@ function add_journal_roll_buttons(target, tokenId=undefined){
     .replaceAll(hitRollRegex, ` $1<button data-exp='1d20' data-mod='$2' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'>$2</button>$3`)
     .replaceAll(dRollRegex, ` <button data-exp='1$1' data-mod='0' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'>$1</button> `)
     .replaceAll(tableNoSpaceRollRegex, `> <button data-exp='1$1' data-mod='0' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'>$1</button><`)
-    .replaceAll(rechargeRegEx, ` <button data-exp='1d6' data-mod='' data-rolltype='recharge' data-actiontype='Recharge' class='avtt-roll-button' title='${actionType}'>$1</button>`)
-    
+    .replaceAll(rechargeRegEx, `<button data-exp='1d6' data-mod='' data-rolltype='recharge' data-actiontype='Recharge' class='avtt-roll-button' title='${actionType}'>$1</button>`)
+
+  updated = add_aoe_to_statblock(updated);
+
   
   let ignoreFormatting = $(currentElement).find('.ignore-abovevtt-formating');
 
@@ -430,9 +523,7 @@ function add_journal_roll_buttons(target, tokenId=undefined){
   const entityType = tokenId ? "monster" : "character";
 
   // terminate the clones reference, overkill but rather be safe when it comes to memory
-  currentElement = null
-
-
+  currentElement = null;
 
   $(target).find(".avtt-roll-button").click(clickHandler);
   $(target).find(".avtt-roll-button").on("contextmenu", rightClickHandler);
@@ -467,7 +558,6 @@ function add_journal_roll_buttons(target, tokenId=undefined){
         .present(e.clientY, e.clientX) // TODO: convert from iframe to main window
     }
   })
-
 
   console.groupEnd()
 }

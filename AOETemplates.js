@@ -19,27 +19,7 @@ const AOE_TEMPLATES = {
     'green-square': 'https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/Spelltoken_GreenSquare.png',
 }
 
-function get_available_styles(){
-    return [
-        "Acid",
-        "Bludgeoning",
-        "Darkness",
-        "Default",
-        "Fire",
-        "Force",
-        "Ice",
-        "Lightning",
-        "Nature",
-        "Necrotic",
-        "Piercing",
-        "Poison",
-        "Psychic",
-        "Radiant",
-        "Slashing",
-        "Thunder",
-        "Water"
-    ]
-}
+
 
 
 
@@ -52,7 +32,9 @@ function setup_aoe_button(buttons) {
     
     aoeMenu.append(`<div><input min='5' onclick='$(this).select()'
         tabindex='2' id='aoe_feet_in_menu' value='20' style='width:75px;margin:0px;text-align:center' maxlength='10' type='number' step='5'></div>`);
-
+    aoeMenu.append("<div class='menu-subtitle'>Line Width</div>");
+    aoeMenu.append(`<div><input min='5' onclick='$(this).select()'
+        tabindex='2' id='aoe_line_feet_in_menu' value='5' style='width:75px;margin:0px;text-align:center' maxlength='10' type='number' step='5'></div>`);
     aoeMenu.append("<div class='menu-subtitle'>Style</div>");
     aoeMenu.append(
         `<div class='ddbc-tab-options--layout-pill'>
@@ -110,11 +92,12 @@ function setup_aoe_button(buttons) {
 
     $("#aoe_menu button").click(function (e) {
        
-        const size = $("#aoe_feet_in_menu").val() / window.CURRENT_SCENE_DATA.fpsq
+        const size = $("#aoe_feet_in_menu").val() / window.CURRENT_SCENE_DATA.fpsq;
+        const lineSize= $("#aoe_line_feet_in_menu").val() / window.CURRENT_SCENE_DATA.fpsq;
 
         const shape = $(e.currentTarget).attr("data-shape") 
         const style = $("#aoe_styles").val().toLowerCase()
-        const options = build_aoe_token_options(style, shape, size)
+        const options = build_aoe_token_options(style, shape, size, '', lineSize)
 
         //if single token selected, place there:
         if(window.CURRENTLY_SELECTED_TOKENS.length == 1) {
@@ -129,11 +112,13 @@ function setup_aoe_button(buttons) {
 
 function place_aoe_token_at_token(options, token){
     const sc = parseFloat(window.CURRENT_SCENE_DATA.hpps);
-    const dx = options.imgsrc.includes("line") ? (- options.gridWidth * sc / 2) : 0;
-    const dy = options.imgsrc.includes("cone") || options.imgsrc.includes("square") ? (options.size / 2) : 0;
     const half = sc * token.options.gridSquares/2;
-    const x = parseInt(token.options.left.slice(0,-2)) + half + dx;
-    const y = parseInt(token.options.top.slice(0,-2)) + half + dy;
+    let x = parseInt(token.options.left.slice(0,-2)) + half;
+    let y = parseInt(token.options.top.slice(0,-2)) + half
+
+    options.rotation = token.options.rotation;
+    options.repositionAoe = {x: x, y: y};
+
     if(window.DM){
         place_token_at_map_point(options, x, y);
     }
@@ -143,6 +128,8 @@ function place_aoe_token_at_token(options, token){
         window.MB.sendMessage("custom/myVTT/createtoken",options);
     }
     
+
+
 }
 
 function place_aoe_token_in_centre(options){
@@ -175,17 +162,23 @@ function getOrigin(token){
     let tokenLeft = (tok.position().left  + tokenImagePosition.left) / (window.ZOOM);
     let tokenRight = tokenLeft + tokenImageWidth;
     
-    let rayAngle = 90;
-    let ray = new Ray({x: (tokenLeft + tokenRight)/2, y: (tokenTop + tokenBottom)/2}, degreeToRadian(parseFloat(tok.css('--token-rotation')) % 360 - rayAngle));   
-    let dir = ray.dir;
-    let tokenWidth = token.sizeWidth();
-    let tokenHeight = token.sizeHeight();
-    let widthAdded = tokenHeight; 
+    if(token.options.imgsrc.match(/aoe-shape-cone|aoe-shape-line|aoe-shape-square/gi)){
+        let rayAngle = 90;
+        let ray = new Ray({x: (tokenLeft + tokenRight)/2, y: (tokenTop + tokenBottom)/2}, degreeToRadian(parseFloat(tok.css('--token-rotation')) % 360 - rayAngle));   
+        let dir = ray.dir;
+        let tokenWidth = token.sizeWidth();
+        let tokenHeight = token.sizeHeight();
+        let widthAdded = tokenHeight; 
 
     return  {
                 'x': (tokenLeft + tokenRight)/2 + (widthAdded*dir.x/2),
                 'y': (tokenTop + tokenBottom)/2 + (widthAdded*dir.y/2)
-            }                         
+            }    
+    } 
+    return  {
+        'x': (tokenLeft + tokenRight)/2,
+        'y': (tokenTop + tokenBottom)/2
+    }                      
 }
 
 function set_spell_override_style(spellName){
@@ -303,7 +296,7 @@ function build_aoe_class_name(style, shape, name) {
 function build_aoe_img_name(style, shape, name) {
     return `class=${build_aoe_class_name(style, shape, name)}`;
 }
-function build_aoe_token_options(style, shape, countGridSquares, name = "") {
+function build_aoe_token_options(style, shape, countGridSquares, name = "", lineWidth = 1) {
     shape = sanitize_aoe_shape(shape)
     let size = Math.round(window.CURRENT_SCENE_DATA.hpps * countGridSquares)
 
@@ -317,7 +310,10 @@ function build_aoe_token_options(style, shape, countGridSquares, name = "") {
     
     options.size = shape !== "line" ? size : ""
     options.gridHeight = shape === "line" ? countGridSquares : ""
-    options.gridWidth = shape === "line" ? 1 : ""
+    options.gridWidth = shape === "line" ? lineWidth : ""
+    if(shape === "line"){
+        options.lineAoe = "1";
+    }
 
     if(style == 'darkness'){
         options = {

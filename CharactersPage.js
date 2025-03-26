@@ -155,6 +155,16 @@ const buffsDebuffs = {
     "type": "class",
     "class": "barbarian",
   },
+  "Luck": {
+    "tohit": "0",
+    "dmg": "0",
+    "save": "0",
+    "check": "0",
+    "replace": /1d20/gi,
+    "newRoll": '1d20ro=1',
+    "type": "species",
+    "species": "halfling",
+  },
   "Great Weapon Master (2024)": {
     "tohit": "0",
     "dmg": "+PB",
@@ -390,6 +400,13 @@ const buffsDebuffs = {
       "dmg": "+2d6",
       "save": "0",
       "check": "0",
+      "type": "spell"
+  },
+  "Synaptic Static": {
+      "tohit": "-d6",
+      "dmg": "0",
+      "save": "0",
+      "check": "-d6",
       "type": "spell"
   }
 }
@@ -732,7 +749,21 @@ function convertToRPGRoller(){
               .present(e.clientY, e.clientX) // TODO: convert from iframe to main window
           }
     })
- 
+    $('.integrated-dice__container.above-vtt-visited-damage:has([class*="styles_signed"])').off('mouseover.color').on('mouseover.color', function(e){
+      if(e.shiftKey){
+        $(this).toggleClass('advantageHover', true)
+      }
+      else if((!isMac() && e.ctrlKey) || e.metaKey){
+        $(this).toggleClass('disadvantageHover', true)
+      }else{
+        $(this).toggleClass('advantageHover', false)
+        $(this).toggleClass('disadvantageHover', false)
+      }
+    })
+   $('.integrated-dice__container.above-vtt-visited-damage:has([class*="styles_signed"])').off('mouseleave.color').on('mouseleave.color', function(e){
+      $(this).toggleClass('advantageHover', false)
+      $(this).toggleClass('disadvantageHover', false)
+    })
     $(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`).off('click.rpg-roller').on('click.rpg-roller', function(e){
       if($(this).parent().hasClass('ct-reset-pane__hitdie-manager-dice'))// allow hit dice roll to go through ddb for auto heals - maybe setup our own message by put to https://character-service.dndbeyond.com/character/v5/life/hp/damage-taken later
         return;
@@ -742,9 +773,30 @@ function convertToRPGRoller(){
         return;
       }
       e.stopImmediatePropagation();
+
+
+      if (/^1d20/g.test( rollData.expression)) {
+        if(e.altKey){
+          if(e.shiftKey){
+            rollData.expression = rollData.expression.replace(/^1d20/g, '3d20kh1');
+          }
+           else if((!isMac() && e.ctrlKey) || e.metaKey){
+            rollData.expression = rollData.expression.replace(/^1d20/g, '3d20kl1');
+          }
+         }
+         else if(e.shiftKey){
+          rollData.expression = rollData.expression.replace(/^1d20/g, '2d20kh1');
+         }  
+         else if((!isMac() && e.ctrlKey) || e.metaKey){
+            rollData.expression = rollData.expression.replace(/^1d20/g, '2d20kl1');
+         }
+      }
+
       if(rollData.rollTitle == 'Initiative' && $(`[aria-label="Has advantage on initiative"]`).length){
         rollData.expression = rollData.expression.replace(/^1d20/g, '2d20kh1');
       }
+
+     
       window.diceRoller.roll(new DiceRoll(rollData.expression, rollData.rollTitle, rollData.rollType));
     });
 }
@@ -765,11 +817,11 @@ async function init_character_sheet_page() {
     observe_character_theme_change();
     observe_character_image_change();
     $(document).off('keydown.keypressAdv keyup.keypressAdv').on('keydown.keypressAdv keyup.keypressAdv', function(e) {
-      let target = $('.ddbc-combat-attack__icon.above-vtt-visited:hover, .ct-spells-spell__action.above-vtt-visited:hover')
+      let target = $('.ddbc-combat-attack__icon.above-vtt-visited:hover, .ct-spells-spell__action.above-vtt-visited:hover, .integrated-dice__container.above-vtt-visited-damage:has([class*="styles_signed"]):hover')
       if(e.shiftKey){
         $(target).toggleClass('advantageHover', true)
       }
-      else if(e.ctrlKey || e.metaKey){
+      else if((!isMac() && e.ctrlKey) || e.metaKey){
         $(target).toggleClass('disadvantageHover', true)
       }else{
         $(target).toggleClass('advantageHover', false)
@@ -1014,51 +1066,39 @@ function rebuild_buffs(fullBuild = false){
   window.rollBuffs = JSON.parse(localStorage.getItem('rollBuffs' + window.PLAYER_ID)) || [];
   rollBuffFavorites = JSON.parse(localStorage.getItem('rollFavoriteBuffs' + window.PLAYER_ID)) || [];
   let avttBuffSelect;
+  const innerBuffHtml = `
+    <ul id='favoriteBuffs'><li>Favorite</li></ul>
+    <ul id='classBuffs'><li>Class</li>
+      <ul id='barbarianBuffs'><li>Barbarian</li></ul>
+      <ul id='bardBuffs'><li>Bard</li></ul>
+      <ul id='clericBuffs'><li>Cleric</li></ul>
+      <ul id='druidBuffs'><li>Druid</li></ul>
+      <ul id='fighterBuffs'><li>Fighter</li></ul>
+      <ul id='monkBuffs'><li>Monk</li></ul>
+      <ul id='paladinBuffs'><li>Paladin</li></ul>
+      <ul id='rangerBuffs'><li>Ranger</li></ul>
+      <ul id='rogueBuffs'><li>Rogue</li></ul>
+      <ul id='sorcererBuffs'><li>Sorcerer</li></ul>
+      <ul id='warlockBuffs'><li>Warlock</li></ul>
+      <ul id='wizardBuffs'><li>Wizard</li></ul>
+    </ul>
+    <ul id='speciesBuffs'><li>Species</li>
+      <ul id='halflingBuffs'><li>Halfling</li></ul>
+    </ul>      
+    <ul id='spellBuffs'><li>Spells</li></ul>
+    <ul id='featBuffs'><li>Feats</li></ul>
+  `
   if(fullBuild){
     avttBuffSelect = $(`<div id="avtt-buff-options" class="dropdown-check-list">
       <span class="clickHandle">Roll Buff/Debuffs</span>
       <ul class="avttBuffItems">
-        <ul id='favoriteBuffs'><li>Favorite</li></ul>
-        <ul id='classBuffs'><li>Class</li>
-          <ul id='barbarianBuffs'><li>Barbarian</li></ul>
-          <ul id='bardBuffs'><li>Bard</li></ul>
-          <ul id='clericBuffs'><li>Cleric</li></ul>
-          <ul id='druidBuffs'><li>Druid</li></ul>
-          <ul id='fighterBuffs'><li>Fighter</li></ul>
-          <ul id='monkBuffs'><li>Monk</li></ul>
-          <ul id='paladinBuffs'><li>Paladin</li></ul>
-          <ul id='rangerBuffs'><li>Ranger</li></ul>
-          <ul id='rogueBuffs'><li>Rogue</li></ul>
-          <ul id='sorcererBuffs'><li>Sorcerer</li></ul>
-          <ul id='warlockBuffs'><li>Warlock</li></ul>
-          <ul id='wizardBuffs'><li>Wizard</li></ul>
-        </ul>
-        <ul id='spellBuffs'><li>Spells</li></ul>
-        <ul id='featBuffs'><li>Feats</li></ul>
+        ${innerBuffHtml}      
       </ul>
     </div>`)
   }
   else{
     avttBuffSelect = $(`#avtt-buff-options`);
-    avttBuffSelect.find('.avttBuffItems').html(`
-      <ul id='favoriteBuffs'><li>Favorite</li></ul>
-      <ul id='classBuffs'><li>Class</li>
-        <ul id='barbarianBuffs'><li>Barbarian</li></ul>
-        <ul id='bardBuffs'><li>Bard</li></ul>
-        <ul id='clericBuffs'><li>Cleric</li></ul>
-        <ul id='druidBuffs'><li>Druid</li></ul>
-        <ul id='fighterBuffs'><li>Fighter</li></ul>
-        <ul id='monkBuffs'><li>Monk</li></ul>
-        <ul id='paladinBuffs'><li>Paladin</li></ul>
-        <ul id='rangerBuffs'><li>Ranger</li></ul>
-        <ul id='rogueBuffs'><li>Rogue</li></ul>
-        <ul id='sorcererBuffs'><li>Sorcerer</li></ul>
-        <ul id='warlockBuffs'><li>Warlock</li></ul>
-        <ul id='wizardBuffs'><li>Wizard</li></ul>
-      </ul>
-      <ul id='spellBuffs'><li>Spells</li></ul>
-      <ul id='featBuffs'><li>Feats</li></ul>
-    `)
+    avttBuffSelect.find('.avttBuffItems').html(innerBuffHtml)
   }
 
   const avttBuffItems = avttBuffSelect.find('.avttBuffItems')
@@ -1086,7 +1126,7 @@ function rebuild_buffs(fullBuild = false){
     {}
   );
   for(let i in sortedBuffs){
-    const headerRow = avttBuffItems.find(`ul#${buffsDebuffs[i].type == 'class' ? buffsDebuffs[i].class : buffsDebuffs[i].type}Buffs`);
+    const headerRow = avttBuffItems.find(`ul#${buffsDebuffs[i].type == 'class' ? buffsDebuffs[i].class : buffsDebuffs[i].type == 'species' ? buffsDebuffs[i].species : buffsDebuffs[i].type}Buffs`);
     const replacedName = i.replace("'", '');
     const addToFavorite = rollBuffFavorites.includes(replacedName);
 
@@ -1237,13 +1277,15 @@ function observe_character_sheet_changes(documentToObserve) {
               //if single token selected, place there:
               if(window.top.CURRENTLY_SELECTED_TOKENS.length == 1) {
                 window.top.place_aoe_token_at_token(options, window.top.TOKEN_OBJECTS[window.top.CURRENTLY_SELECTED_TOKENS[0]]);
-              } else {
+              } 
+              else if(window.top.TOKEN_OBJECTS[`/profile/${window.myUser}/characters/${window.PLAYER_ID}`] != undefined){
+                window.top.place_aoe_token_at_token(options, window.top.TOKEN_OBJECTS[`/profile/${window.myUser}/characters/${window.PLAYER_ID}`]);
+              }else {
                 window.top.place_aoe_token_in_centre(options)
               }
-              
             }
             else if(window.sendToTab != undefined){
-              const data = {color: color, shape: shape, feet: feet, name: name}
+              const data = {color: color, shape: shape, feet: feet, name: name, tokenId: `/profile/${window.myUser}/characters/${window.PLAYER_ID}`}
               tabCommunicationChannel.postMessage({
                 msgType: 'placeAoe',
                 data: data,
@@ -1283,6 +1325,7 @@ function observe_character_sheet_changes(documentToObserve) {
       })
       snippets.each(function(){
         add_journal_roll_buttons($(this));
+        add_aoe_statblock_click($(this), `/profile/${window.myUser}/characters/${window.PLAYER_ID}`);
       })
     }
 
@@ -1338,6 +1381,7 @@ function observe_character_sheet_changes(documentToObserve) {
     if(extras_stats.length>0){
       extras_stats.addClass("above-vtt-visited");   
       scan_player_creature_pane($(extras_stats));
+      add_aoe_statblock_click($(extras_stats));
     }
 
 
@@ -1349,11 +1393,11 @@ function observe_character_sheet_changes(documentToObserve) {
         '-ms-user-select': 'none',
         'user-select': 'none',
       })
-      spells.off().on('mouseover.color', function(e){
+      spells.off('mouseover.color').on('mouseover.color', function(e){
         if(e.shiftKey){
           $(this).toggleClass('advantageHover', true)
         }
-        else if(e.ctrlKey || e.metaKey){
+        else if((!isMac() && e.ctrlKey) || e.metaKey){
           $(this).toggleClass('disadvantageHover', true)
         }else{
           $(this).toggleClass('advantageHover', false)
@@ -1385,14 +1429,14 @@ function observe_character_sheet_changes(documentToObserve) {
                     if(e.shiftKey){
                       diceRoll = new DiceRoll(`3d20kh1${data.modifier}`, data.rollTitle, data.rollType);
                     }
-                     else if(e.ctrlKey || e.metaKey){
+                     else if((!isMac() && e.ctrlKey) || e.metaKey){
                       diceRoll = new DiceRoll(`3d20kl1${data.modifier}`, data.rollTitle, data.rollType);
                     }
                    }
                    else if(e.shiftKey){
                     diceRoll = new DiceRoll(`2d20kh1${data.modifier}`, data.rollTitle, data.rollType);
                    }
-                   else if(e.ctrlKey || e.metaKey){
+                   else if((!isMac() && e.ctrlKey) || e.metaKey){
                     diceRoll = new DiceRoll(`2d20kl1${data.modifier}`, data.rollTitle, data.rollType);
                    }else{
                     diceRoll = new DiceRoll(data.expression, data.rollTitle, data.rollType);
@@ -1632,11 +1676,11 @@ function observe_character_sheet_changes(documentToObserve) {
         '-ms-user-select': 'none',
         'user-select': 'none',
       })
-      attackIcons.off().on('mouseover.color', function(e){
+      attackIcons.off('mouseover.color').on('mouseover.color', function(e){
         if(e.shiftKey){
           $(this).toggleClass('advantageHover', true)
         }
-        else if(e.ctrlKey || e.metaKey){
+        else if((!isMac() && e.ctrlKey) || e.metaKey){
           $(this).toggleClass('disadvantageHover', true)
         }else{
           $(this).toggleClass('advantageHover', false)
@@ -1680,14 +1724,14 @@ function observe_character_sheet_changes(documentToObserve) {
                 if(e.shiftKey){
                   data.expression = data.expression.replaceAll(/^1d20/g, '3d20kh1')
                  }
-                 else if(e.ctrlKey || e.metaKey){
+                 else if((!isMac() && e.ctrlKey) || e.metaKey){
                   data.expression = data.expression.replaceAll(/^1d20/g, '3d20kl1')
                  }
               }
               else if(e.shiftKey){
                 data.expression = data.expression.replaceAll(/^1d20/g, '2d20kh1')
               }
-              else if(e.ctrlKey || e.metaKey){
+              else if((!isMac() && e.ctrlKey) || e.metaKey){
                 data.expression = data.expression.replaceAll(/^1d20/g, '2d20kl1')
               }  
             }
@@ -1889,7 +1933,8 @@ function observe_character_sheet_changes(documentToObserve) {
               }
               .ct-character-sheet__inner button.avtt-roll-button,
               .ct-sidebar__inner .integrated-dice__container,
-              .ct-sidebar__inner .avtt-roll-button{
+              .ct-sidebar__inner .avtt-roll-button,
+              .ct-sidebar__inner .avtt-aoe-button{
                   /* lifted from DDB encounter stat blocks  */
                   color: var(--theme-contrast, #b43c35) !important;
                   background: transparent !important;
@@ -1902,32 +1947,39 @@ function observe_character_sheet_changes(documentToObserve) {
               }
               .ct-character-sheet__inner button.avtt-roll-button:hover,
               .ct-sidebar__inner .integrated-dice__container:hover,
-              .ct-sidebar__inner .avtt-roll-button:hover{
+              .ct-sidebar__inner .avtt-roll-button:hover,
+              .ct-sidebar__inner .avtt-aoe-button:hover {
                 background: var(--theme-transparent, #ced9e0) !important;
               }
               .ct-sidebar__inner .integrated-dice__container, 
-              .ct-sidebar__inner .avtt-roll-button{
+              .ct-sidebar__inner .avtt-roll-button,
+              .ct-sidebar__inner .avtt-aoe-button{
                   font-size:12px;
                   line-height:10px;
                   padding:2px 2px 1px 2px;
               }    
-              .ct-sidebar__inner .stat-block .avtt-roll-button{
+              .ct-sidebar__inner .stat-block .avtt-roll-button,
+              .ct-sidebar__inner .stat-block .avtt-aoe-button{
                   font-size:15px;
                   line-height:15px;
                   font-weight: unset;
               }
 
-              .ct-sidebar__inner .glc-game-log .abovevtt-sidebar-injected button.avtt-roll-button{
+              .ct-sidebar__inner .glc-game-log .abovevtt-sidebar-injected button.avtt-roll-button,
+              .ct-sidebar__inner .glc-game-log .abovevtt-sidebar-injected button.avtt-aoe-button{
                 color: rgb(92, 112, 128) !important;
               }
 
-              .ct-sidebar__inner .glc-game-log .abovevtt-sidebar-injected button.avtt-roll-button:hover{
+              .ct-sidebar__inner .glc-game-log .abovevtt-sidebar-injected button.avtt-roll-button:hover,
+              .ct-sidebar__inner .glc-game-log .abovevtt-sidebar-injected button.avtt-aoe-button:hover{
                 background: #ced9e0 !important;
               }
 
 
               .ct-sidebar__inner [class*='ddbc-creature-block'] .avtt-roll-button,
-              .ct-sidebar__inner [class*='styles_creatureBlock'] .avtt-roll-button{
+              .ct-sidebar__inner [class*='styles_creatureBlock'] .avtt-roll-button,
+              .ct-sidebar__inner [class*='styles_creatureBlock'] .avtt-aoe-button,
+              .ct-sidebar__inner [class*='ddbc-creature-block'] .avtt-aoe-button{
                   /* lifted from DDB encounter stat blocks  */
                   color: #b43c35 !important;
                   background: #fff !important;
@@ -2042,6 +2094,13 @@ function observe_character_sheet_changes(documentToObserve) {
         }
         else if(mutationTarget.closest(".ct-game-log-pane, [class*='styles_gameLogPane']").length > 0){
           $('#castbutton').remove();
+            if($("#switch_gamelog").length > 0){
+              if($('#settings-panel').length == 0){
+                init_sidebar_tabs();
+                $('.avtt-sidebar-controls .selected-tab').click();
+              }
+            return;
+          }
         }
          
 

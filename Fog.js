@@ -260,7 +260,7 @@ class WaypointManagerClass {
 		}
 
 		rulerContainer.innerHTML = "";
-		if (window.PEER_TOKEN_DRAGGING[playerId]) {
+		if (window.PEER_TOKEN_DRAGGING != undefined && window.PEER_TOKEN_DRAGGING[playerId]) {
 	        const html = window.PEER_TOKEN_DRAGGING[playerId];
 	        delete window.PEER_TOKEN_DRAGGING[playerId];
 	        $(html).remove();
@@ -521,7 +521,7 @@ class WaypointManagerClass {
 
 			this.throttleDraw(function(){
 				self.draw(undefined, undefined, alpha, playerID)
-				if (window.PEER_TOKEN_DRAGGING[self.playerId]) {
+				if (window.PEER_TOKEN_DRAGGING != undefined && window.PEER_TOKEN_DRAGGING[self.playerId]) {
 			        const html = window.PEER_TOKEN_DRAGGING[self.playerId];
 			        $(html).css('opacity', 0.5 * alpha);
 		      	}
@@ -587,6 +587,34 @@ function is_token_in_raycasting_context(tokenid, rayContext=undefined){
 		}
 	}
 				
+	return  false;
+}
+
+function is_token_in_aoe_context(tokenid, aoeContext=undefined){
+	if(aoeContext == undefined)
+		return;
+	
+	let gridSquares = window.TOKEN_OBJECTS[tokenid].options.gridSquares;
+
+	if(gridSquares != undefined){
+		gridSquares = Math.max(Math.round(gridSquares), 1);
+		let centerSquareLeft = (parseInt(window.TOKEN_OBJECTS[tokenid].options.left.replace('px', ''))/ window.CURRENT_SCENE_DATA.scale_factor) + window.CURRENT_SCENE_DATA.hpps/2/window.CURRENT_SCENE_DATA.scale_factor;
+		let centerSquareTop = (parseInt(window.TOKEN_OBJECTS[tokenid].options.top.replace('px', ''))/ window.CURRENT_SCENE_DATA.scale_factor) + window.CURRENT_SCENE_DATA.vpps/2/window.CURRENT_SCENE_DATA.scale_factor;
+		let pixeldata = aoeContext.getImageData(centerSquareLeft - 2, centerSquareTop -2, 4, 4).data;
+
+		for(let x = 0; x<=gridSquares-1; x++){
+			let left = centerSquareLeft + (window.CURRENT_SCENE_DATA.hpps/window.CURRENT_SCENE_DATA.scale_factor)*x;
+			for(let y = 0; y<=gridSquares-1; y++){
+				let top = centerSquareTop + (window.CURRENT_SCENE_DATA.vpps/window.CURRENT_SCENE_DATA.scale_factor)*y;
+				let pixeldata = aoeContext.getImageData(left-2, top-2, 4, 4).data;
+				for(let i=0; i<pixeldata.length; i+=4){
+					if(pixeldata[i]>100 || pixeldata[i+1]>100 || pixeldata[i+2]>100){
+						return true;
+					}
+				}
+			}	
+		}
+	}			
 	return  false;
 }
 function is_token_under_light_aura(tokenid, lightContext=undefined){
@@ -2067,6 +2095,8 @@ function door_note_icon(id){
 							window.JOURNAL.translateHtmlAndBlocks(tooltipHtml);	
 							add_journal_roll_buttons(tooltipHtml);
 							window.JOURNAL.add_journal_tooltip_targets(tooltipHtml);
+							add_stat_block_hover(tooltipHtml);
+							add_aoe_statblock_click(tooltipHtml);
 				            flyout.append(tooltipHtml);
 				            let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
 				            sendToGamelogButton.css({ "float": "right" });
@@ -2257,6 +2287,8 @@ function numToColor(num, alpha, max) {
  * @returns
  */
 function drawing_mousedown(e) {
+	if($(e.target).is('#context-menu-layer'))
+		return;
 	// perform some cleanup of the canvas/objects
 	if(e.button !== 2 && !window.MOUSEDOWN){
 		clear_temp_canvas()
@@ -3821,7 +3853,7 @@ function drawRect(ctx, startx, starty, width, height, style, fill=true, lineWidt
 
 }
 
-function drawCone(ctx, startx, starty, endx, endy, style, fill=true, lineWidth = 6)
+function drawCone(ctx, startx, starty, endx, endy, style, fill=true, lineWidth = 6, addStrokeToFill = false)
 {
 	let L = Math.sqrt(Math.pow(endx - startx, 2) + Math.pow(endy - starty, 2));
 	let T = Math.sqrt(Math.pow(L, 2) + Math.pow(L / 2, 2));
@@ -3834,6 +3866,11 @@ function drawCone(ctx, startx, starty, endx, endy, style, fill=true, lineWidth =
 	if(fill){
 		ctx.fillStyle = style;
 		ctx.fill();
+		if(addStrokeToFill){
+			ctx.lineWidth = lineWidth;
+			ctx.strokeStyle = style;
+			ctx.stroke();
+		}
 	}
 	else{
 		ctx.lineWidth = lineWidth;
@@ -5955,7 +5992,7 @@ function redraw_light(){
 
 		if(!window.DM || window.SelectedTokenVision){
 			draw_darkness_aoe_to_canvas(lightInLosContext);
-		
+			
 			lightInLosContext.globalCompositeOperation='source-over';
 			lightInLosContext.drawImage(devilsightCanvas, 0, 0);
 
@@ -6037,66 +6074,81 @@ function redraw_light(){
 }
 
 
+function draw_aoe_to_canvas(targetAoes, ctx, isDarkness = false){
 
-function draw_darkness_aoe_to_canvas(ctx, canvas=lightInLos){
+	for(let i = 0; i<targetAoes.length; i++){
+		let currentAoe = $(targetAoes[i]);
 
-	let darknessAoes = $('[data-darkness]');
-	ctx.globalCompositeOperation='source-over';
-	for(let i = 0; i<darknessAoes.length; i++){
-		let currentAoe = $(darknessAoes[i]);
+		let left = parseFloat(currentAoe.css('left'));
+		let top = parseFloat(currentAoe.css('top'));
+		let width = parseFloat(currentAoe.css('width'));
+		let height = parseFloat(currentAoe.css('height'));
+		let scale = window.CURRENT_SCENE_DATA.scale_factor != undefined ? window.CURRENT_SCENE_DATA.scale_factor : 1;
+		let halfGrid = window.CURRENT_SCENE_DATA.hpps/2;
+		let divideScale = 1;
+		let color = 'black';
+
+		if(isDarkness == false){
+			scale = 1;
+			halfGrid = 0;
+			divideScale = window.CURRENT_SCENE_DATA.scale_factor != undefined ? window.CURRENT_SCENE_DATA.scale_factor : 1;
+			color = 'white';
+		}
 		if(currentAoe.find('.aoe-shape-circle').length>0){
-			let centerX = (parseFloat(currentAoe.css('left')) + parseFloat(currentAoe.css('width'))/2) * window.CURRENT_SCENE_DATA.scale_factor;
-			let centerY = (parseFloat(currentAoe.css('top')) + parseFloat(currentAoe.css('height'))/2) * window.CURRENT_SCENE_DATA.scale_factor;
-			let radius = (parseFloat(currentAoe.css('width'))/2) * window.CURRENT_SCENE_DATA.scale_factor + window.CURRENT_SCENE_DATA.hpps/2;
-			drawCircle(ctx, centerX, centerY, radius, 'black')
+			let centerX = (left + width/2) * scale;
+			let centerY = (top + height/2) * scale;
+			let radius = (width/2) * scale;
+			drawCircle(ctx, centerX, centerY, radius, color)
 		}
 		if(currentAoe.find('.aoe-shape-square').length>0){
-			let width = parseFloat(currentAoe.css('width')) * window.CURRENT_SCENE_DATA.scale_factor + window.CURRENT_SCENE_DATA.hpps/2;
-			let height = parseFloat(currentAoe.css('height')) * window.CURRENT_SCENE_DATA.scale_factor + window.CURRENT_SCENE_DATA.hpps/2;
-			let centerX = (parseFloat(currentAoe.css('left')) + parseFloat(currentAoe.css('width'))/2);
-			let centerY = (parseFloat(currentAoe.css('top')) + parseFloat(currentAoe.css('height'))/2);
+			width = width;
+			height = height;
+			let centerX = (left + width/2)/divideScale;
+			let centerY = (top + height/2)/divideScale;
 
 			let rotationRad = parseFloat(currentAoe.css('--token-rotation')) * (Math.PI/180) 
 
 			ctx.translate(centerX, centerY);
 			ctx.rotate(rotationRad);
-			drawRect(ctx, -width/2, -height/2, width, height, "black")
+			drawRect(ctx, -width/2*scale, -height/2*scale, width*scale, height*scale, color)
 			ctx.rotate(-rotationRad);
 			ctx.translate(-centerX, -centerY);
 		}
 		if(currentAoe.find('.aoe-shape-line').length>0){
-			let width = parseFloat(currentAoe.css('width')) * window.CURRENT_SCENE_DATA.scale_factor + window.CURRENT_SCENE_DATA.hpps/2;
-			let height = parseFloat(currentAoe.css('height')) * window.CURRENT_SCENE_DATA.scale_factor + window.CURRENT_SCENE_DATA.hpps/2;
-			let centerX = (parseFloat(currentAoe.css('left')) + parseFloat(currentAoe.css('width'))/2);
-			let centerY = (parseFloat(currentAoe.css('top')) + parseFloat(currentAoe.css('height'))/2);
+			width = width;
+			height = height;
+			let centerX = (left + width/2)/divideScale;
+			let centerY = (top + height/2)/divideScale;
 
 			let rotationRad = parseFloat(currentAoe.css('--token-rotation')) * (Math.PI/180) 
 
 			ctx.translate(centerX, centerY);
 			ctx.rotate(rotationRad);
-			drawRect(ctx, -width/2, -height/2, width, height, "black")
+			drawRect(ctx, -width/2*scale, -height/2*scale, width*scale, height*scale, color)
 			ctx.rotate(-rotationRad);
 			ctx.translate(-centerX, -centerY);
 		}
 		if(currentAoe.find('.aoe-shape-cone').length>0){
-			let width = parseFloat(currentAoe.css('width')) + window.CURRENT_SCENE_DATA.hpps/2;
-			let height = parseFloat(currentAoe.css('height')) + window.CURRENT_SCENE_DATA.hpps/2;
-			let centerX = (parseFloat(currentAoe.css('left')) + parseFloat(currentAoe.css('width'))/2);
-			let centerY = (parseFloat(currentAoe.css('top')) + parseFloat(currentAoe.css('height'))/2);
+			width = width;
+			height = height;
+			let centerX = (left + width/2)/divideScale;
+			let centerY = (top + height/2)/divideScale;
 
 			let rotationRad = parseFloat(currentAoe.css('--token-rotation')) * (Math.PI/180) 
 
 			ctx.translate(centerX, centerY);
 			ctx.rotate(rotationRad);
-			drawCone(ctx, 0, -height, 0, height, "black")
+			drawCone(ctx, 0, (-height)/2*scale, 0, (height)/2*scale, color, true);
 			ctx.rotate(-rotationRad);
 			ctx.translate(-centerX, -centerY);
 		}
-
 	}
+}
 
-
-
+function draw_darkness_aoe_to_canvas(ctx){
+	let darknessAoes = $('[data-darkness]');
+	ctx.globalCompositeOperation='source-over';
+	draw_aoe_to_canvas(darknessAoes, ctx, true)
 }
 function clipped_light(auraId, maskPolygon, playerTokenId, canvasWidth = $("#raycastingCanvas").width(), canvasHeight = $("#raycastingCanvas").height()){
 	//this saves clipped light offscreen canvas' to a window object so we can check them later to see what tokens are visible to the players

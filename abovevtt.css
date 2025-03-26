@@ -1,3 +1,4 @@
+
 button[id$='-button'],
 button[id$='_button'],
 button[id^=peerVideo_],
@@ -168,31 +169,7 @@ body > div {
     padding: 2px 4px;
 }
 
-button[id$='-button']:hover,
-button[id$='_button']:hover,
-button[id^=peerVideo_]:hover,
-#combat_tracker > button:hover,
-body > button:hover,
-#addscene:hover,
-.scene button:hover,
-#combat_tracker_inside button:hover,
-#edit_dialog button:not(.rc-switch):hover,
-#edit_scene_form button:not(.rc-switch):hover,
-#mega_importer button:hover,
-#prewiz td button:hover,
-#wizard_popup button:hover,
-.top_menu button:hover,
-.monster_frame > button:hover,
-.stp-btn:hover,
-.player-actions button:hover,
-#add-party:hover,
-.importer_toggle:hover,
-#zoom_buttons button:hover,
-.GameLogEntry_Message__1GoY3 button:hover {
-    color: #333;
-    background-image: none;
-    background: #e6e6e6;
-}
+
 [class*='GameLogEntries'] [class*='Message-Collapsed-Other-Flex'] {
     padding: 8px 10px;
     color: rgb(92, 112, 128);
@@ -267,9 +244,7 @@ button.gamelog-to-everyone-button:hover {
     font-weight: 700;
     margin: -3px -3px;
 }
-.material-icons.button-icon:hover {
-    color: #fff;
-}
+
 
 
 .ddbc-tab-options--layout-pill .ddbc-tab-options__header-heading {
@@ -295,14 +270,12 @@ button .ddbc-tab-options__header-heading{
 button .ddbc-tab-options__header-heading .menu-option{
     width: 69px;
 }
+
 .ddbc-tab-options--layout-pill .ddbc-tab-options__header-heading--is-active {
     color: #fff;
     background-color: #c53131;
 }
-.ddbc-tab-options--layout-pill .ddbc-tab-options__header-heading:hover {
-    background-color: #5d5d5d;
-    color: #f2f2f2;
-}
+
 .ddbc-tab-options--layout-pill .ddbc-tab-options__header-heading svg path {
     fill: #838383
 }
@@ -714,12 +687,21 @@ button .ddbc-tab-options__header-heading .menu-option{
     flex-direction: column;
     justify-content: center;
 }
-#resizeDragMon .avtt-stat-block-container .mon-stat-block .tooltip-hover{
+#resizeDragMon .avtt-stat-block-container .tooltip-hover{
+    -webkit-text-decoration-thickness:1px ; 
+    -webkit-text-decoration-style: dotted;  
+    text-decoration-thickness:1px ; 
+    text-decoration-style: dotted;
+}
+
+#resizeDragMon .avtt-stat-block-container :is(.rule-tooltip, .skill-tooltip, .condition-tooltip, .sense-tooltip){
     color: inherit !important;
     font-weight: inherit !important;
-    -webkit-text-decoration: underline solid #47d18c;
-    text-decoration: underline solid #47d18c;
+    text-decoration-line: underline; 
+    -webkit-text-decoration-color: #47d18c;
+    text-decoration-color: #47d18c;
 }
+
 #resizeDragMon .avtt-stat-block-container .ddbc-creature-block__header{
     margin-top: 10px;
 }
@@ -1655,6 +1637,12 @@ div#combat-tracker-settings form > div {
     transition: box-shadow 0.5 ease-in-out;
     z-index: 50;
 }
+[class*='styles_mobileNav']>div>button[class*='styles_navToggle']{
+    display: none;
+}
+[class*='styles_mobileNav'].visibleMobileNav>div>button[class*='styles_navToggle']{
+    display: flex;
+}
 
 .hasTooltip::after {
     content: attr(data-name);
@@ -1670,6 +1658,11 @@ div#combat-tracker-settings form > div {
     text-shadow: 0px 1px 1px #000;
     visibility: hidden;
     transition: 0.2s ease-in-out 0.5s;
+}
+
+.hasTooltip::after,
+.sidebar-hover-text-flyout{
+  pointer-events: none;
 }
 
 .tooltip-body {
@@ -3315,6 +3308,11 @@ div#selectedTokensBorder {
 .context-menu-icon-view:before {
     content: "\f22e" !important;
 }
+#tokenOptionsContainer .aoe-select-tokens::before, 
+#tokenOptionsContainer .context-menu-aoe-select-tokens::before {
+    content: "\e9fe" !important;
+    font-family: 'Material Symbols Outlined' !important;
+}
 .icon-add-circle:before,
 .context-menu-icon-add-circle:before {
     content: "\e148" !important;
@@ -3545,8 +3543,8 @@ div#selectedTokensBorder {
 
 /* AOE STYLES */
 .aoe-style-acid{
-    background-image: url(https://opengameart.org/sites/default/files/styles/medium/public/oga-textures/12976/caust_009.png);
-    box-shadow: inset -20px -20px 2px 1000px rgba(13, 253, 0, 0.49);
+    background:linear-gradient(rgba(13, 253, 0, 0.49), rgba(13, 253, 0, 0.49)), url(https://opengameart.org/sites/default/files/styles/medium/public/oga-textures/12976/caust_009.png);
+    background-repeat: no-repeat, repeat;
 }
 .aoe-style-bludgeoning{
     background-image: url(https://www.tilingtextures.com/wp-content/uploads/2020/06/17064578-0145-512x512.jpg);
@@ -3557,7 +3555,8 @@ div#selectedTokensBorder {
 .aoe-style-force{
     background-image: url(https://www.myfreetextures.com/wp-content/uploads/2014/10/electbubbles-900x900.jpg);
 }
-.aoe-style-ice {
+.aoe-style-ice,
+.aoe-style-cold {
     background-image: url(https://3djungle.net/upload/resize_cache/iblock/849/400_400_1/8495c4591433cffedbe8a19a13fbc7eb.jpg);
 }
 .aoe-style-nature{
@@ -3571,12 +3570,12 @@ div#selectedTokensBorder {
     background-image: url(https://previews.123rf.com/images/sylverarts/sylverarts1801/sylverarts180100741/92992928-horror-style-horrible-seamless-pattern-vector-background-blackthorn-branches-with-thorns-stylish-end.jpg);
 }
 .aoe-style-poison {
-    background-image: url(https://www.tilingtextures.com/wp-content/uploads/2017/02/0005-512x512.jpg);
-    box-shadow: inset -20px -20px 2px 1000px rgba(119, 247, 0, 0.52);
+    background:linear-gradient(rgba(119, 247, 0, 0.52), rgba(119, 247, 0, 0.52)), url(https://www.tilingtextures.com/wp-content/uploads/2017/02/0005-512x512.jpg);
+    background-repeat: no-repeat, repeat;
 }
 .aoe-style-psychic {
-    background-image: url(https://images.assetsdelivery.com/compings_v2/almagami/almagami1912/almagami191200125.jpg);
-    box-shadow: inset -20px -20px 2px 1000px rgba(115, 10, 235, 0.49);
+    background:linear-gradient(rgba(115, 10, 235, 0.49), rgba(115, 10, 235, 0.49)), url(https://images.assetsdelivery.com/compings_v2/almagami/almagami1912/almagami191200125.jpg);
+    background-repeat: no-repeat, repeat;
 }
 .aoe-style-radiant {
     background-image: url(https://www.tilingtextures.com/wp-content/uploads/2019/06/0097-512x512.jpg);
@@ -3586,20 +3585,93 @@ div#selectedTokensBorder {
     background-image: url(https://www.tilingtextures.com/wp-content/uploads/2018/11/0069-512x512.jpg);
 }
 .aoe-style-water{
-    background-image: url(https://opengameart.org/sites/default/files/styles/medium/public/oga-textures/12976/caust_009.png);
-    box-shadow: inset -20px -20px 2px 1000px rgba(49, 177, 246, 0.49);
+    background:linear-gradient(rgba(49, 177, 246, 0.49), rgba(49, 177, 246, 0.49)), url(https://opengameart.org/sites/default/files/styles/medium/public/oga-textures/12976/caust_009.png);
+    background-repeat: no-repeat, repeat;
 }
 
 .aoe-style-darkness{
     filter: grayscale(1) brightness(0.2) !important;
 }
-
+.aoe-style-fire{
+  background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/fire_background.png);
+}
+.aoe-style-lightning{
+    background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/lightning.png);
+}
+.aoe-style-slashing{
+    background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/slashing.png);
+}
+.aoe-style-darkness{
+    background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/fire_background.png);
+}
 /* SPECIFIC SPELL STYLES */
-
 .aoe-style-stinking-cloud{
-    box-shadow: inset -20px -20px 2px 1000px rgba(49, 246, 85, 0.49) !important;
+    background:linear-gradient(rgba(49, 246, 85, 0.49), rgba(49, 246, 85, 0.49)), url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/fog_cloud_tileable.png);
+    background-repeat: no-repeat, repeat;
+}
+.aoe-style-fog-cloud{
+    background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/fog_cloud_tileable.png) !important;
+}
+.aoe-style-hypnotic-pattern{
+    background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/hypnotic-pattern.png) !important;
+}
+.aoe-style-web{
+    background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/tileable3pxsquareweb.png) !important;
 }
 
+[data-animation='fairy-fx'] .islight,
+.aura-element[data-animation='fairy-fx'][id*='aura_'] {
+    -webkit-mask-image: url('https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/fairys.png');
+}
+
+[data-animation='fairy-fx'] .islight:before,
+.aura-element[data-animation='fairy-fx'][id*='aura_']:before {
+    -webkit-mask-image: url('https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/fairys.png');
+}
+
+[data-animation='spore-fx'] .islight,
+.aura-element[data-animation='spore-fx'][id*='aura_'] {
+    -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/spore.png");
+}
+
+[data-animation='lightning-fx'] .islight,
+.aura-element[data-animation='lightning-fx'][id*='aura_'] {
+    --mask-1: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/lightningcircle.png");
+}
+
+[data-animation='magic-circle-fx'] .islight,
+.aura-element[data-animation='magic-circle-fx'][id*='aura_'] {
+    -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/magiccircle1.png");
+}
+
+[data-animation='magic-circle-2-fx'] .islight,
+.aura-element[data-animation='magic-circle-2-fx'][id*='aura_'] {
+    -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/magiccircle2.png");
+}
+[data-animation='hurricane-fx'] .islight,
+.aura-element[data-animation='hurricane-fx'][id*='aura_'] {
+    -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/hurricane_cloud.png");
+}
+
+[data-animation='hurricane-fx'] .islight:before,
+.aura-element[data-animation='hurricane-fx'][id*='aura_']:before
+{
+    -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/lightning_2.png");
+}
+[data-animation='snow-fx'] .islight:before,
+.aura-element[data-animation='snow-fx'][id*='aura_']:before,
+[data-animation='snow-fx'] .islight:after,
+.aura-element[data-animation='snow-fx'][id*='aura_']:after
+{
+    -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/snow.png");
+}
+[data-animation='bubble-fx'] .islight:before,
+.aura-element[data-animation='bubble-fx'][id*='aura_']:before,
+[data-animation='bubble-fx'] .islight:after,
+.aura-element[data-animation='bubble-fx'][id*='aura_']:after
+{
+    -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/bubble.png");
+}
 
 
 /* END AOE STYLES */
@@ -3711,6 +3783,11 @@ div.token-image {
     width: 100%;
     height: 100%;
 }
+
+.ct-sidebar__portal>[class*='styles_mask']{
+    display: none;
+}
+
 .ct-sidebar[class*='styles_sidebar'] {
     min-width: 340px !important;
 }
@@ -5554,7 +5631,7 @@ div button.add-monster-token-to-vtt {
     background: var(--theme-background);
 }
 button.avtt-roll-button,
-.avtt-ability-roll-button {
+.avtt-ability-roll-button{
     /* lifted from DDB encounter stat blocks  */
     color: #b43c35;
     border: 1px solid #b43c35;
@@ -5567,6 +5644,35 @@ button.avtt-roll-button,
     line-height: 18px;
     letter-spacing: 1px;
     padding: 1px 4px 0;
+}
+.tooltip .tooltip-body-statblock-item-value{
+    display:flex;
+    flex-direction: row;
+    align-items: center;
+}
+.tooltip .above-aoe.integrated-dice__container,
+.avtt-aoe-button {
+    display: inline-flex;
+    padding: 0px;
+    color: #b43c35;
+    border: 1px solid #b43c35;
+    border-radius: 4px;
+    background-color: #fff;
+    white-space: nowrap;
+    font-size: 14px;
+    padding: 1px 2px 1px 3px;
+    font-weight:bold;
+    cursor: pointer;
+}
+
+.tooltip .avtt-roll-button,
+.avtt-ability-roll-button{
+    cursor: pointer;
+}
+
+.tooltip .aoe-size{
+    display:flex;
+    align-items: center;
 }
 button.avtt-roll-button:has(button.avtt-roll-button) {
     border:0 !important;
@@ -7725,10 +7831,21 @@ button span.onedrive-btn-status{
     display: none;
 }
 .glc-game-log .ddbc-concentration-icon, 
-.glc-game-log .ddbc-ritual-icon{
-    position: absolute;
-    width: 24px;
-    height:  24px;
+.glc-game-log .ddbc-ritual-icon,
+.glc-game-log [class*='styles_ritualIcon'],
+.glc-game-log [class*='styles_concentrationIcon']
+{
+    display: inline-block;
+    margin-left: .188rem;
+}
+.glc-game-log [class*='styles_concentrationIcon'] rect {
+    transform: translate(-4.18px, 10.09px) rotate(-45deg) !important;
+}
+.glc-game-log [class*='styles_concentrationIcon'] [class*='styles_svg'],
+.glc-game-log [class*='styles_ritualIcon'] [class*='styles_svg']{
+    height: .75rem;
+    margin-right: 0;
+    width: .75rem;
 }
 .stream-dice-button:hover {
     cursor: pointer;
@@ -9584,6 +9701,62 @@ button.journal-view-button.journal-button {
     text-align: left;
     color: #444d;
     font-weight: 600;
+
+}
+
+#qrm-block-send-to-game-log {
+    width: 22px;
+    height: 22px;
+    display:inline-flex;
+    align-items: center;
+    justify-content: center;
+    position:relative;
+}
+[class*="glc-game-log"] .qrm_name_line{
+    max-width:;
+
+}
+[class*="glc-game-log"] span.save-fail{
+    color: #A00;
+}
+[class*="glc-game-log"] span.save-success{
+    color:#0A0;
+}
+[class*="glc-game-log"] table#qrm-gamelog{
+    width: 100%;
+    display: block;
+    border-radius:5px;
+    border:1px solid #ddd
+}
+[class*="glc-game-log"] table#qrm-gamelog tbody{
+    width:100%;
+    display:block;
+}
+
+[class*="glc-game-log"] table#qrm-gamelog tr{
+    display:table;
+    width:100%;
+}
+[class*="glc-game-log"] table#qrm-gamelog :is(tr, td),
+[class*="glc-game-log"] table#qrm-gamelog{
+    background:none;
+    border: none;
+    margin: 0px;
+    padding: 0px;
+    border-radius:5px;
+}
+[class*="glc-game-log"] table#qrm-gamelog td{
+    max-width:210px;
+    width:100%;
+}
+[class*="glc-game-log"] table#qrm-gamelog tr:nth-of-type(odd){
+    backdrop-filter:brightness(0.96);
+    border-radius:5px;
+}
+
+
+#qrm-block-send-to-game-log span{
+    font-size: 20px;
 }
 .menu_table{
     overflow: visible;
@@ -10470,7 +10643,6 @@ button#editAnimations {
     border-color: #ddd;
 }
 .adjustments_wrapper{
-    top: 5px;
     position: relative;
     display: inline-block;
 }
@@ -11039,7 +11211,17 @@ div#playlistFields {
 .ct-sidebar .glc-game-log .stat-block .stats table tbody tr:hover button.avtt-roll-button{
     background-color: #fff;
 }
+.ct-sidebar__inner>[class*='styles_pane']>[class*='styles_content']{
+    padding: 0px; 
+}
 
+.ct-sidebar__inner>[class*='styles_pane']>[class*='styles_content'] .glc-game-log{
+    background: #FEFEFE;
+}
+
+.ct-sidebar__inner>[class*='styles_pane']>[class*='styles_content'][class*='styles_dark'] .glc-game-log{
+    background: #12181c;
+}
 .stat-block .mon-stat-block__attribute-label,
 .stat-block .mon-stat-block__attribute-data-value,
 .stat-block .mon-stat-block__tidbits span,
@@ -11485,23 +11667,17 @@ div#playlistFields {
 }
 
 
- .more-info,.RPGMonster-listing .more-info,.RPGMagicItem-listing .more-info,.ihomebrewable-listing .more-info,.RPGSpell-listing .more-info,.IGear-listing .more-info,.RPGFeat-listing .more-info,.RPGBackground-listing .more-info,.RPGSubclass-listing .more-info {
+.more-info,.RPGMonster-listing .more-info,.RPGMagicItem-listing .more-info,.ihomebrewable-listing .more-info,.RPGSpell-listing .more-info,.IGear-listing .more-info,.RPGFeat-listing .more-info,.RPGBackground-listing .more-info,.RPGSubclass-listing .more-info {
     position: relative;
     top: -10px;
     background-color: #fff;
-    border-left: 1px solid #ECE9E9;
-    border-right: 1px solid #ECE9E9;
+    border: none;
     width: calc(100% - 2px);
     margin: 0 auto;
-    padding: 20px 20px 0
+    padding: 5px 5px 0
 }
 
-@media(min-width: 1024px) {
-     .more-info,.RPGMonster-listing .more-info,.RPGMagicItem-listing .more-info,.ihomebrewable-listing .more-info,.RPGSpell-listing .more-info,.IGear-listing .more-info,.RPGFeat-listing .more-info,.RPGBackground-listing .more-info,.RPGSubclass-listing .more-info {
-        width:calc(100% - 10px);
-        padding: 30px 26px 0
-    }
-}
+
 
  .more-info-body-description,.RPGMonster-listing .more-info-body-description,.RPGMagicItem-listing .more-info-body-description,.ihomebrewable-listing .more-info-body-description,.RPGSpell-listing .more-info-body-description,.IGear-listing .more-info-body-description,.RPGFeat-listing .more-info-body-description,.RPGBackground-listing .more-info-body-description,.RPGSubclass-listing .more-info-body-description {
     font-size: 14px;
@@ -12184,7 +12360,17 @@ div#playlistFields {
     text-decoration: underline;
     text-decoration: underline solid #1b9af0
 }
-
+.tooltip-hover.loading-tooltip:hover:after {
+    position  : fixed;
+    left: var(--cursor-offsetX);
+    top: var(--cursor-offsetY);
+    z-index   : 1000000;
+    width     : 20px;
+    height    : 20px;
+    background: url(https://dndbeyond.com/content/1-0-3132-0/skins/waterdeep/images/character-sheet/loading-ring.svg) no-repeat;
+    background-size: contain;
+    content: '';
+}
 @media print,(min-width: 1480px) {
     .mon-stat-block-2024 {
         -webkit-column-count:2;
@@ -12920,57 +13106,41 @@ div#playlistFields {
     .i-aoe-cone {
         background-image: url(https://www.dndbeyond.com/content/1-0-3073-0/skins/waterdeep/images/icons/areas_of_effect/cone.svg);
         position: relative;
-        top: 3px;
-        left: 1px;
-        margin-right: 3px
+
     }
 
     .i-aoe-cube {
         background-image: url(https://www.dndbeyond.com/content/1-0-3073-0/skins/waterdeep/images/icons/areas_of_effect/cube.svg);
         position: relative;
-        top: 3px;
-        left: 1px;
-        margin-right: 3px
     }
 
     .i-aoe-cylinder {
         background-image: url(https://www.dndbeyond.com/content/1-0-3073-0/skins/waterdeep/images/icons/areas_of_effect/cylinder.svg);
         position: relative;
-        top: 3px;
-        left: 1px;
-        margin-right: 3px
     }
 
     .i-aoe-emanation {
         background-image: url(https://www.dndbeyond.com/content/1-0-3073-0/skins/waterdeep/images/icons/areas_of_effect/emanation.svg);
         position: relative;
-        top: 3px;
-        left: 1px;
-        margin-right: 3px
+
     }
 
     .i-aoe-line {
         background-image: url(https://www.dndbeyond.com/content/1-0-3073-0/skins/waterdeep/images/icons/areas_of_effect/line.svg);
         position: relative;
-        top: 3px;
-        left: 1px;
-        margin-right: 3px
+
     }
 
     .i-aoe-sphere {
         background-image: url(https://www.dndbeyond.com/content/1-0-3073-0/skins/waterdeep/images/icons/areas_of_effect/sphere.svg);
         position: relative;
-        top: 3px;
-        left: 1px;
-        margin-right: 3px
+
     }
 
     .i-aoe-square {
         background-image: url(https://www.dndbeyond.com/content/1-0-3073-0/skins/waterdeep/images/icons/areas_of_effect/square.svg);
         position: relative;
-        top: 3px;
-        left: 1px;
-        margin-right: 3px
+
     }
 
     .i-artificer {
@@ -13450,6 +13620,8 @@ div#playlistFields {
 .mobileAVTTUI #sheet_resize_button{
     left: -195px !important;
 }
+
+
 /***Font Faces*****/
 @font-face {
     font-family: Scala Sans Offc;
@@ -13631,6 +13803,52 @@ div#playlistFields {
     #combat_tracker_inside button{
         display:none !important;
         
+    }  
+}
+/* hover for non-touch device */
+@media (pointer: fine) {
+    button[id$='-button']:hover,
+    button[id$='_button']:hover,
+    button[id^=peerVideo_]:hover,
+    #combat_tracker > button:hover,
+    body > button:hover,
+    #addscene:hover,
+    .scene button:hover,
+    #combat_tracker_inside button:hover,
+    #edit_dialog button:not(.rc-switch):hover,
+    #edit_scene_form button:not(.rc-switch):hover,
+    #mega_importer button:hover,
+    #prewiz td button:hover,
+    #wizard_popup button:hover,
+    .top_menu button:hover,
+    .monster_frame > button:hover,
+    .stp-btn:hover,
+    .player-actions button:hover,
+    #add-party:hover,
+    .importer_toggle:hover,
+    #zoom_buttons button:hover,
+    .GameLogEntry_Message__1GoY3 button:hover {
+        color: #333;
+        background-image: none;
+        background: #e6e6e6;
     }
     
+    .ddbc-tab-options--layout-pill .ddbc-tab-options__header-heading:hover {
+        background-color: #5d5d5d;
+        color: #f2f2f2;
+    }
+    .ddbc-tab-options--layout-pill .ddbc-tab-options__header-heading.ddbc-tab-options__header-heading--is-active:hover {
+        background-color: #c53131;
+        color: #fff;
+    }
+    .material-icons.button-icon:hover {
+        color: #fff;
+    }
+}
+/* remove hover tooltips for touch devices */
+@media (pointer: coarse) {
+  .hasTooltip::after,
+  .sidebar-hover-text-flyout{
+    display:none;
+  }
 }

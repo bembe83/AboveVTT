@@ -187,7 +187,7 @@ $(function() {
             }
           }                 
           if(event.data.msgType=='placeAoe' && (event.data.sendTo == window.PLAYER_ID || (window.DM && event.data.sendTo == false)))  {
-              let options = build_aoe_token_options(event.data.data.color, event.data.data.shape, event.data.data.feet / window.CURRENT_SCENE_DATA.fpsq, event.data.data.name)
+              let options = build_aoe_token_options(event.data.data.color, event.data.data.shape, event.data.data.feet / window.CURRENT_SCENE_DATA.fpsq, event.data.data.name, event.data.data.lineWidth / window.CURRENT_SCENE_DATA.fpsq)
               if(name == 'Darkness' || name == 'Maddening Darkness' ){
                 options = {
                   ...options,
@@ -197,7 +197,10 @@ $(function() {
               //if single token selected, place there:
               if(window.CURRENTLY_SELECTED_TOKENS.length == 1) {
                 place_aoe_token_at_token(options, window.TOKEN_OBJECTS[window.CURRENTLY_SELECTED_TOKENS[0]]);
-              } else {
+              } 
+              else if(window.TOKEN_OBJECTS[event.data.data.tokenId] != undefined){
+                place_aoe_token_at_token(options, window.TOKEN_OBJECTS[event.data.data.tokenId]);
+              }else {
                 place_aoe_token_in_centre(options)
               }
           }      
@@ -290,84 +293,6 @@ function addExtensionPathStyles(){ // some above server images moved out of exte
     body{
       --onedrive-svg: url('${window.EXTENSION_PATH}images/Onedrive_icon.svg');
       --onedrive-mask: url('${window.EXTENSION_PATH}images/Onedrive_icon.png');
-    }
-    .aoe-style-fire{
-      background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/fire_background.png);
-    }
-    .aoe-style-lightning{
-        background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/lightning.png);
-    }
-    .aoe-style-slashing{
-        background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/slashing.png);
-    }
-    .aoe-style-darkness{
-        background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/fire_background.png);
-    }
-    .aoe-style-fog-cloud{
-        background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/fog_cloud_tileable.png) !important;
-    }
-    .aoe-style-hypnotic-pattern{
-        background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/hypnotic-pattern.png) !important;
-    }
-    .aoe-style-stinking-cloud{
-        background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/fog_cloud_tileable.png) !important;
-    }
-    .aoe-style-web{
-        background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/tileable3pxsquareweb.png) !important;
-    }
-
-    [data-animation='fairy-fx'] .islight,
-    .aura-element[data-animation='fairy-fx'][id*='aura_'] {
-        -webkit-mask-image: url('https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/fairys.png');
-    }
-
-    [data-animation='fairy-fx'] .islight:before,
-    .aura-element[data-animation='fairy-fx'][id*='aura_']:before {
-        -webkit-mask-image: url('https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/fairys.png');
-    }
-
-    [data-animation='spore-fx'] .islight,
-    .aura-element[data-animation='spore-fx'][id*='aura_'] {
-        -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/spore.png");
-    }
-
-    [data-animation='lightning-fx'] .islight,
-    .aura-element[data-animation='lightning-fx'][id*='aura_'] {
-        --mask-1: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/lightningcircle.png");
-    }
-
-    [data-animation='magic-circle-fx'] .islight,
-    .aura-element[data-animation='magic-circle-fx'][id*='aura_'] {
-        -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/magiccircle1.png");
-    }
-
-    [data-animation='magic-circle-2-fx'] .islight,
-    .aura-element[data-animation='magic-circle-2-fx'][id*='aura_'] {
-        -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/magiccircle2.png");
-    }
-    [data-animation='hurricane-fx'] .islight,
-    .aura-element[data-animation='hurricane-fx'][id*='aura_'] {
-        -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/hurricane_cloud.png");
-    }
-
-    [data-animation='hurricane-fx'] .islight:before,
-    .aura-element[data-animation='hurricane-fx'][id*='aura_']:before
-    {
-        -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/lightning_2.png");
-    }
-    [data-animation='snow-fx'] .islight:before,
-    .aura-element[data-animation='snow-fx'][id*='aura_']:before,
-    [data-animation='snow-fx'] .islight:after,
-    .aura-element[data-animation='snow-fx'][id*='aura_']:after
-    {
-        -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/snow.png");
-    }
-    [data-animation='bubble-fx'] .islight:before,
-    .aura-element[data-animation='bubble-fx'][id*='aura_']:before,
-    [data-animation='bubble-fx'] .islight:after,
-    .aura-element[data-animation='bubble-fx'][id*='aura_']:after
-    {
-        -webkit-mask-image: url("https://abovevtt-assets.s3.eu-central-1.amazonaws.com/mask-images/bubble.png");
     }
   </style>`
 
@@ -492,7 +417,13 @@ async function start_above_vtt_for_dm() {
   $(window).off('scroll.projectorMode').on("scroll.projectorMode", projector_scroll_event);
   remove_loading_overlay();
 }
-
+const debounceResizeUI = mydebounce(function(){
+  init_character_page_sidebar();
+  reposition_player_sheet();
+  if(!window.showPanel){
+    hide_sidebar(false);
+  }
+}, 100)
 async function start_above_vtt_for_players() {
   if (!is_abovevtt_page() || !is_characters_page() || window.DM) {
     throw new Error(`start_above_vtt_for_players cannot start on ${window.location.href}; window.DM: ${window.DM}`);
@@ -516,13 +447,7 @@ async function start_above_vtt_for_players() {
     if (window.showPanel === undefined) {
       window.showPanel = is_sidebar_visible();
     }
-    init_character_page_sidebar();
-    reposition_player_sheet();
-    setTimeout(function(){
-      if(!window.showPanel){
-        hide_sidebar(false);
-      }
-    }, 1000);
+    debounceResizeUI();
     if(!window.CURRENT_SCENE_DATA.is_video || !window.CURRENT_SCENE_DATA.player_map.includes('youtu')){
       $("#youtube_controls_button").css('visibility', 'hidden');
     }
