@@ -5,7 +5,7 @@ console.log("Load.js is executing", isVttGamePage, isPlainCharacterPage, isCampa
 function getExtURL(url) {
 	return (chrome || browser).runtime.getURL(url);
 }
-let loadStyle = [];
+var loadStyle = [];
 window.scripts = []; // in case it ever loads on a non-matching page
 if (isPlainCharacterPage) {
 	let l = document.createElement('div');
@@ -121,6 +121,7 @@ if (isPlainCharacterPage) {
 		{ src: "scenedata/hcs-scene-data.js" },
 		{ src: "scenedata/dosi-scene-data.js" },
 		{ src: "scenedata/sdw-scene-data.js" },
+		{ src: "scenedata/hgtmh1-scene-data.js" },
 		{ src: "ScenesHandler.js" },
 		{ src: "ScenesPanel.js" },
 		{ src: "Settings.js" },

@@ -4,7 +4,7 @@ $(function() {
   init_characters_pages();
 });
 
-let recentCharacterUpdates = {};
+var recentCharacterUpdates = {};
 
 const debounce_add_extras = mydebounce(() => {
   const isAbove = is_abovevtt_page()
@@ -410,8 +410,8 @@ const buffsDebuffs = {
       "type": "spell"
   }
 }
-let rollBuffFavorites = [];
-let rollBuffContext = [];
+var rollBuffFavorites = [];
+var rollBuffContext = [];
 
 /** @param changes {object} the changes that were observed. EX: {hp: 20} */
 function character_sheet_changed(changes) {
@@ -1305,11 +1305,11 @@ function observe_character_sheet_changes(documentToObserve) {
     //for character page snippets and sidebar text. Can add anything else that's text isn't modified without removing parent.
     const snippets = documentToObserve.find(`
       .ddbc-snippet__content p:not('.above-vtt-visited'), 
-      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div>div[class*='-detail']>div:not(.ct-item-detail__customize):not([class*='__intro']) p:not(.above-vtt-visited),
-      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div>div[class*='-detail']>div[class*='ct-item-detail__customize']:nth-child(4) p:not(.above-vtt-visited),
-      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div>div[class*='-detail']>div:not(.ct-item-detail__customize):not([class*='__intro']) tr:not(.above-vtt-visited),
-      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div>div[class*='-detail']>div:not(.ct-item-detail__customize):not([class*='__intro']) div[class*='--damage']:not([class*='__modifier']):not(.above-vtt-visited),
-      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div>div[class*='-detail']>div:not(.ct-item-detail__customize):not([class*='__intro']) span:not([class*='button']):not([class*='casting']):not([class*='__modifier']):not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane'])>div>div:not(.ct-item-detail__customize):not([class*='__intro']) p:not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane'])>div>div[class*='ct-item-detail__customize']:nth-child(4) p:not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane'])>div>div:not(.ct-item-detail__customize):not([class*='__intro']) tr:not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane'])>div>div:not(.ct-item-detail__customize):not([class*='__intro']) div[class*='--damage']:not([class*='__modifier']):not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane'])>div>div:not(.ct-item-detail__customize):not([class*='__intro']) span:not([class*='button']):not([class*='casting']):not([class*='__modifier']):not(.above-vtt-visited),
       [class*='spell-damage-group'] span[class*='__value']:not(.above-vtt-visited)
     `);
 
@@ -1767,7 +1767,20 @@ function observe_character_sheet_changes(documentToObserve) {
           $('body').append(`
             <style id='advantageHover'>
 
-
+              .avtt-ability-roll-button{
+                  color: #b43c35;
+                  border: 1px solid #b43c35;
+                  border-radius: 4px;
+                  background-color: #fff;
+                  white-space: nowrap;
+                  font-size: 14px;
+                  font-weight: 600;
+                  font-family: Roboto Condensed,Open Sans,Helvetica,sans-serif;
+                  line-height: 18px;
+                  letter-spacing: 1px;
+                  padding: 1px 4px 0;
+                  cursor: pointer;
+              }
               ul.avttBuffItems select {
                 -webkit-appearance: none;
                 -moz-appearance: none;

@@ -341,9 +341,9 @@ function apply_zoom_from_storage() {
 	console.groupEnd()
 }
 
-let zoomBusy = false;
-let zoomQ = [];
-let lastZoom;	  
+var zoomBusy = false;
+var zoomQ = [];
+var lastZoom;	  
 //each zoom event [amt, typ, off, x, y] typ = 0(relative) 1(absolute) 2(offset)
 //keep a queue - which can mostly be squashed except for some offset events
 function throttledZoom(amount, typeFlag, zx, zy)  {
@@ -1524,8 +1524,8 @@ function init_splash() {
 
 
 
-let DDB_WS_OBJ = null;
-let DDB_WS_FORCE_RECONNECT_LOCK = false; // Best effort (not atomic) - ensure function is called only once at a time
+var DDB_WS_OBJ = null;
+var DDB_WS_FORCE_RECONNECT_LOCK = false; // Best effort (not atomic) - ensure function is called only once at a time
 /**
  * Attempts to force DDBs WebSocket to re-connect.
  * @returns Bool false - wasn't able to force / no need
@@ -3342,6 +3342,7 @@ function init_help_menu() {
 				<div class="help-tabs">
 					<ul>
 						<li class="active"><a href="#tab1"> Keyboard shortcuts</a></li>
+						<li><a href="#tab19" class='popout' data-href="https://github.com/cyruzzo/AboveVTT/wiki" data-name='AboveVTT Wiki'>Wiki <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"></path><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"></path></svg></a></li>
 						<li><a href="#tab2">FAQ</a></li>
 						<li><a href="#tab3">Scene Creation</a></li>
 						<li><a href="#tab4">Player UI</a></li>
@@ -3366,159 +3367,162 @@ function init_help_menu() {
 						<dl>
 							<dt>SPACE</dt>
 							<dd>Show/hide character sheet (players only)</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getShiftKeyName()}+SPACE</dt>
 							<dd>Center Player Token (players only)</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getCtrlKeyName()}+SPACE</dt>
 							<dd>Center Current Turn Token</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>Q</dt>
 							<dd>Show/hide sidebar</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>ESC</dt>
 							<dd>Cancel button selections</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>S</dt>
 							<dd>Select tool</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>R</dt>
 							<dd>Ruler</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>F</dt>
 							<dd>Fog menu</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>W</dt>
 							<dd>Wall tool</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>D</dt>
 							<dd>Draw tool</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>T</dt>
 							<dd>Text tool</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>A</dt>
 							<dd>Area of effect menu</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>C</dt>
 							<dd>Combat tracker</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>N</dt>
 							<dd>Next creature in combat</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>P</dt>
 							<dd>Prev creature in combat</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>- / ${getCtrlKeyName()}+Mouse Wheel Down</dt>
 							<dd>Zoom out</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>= / + / ${getCtrlKeyName()}+Mouse Wheel Up</dt>
 							<dd>Zoom in</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>1-7</dt>
 							<dd> Add Dice to Dice Pool</dd>
-						<dl>
-							<dl>
+						</dl>
 							<dt>${getModKeyName()}+1-7</dt>
 							<dd>Remove Dice from Dice Pool</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>- (with Dice Pool Mod visibile)</dt>
 							<dd>Subtract from Roll Mod</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>= / + (with Dice Pool Mod visibile)</dt>
 							<dd>Add to Roll Mod</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>Enter</dt>
 							<dd>Roll added dice pool</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getModKeyName()} (held)</dt>
 							<dd>Temporarily toggle grid snapping</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getAltKeyName()} (held)</dt>
 							<dd>Temporarily activate ruler</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getShiftKeyName()}+H</dt>
 							<dd>Hide buttons from screen (spectator mode)</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getModKeyName()}+C</dt>
 							<dd>Copy Selected Token</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getModKeyName()}+V</dt>
 							<dd>Paste Selected Tokens</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getShiftKeyName()}+L</dt>
 							<dd>Enable/Disable locked token interation (DM only)</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getShiftKeyName()}+V</dt>
 							<dd>Temporary check token vision.</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getShiftKeyName()}+W</dt>
 							<dd>Toggle always show walls. Will also show 'hidden icon' doors/windows.</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getShiftKeyName()}+S</dt>
 							<dd>Toggle snap drawings to grid. This includes drawings from most menus - fog, draw, light, walls etc.</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>Hold ${getModKeyName()} while using most tools</dt>
 							<dd>Temporary toggle snap tools to grid on/off (opposite of the toggle set). This includes drawings from most menus - fog, draw, light, walls etc.</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getShiftKeyName()}+Click Token</dt>
 							<dd>Select multiple tokens</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getShiftKeyName()}+Drag Token</dt>
 							<dd>If token is grouped or multiple tokens selected just move the one token</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getShiftKeyName()}+Click Door/Window</dt>
 							<dd>Quick toggle door/window locked</dd>
+						</dl>
 						<dl>
+							<dt>${getShiftKeyName()}+Click Portal</dt>
+							<dd>Force recenter camera and instant teleport token for those receiving the message. (Always does this for those clicking the portal)</dd>
+						</dl>
 						<dl>
 							<dt>Hold ${getShiftKeyName()} while drawing walls</dt>
 							<dd>Create Segemented Wall. This keeps walls from having pin point holes.</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>UP/DOWN arrows</dt>
 							<dd>Will cycle through fog & draw options if menu open</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getShiftKeyName()}/${getModKeyName()} Click on Icon Rolls and Most Character/Extras/Monsters d20 Rolls</dt>
 							<dd>Will roll with ADV/DIS respectively</dd>
-						<dl>
+						</dl>
 						<dl>
 							<dt>${getAltKeyName()} + ${getShiftKeyName()}/${getModKeyName()} Click on Icon Rolls and Most Character/Extras/Monsters d20 Rolls</dt>
 							<dd>Will roll with Super ADV/DIS respectively</dd>
-						<dl>
+						</dl>
 		
 					</div>
 
@@ -3574,6 +3578,11 @@ function init_help_menu() {
 
 
 	$('.help-tabs a').on('click', function() {
+
+		if($(this).hasClass('popout')){
+			window.open($(this).attr('data-href'), $(this).attr('data-name'), 'width=800,height=600');
+			return;
+		}
 		$('.help-tabs li').removeClass('active');
 		$(this).parent().addClass('active');
 		let currentTab = $(this).attr('href');
@@ -3963,7 +3972,7 @@ function reposition_player_sheet() {
 	}
 }
 
-let player_sheet_layout = "full"; // or thin
+var player_sheet_layout = "full"; // or thin
 /**
  * When playing on the characters page, this will tell you if the character sheet is full width or thin.
  * When not on the characters page, `init_sheet` injects a button to handle the iframe resizing.

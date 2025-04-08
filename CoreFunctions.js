@@ -304,6 +304,8 @@ function get_available_styles(){
 }
 function add_aoe_to_statblock(html){
 
+  html = html.replaceAll(/&shy;|­/gi, '')
+
   const aoeRegEx = /(([\d]+)-foot(-long ([\d]+)-foot-wide|-long, ([\d]+)-foot-wide|-radius, [\d]+-foot-high|-radius)? ([a-zA-z]+))(.*?[\>\s]([a-zA-Z]+) damage)?/gi
 
 
@@ -372,7 +374,7 @@ function add_aoe_statblock_click(target, tokenId = undefined){
   })
 }
 
-function add_journal_roll_buttons(target, tokenId=undefined){
+function add_journal_roll_buttons(target, tokenId=undefined, specificImage=undefined, specificName=undefined){
   console.group("add_journal_roll_buttons")
   
   let pastedButtons = target.find('.avtt-roll-button, .integrated-dice__container, .avtt-aoe-button');
@@ -381,8 +383,8 @@ function add_journal_roll_buttons(target, tokenId=undefined){
     $(pastedButtons[i]).replaceWith($(pastedButtons[i]).text());
   }
 
-  const rollImage = (tokenId) ? window.TOKEN_OBJECTS[tokenId].options.imgsrc : window.PLAYER_IMG
-  const rollName = (tokenId) ? window.TOKEN_OBJECTS[tokenId].options.revealname == true || window.TOKEN_OBJECTS[tokenId].options.player_owned ? window.TOKEN_OBJECTS[tokenId].options.name : '' : window.PLAYER_NAME
+  const rollImage = specificImage ? specificImage : (tokenId) ? window.TOKEN_OBJECTS[tokenId].options.imgsrc : window.PLAYER_IMG
+  const rollName = specificName ? specificName : (tokenId) ? window.TOKEN_OBJECTS[tokenId].options.revealname == true || window.TOKEN_OBJECTS[tokenId].options.player_owned ? window.TOKEN_OBJECTS[tokenId].options.name : '' : window.PLAYER_NAME
 
   const clickHandler = function(clickEvent) {
     clickEvent.stopPropagation();
@@ -406,12 +408,11 @@ function add_journal_roll_buttons(target, tokenId=undefined){
   // matches "1d10", " 1d10 ", "1d10+1", " 1d10+1 ", "1d10 + 1" " 1d10 + 1 "
   const strongRoll = /(<strong>)(([0-9]+d[0-9]+)\s?([+-]\s?[0-9]+)?)(<\/strong>)/gi
   const damageRollRegexBracket = /(\()(([0-9]+d[0-9]+)\s?([+-]\s?[0-9]+)?)(\))/gi
-  const damageRollRegex = /([:\s>])(([0-9]+d[0-9]+)\s?([+-]\s?[0-9]+)?)([\.\):\s<,]|$)/gi
+  const damageRollRegex = /([:\s>]|^)(([0-9]+d[0-9]+)\s?([+-]\s?[0-9]+)?)([\.\):\s<,]|$)/gi
   // matches " +1 " or " + 1 "
   const hitRollRegexBracket = /(?<![0-9]+d[0-9]+)(\()([+-]\s?[0-9]+)(\))/gi
-  const hitRollRegex = /(?<![0-9]+d[0-9]+)([:\s>])([+-]\s?[0-9]+)([:\s<,]|$)/gi
-  const dRollRegex = /\s(\s?d[0-9]+)\s/gi
-  const tableNoSpaceRollRegex = />(\s?d[0-9]+\s?)</gi
+  const hitRollRegex = /(?<![0-9]+d[0-9]+)([:\s>]|^)([+-]\s?[0-9]+)([:\s<,]|$)/gi
+  const dRollRegex = /([\s>]|^)(\s?d[0-9]+)([^+-])/gi
   const rechargeRegEx = /(Recharge [0-6]?\s?[—–-]?\s?[0-6])/gi
   const actionType = "roll"
   const rollType = "AboveVTT"
@@ -422,8 +423,7 @@ function add_journal_roll_buttons(target, tokenId=undefined){
     .replaceAll(damageRollRegex, ` $1<button data-exp='$3' data-mod='$4' data-rolltype='damage' data-actiontype='${actionType}' class='avtt-roll-button' title='${actionType}'>$2</button>$5`)
     .replaceAll(hitRollRegexBracket, ` <button data-exp='1d20' data-mod='$2' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'>$1$2$3</button>`)
     .replaceAll(hitRollRegex, ` $1<button data-exp='1d20' data-mod='$2' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'>$2</button>$3`)
-    .replaceAll(dRollRegex, ` <button data-exp='1$1' data-mod='0' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'>$1</button> `)
-    .replaceAll(tableNoSpaceRollRegex, `> <button data-exp='1$1' data-mod='0' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'>$1</button><`)
+    .replaceAll(dRollRegex, `$1<button data-exp='1$2' data-mod='0' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'>$2</button>$3`)
     .replaceAll(rechargeRegEx, `<button data-exp='1d6' data-mod='' data-rolltype='recharge' data-actiontype='Recharge' class='avtt-roll-button' title='${actionType}'>$1</button>`)
 
   updated = add_aoe_to_statblock(updated);
@@ -469,6 +469,7 @@ function add_journal_roll_buttons(target, tokenId=undefined){
     rollAction = (rollAction == '') ? $(this).prevUntil('strong').last().prev().text().replace('.', '') : rollAction;
     rollAction = (rollAction == '') ? $(this).parent().prevUntil('em>strong').find('strong').last().text().replace('.', '') : rollAction;
     rollAction = (rollAction == '') ? $(this).closest('.mon-stat-block__attribute-value').prev().text().replace('.', '') : rollAction;
+    rollAction = (rollAction == '') ? $(this).closest('.mon-stat-block__tidbit, [class*="styles_attribute"]').find('>.mon-stat-block__tidbit-label, >[class*="styles_attributeLabel"]').text().replace('.', '') : rollAction;
     let rollType = $(this).attr('data-rolltype')
     let newStatBlockTables = $(this).closest('table').find('tbody tr:first th').text().toLowerCase();
     if(newStatBlockTables.includes('str') || newStatBlockTables.includes('int')){
@@ -486,12 +487,12 @@ function add_journal_roll_buttons(target, tokenId=undefined){
       rollAction = 'Roll';
     } 
     else if(rollAction.replace(' ', '').toLowerCase() == 'savingthrows'){ 
-      rollAction = $(this)[0].previousSibling.nodeValue.replace(/[\W]+/gi, '');
+      rollAction = $(this)[0].previousSibling?.nodeValue.replace(/[\W]+/gi, '');
       rollAction = (rollAction == '') ? $(this).prev().text().replace(/[\W]+/gi, '') : rollAction;
       rollType = 'Save';  
     }
     else if(rollAction.replace(' ', '').toLowerCase() == 'skills'){
-      rollAction = $(this)[0].previousSibling.nodeValue.replace(/[\W]+/gi, '');
+      rollAction = $(this)[0].previousSibling?.nodeValue.replace(/[\W]+/gi, '');
       rollAction = (rollAction == '') ? $(this).prev().text().replace(/[\W]+/gi, '') : rollAction;
       rollType = 'Check'; 
     }
@@ -561,7 +562,47 @@ function add_journal_roll_buttons(target, tokenId=undefined){
 
   console.groupEnd()
 }
+function general_statblock_formating(input){
+  input = input.replace(/&nbsp;/g,' ')
 
+  input = input.replace(/^((\s+?)?<(strong|em)>(<(strong|em)>)?([a-z0-9\s\.\(\)]+)(<\/(strong|em)>)?<\/(strong|em)>)/gi, '$6');
+
+  //bold top of statblock info
+  input = input.replace(/^(Senses|Gear|Skills|Damage Resistances|Resistances|Immunities|Damage Immunities|Damage Vulnerabilities|Condition Immunities|Languages|Proficiency Bonus|Saving Throws)/gi, `<strong>$1</strong>`)
+  input = input.replace(/^(Speed|Hit Points|HP|AC|Armor Class|Challenge|CR)(\s[\d\()])/gi, `<strong>$1</strong>$2`)
+  // Remove space between letter ranges
+  // e.g. a- b
+  input = input.replace(/([a-z])- ([a-z])/gi, '$1$2');
+  // Replace with right single quote
+  input = input.replace(/'/g, '’');
+  // e.g. Divine Touch. Melee Spell Attack:
+  input = input.replace(
+      /^(([a-z0-9]+[\s]?){1,7})(\([^\)]+\))?(\.)([\s]+)?((Melee|Ranged|Melee or Ranged) (Weapon Attack:|Spell Attack:|Attack Roll:))?/gi,
+        '<em><strong>$1$4</strong></em><em>$3$5$6</em>'
+  ).replace(/[\s]+\./gi, '.');
+
+  // Find actions requiring saving throws
+  input = input.replace(
+      /(?<!\])(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) Saving Throw:/gi,
+      '<em>$1 Saving Throw:</em>'
+  );
+  // Emphasize hit
+  input = input.replace(/Hit:/g, '<em>Hit:</em>');
+  // Emphasize hit or miss
+  input = input.replace(/Hit or Miss:/g, '<em>Hit or Miss:</em>');
+  // Emphasize trigger (2024 monsters)
+  input = input.replace(/Trigger:/g, '<em>Trigger:</em>');
+  // Emphasize response (2024 monsters)
+  input = input.replace(/Response:/g, '<em>Response:</em>');
+  // Emphasize failure/success (2024 monsters)
+  input = input.replace(/Failure:/g, '<em>Failure:</em>');
+  input = input.replace(/Success:/g, '<em>Success:</em>');
+  input = input.replace(/Success or Failure:/g, '<em>Success or Failure:</em>');
+  input = input.replace(/Failure or Success:/g, '<em>Failure or Success:</em>');
+
+  return input;
+        
+}
 function process_monitored_logs() {
   const logs = [...console.concerningLogs, ...console.otherLogs].sort((a, b) => a.timeStamp < b.timeStamp ? 1 : -1);
   let processedLogs = [];
@@ -634,8 +675,8 @@ function is_abovevtt_page() {
 function is_gamelog_popout() {
   return is_campaign_page() && window.location.search.includes("popoutgamelog=true");
 }
-let MYCOBALT_TOKEN = false;
-let MYCOBALT_TOKEN_EXPIRATION = 0;
+var MYCOBALT_TOKEN = false;
+var MYCOBALT_TOKEN_EXPIRATION = 0;
 /**
  * UNIFIED TOKEN HANDLING
  * Triggers callback with a valid DDB cobalt token
@@ -947,7 +988,7 @@ function showTempMessage(messageString){
  * @return {String} "THE DM" */
 const dm_id = "THE DM";
 // Use Acererak as the avatar, because he's on the DMG cover... but also because he's the fucking boss!
-let dmAvatarUrl = "https://www.dndbeyond.com/avatars/thumbnails/30/787/140/140/636395106768471129.jpeg";
+var dmAvatarUrl = "https://www.dndbeyond.com/avatars/thumbnails/30/787/140/140/636395106768471129.jpeg";
 const defaultAvatarUrl = "https://www.dndbeyond.com/content/1-0-2416-0/skins/waterdeep/images/characters/default-avatar.png";
 
 /** an object that mimics window.pcs, but specific to the DM */
@@ -1323,7 +1364,7 @@ function projector_scroll_event(event){
               scrollPercentageX:  (window.pageXOffset + window.innerWidth/2 - sidebarSize/2) / Math.max( document.body.scrollWidth, document.body.offsetWidth, 
                    document.documentElement.clientWidth, document.documentElement.scrollWidth, document.documentElement.offsetWidth ),
               zoom: zoom,
-              mapPos: convert_point_from_view_to_map(center.x, center.y, true)
+              mapPos: convert_point_from_view_to_map(center.x, center.y, true, true)
             });
       }
 }

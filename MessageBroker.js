@@ -203,7 +203,25 @@ const debounceSendNote = mydebounce(function(id, note){
 
 const delayedClear = mydebounce(() => clearFrame());
 
+function setupMBIntervals(){
+	if(window.pingInterval!=undefined)
+		clearInterval(window.pingInterval);
+	if(window.reconInterval!=undefined)
+		clearInterval(window.reconInterval);
 
+	
+	window.pingInterval = setInterval(function() {
+		window.MB.sendPing();
+		window.MB.sendAbovePing();
+	}, 480000);
+
+
+	window.reconInterval = setInterval(function() {
+   		forceDdbWsReconnect();
+		window.MB.reconnectDisconnectedAboveWs();
+	}, 4000)
+	
+}
 
 function resizeCanvasChromeBug(){
 	let diceRollCanvas = $(".dice-rolling-panel__container");
@@ -774,6 +792,15 @@ class MessageBroker {
 					if(window.JOURNAL.notes[msg.data.id].abilityTracker && openNote.length>0){
 						for(let i in window.JOURNAL.notes[msg.data.id].abilityTracker){
 							openNote.find(`input[data-tracker-key='${i}']`).val(window.JOURNAL.notes[msg.data.id].abilityTracker[i])
+						}
+					}
+
+					if(window.JOURNAL.notes[msg.data.id].pins && openNote.length>0){
+						for(let i in window.JOURNAL.notes[msg.data.id].pins){
+							$(`div.note[data-id='${msg.data.id}'] .note-pin[data-id='${i}']`).css({
+								'top': `${parseFloat(window.JOURNAL.notes[msg.data.id].pins[i].y) - 43}px`,
+								'left': window.JOURNAL.notes[msg.data.id].pins[i].x
+							})	
 						}
 					}
 
@@ -1493,16 +1520,7 @@ class MessageBroker {
 
 		self.loadAboveWS();
 
-		setInterval(function() {
-			self.sendPing();
-			self.sendAbovePing();
-		}, 480000);
-
-		// Ensure we have an initial delay (15 seconds) before attempting re-connects to let everything load (every 4 seconds)
-		setTimeout(setInterval(function() {
-			   	forceDdbWsReconnect();
-			   	self.reconnectDisconnectedAboveWs();
-		}, 4000), 15000);
+		setupMBIntervals();
 
 
 	}
@@ -1541,7 +1559,7 @@ class MessageBroker {
 		//Security logic to prevent content being sent which can execute JavaScript.
 		data.player = DOMPurify.sanitize( data.player,{ALLOWED_TAGS: []});
 		data.img = DOMPurify.sanitize( data.img,{ALLOWED_TAGS: []});
-		data.text = DOMPurify.sanitize( data.text,{ALLOWED_TAGS: ['video','img','div','p', 'b', 'button', 'span', 'style', 'path', 'rect', 'svg', 'a', 'hr', 'ul', 'li', 'h3', 'h2', 'h4', 'h1', 'table', 'tr', 'td', 'th'], ADD_ATTR: ['target']}); //This array needs to include all HTML elements the extension sends via chat.
+		data.text = DOMPurify.sanitize( data.text,{ALLOWED_TAGS: ['video','img','div','p', 'b', 'button', 'span', 'style', 'path', 'rect', 'svg', 'a', 'hr', 'ul', 'li', 'ol', 'h3', 'h2', 'h4', 'h1', 'table', 'tr', 'td', 'th', 'br', 'input', 'strong', 'em'], ADD_ATTR: ['target']}); //This array needs to include all HTML elements the extension sends via chat.
 
 		if(data.dmonly && !(window.DM) && !local) // /dmroll only for DM of or the user who initiated it
 			return $("<div/>");
@@ -1635,10 +1653,16 @@ class MessageBroker {
 
 	handleToken(msg) {
 		let data = msg.data;
-		let playerTokenId = $(`.token[data-id*='${window.PLAYER_ID}']`).attr("data-id");
-		let auraislightchanged = false;
+
 		if(data.id == undefined)
 			return;
+
+		const animationDuration = data.speedAnim == true ? 0 : undefined;
+		delete msg.data.speedAnim;
+
+		const centerView = data.highlightCenter == true;
+		delete msg.data.highlightCenter;
+
 		if (msg.sceneId != window.CURRENT_SCENE_DATA.id || msg.loading) {
 			let gridSquares = parseFloat(data.gridSquares);
 			if (!isNaN(gridSquares)) {
@@ -1666,11 +1690,12 @@ class MessageBroker {
 			
 		if (data.id in window.TOKEN_OBJECTS) {
 
+
 			for (let property in data) {
 				if(msg.sceneId != window.CURRENT_SCENE_DATA.id && (property == "left" || property == "top" || property == "hidden" || property == "scaleCreated"))
 					continue;	
 				if(window.all_token_objects[data.id] == undefined){
-						window.all_token_objects[data.id] = window.TOKEN_OBJECTS[data.id]	
+					window.all_token_objects[data.id] = window.TOKEN_OBJECTS[data.id]	
 				}	
 				window.TOKEN_OBJECTS[data.id].options[property] = data[property];
 				window.all_token_objects[data.id].options[property] = data[property];
@@ -1691,7 +1716,28 @@ class MessageBroker {
 				delete window.TOKEN_OBJECTS[data.id].options.groupId;
 				delete window.all_token_objects[data.id].options.groupId;
 			}
-			window.TOKEN_OBJECTS[data.id].place();
+			let selector = "div[data-id='" + data.id + "']";
+			let token = $("#tokens").find(selector);
+			
+			if(animationDuration == 0)
+				token.css('visibility', 'hidden');
+			
+			window.TOKEN_OBJECTS[data.id].place(animationDuration);
+			if(animationDuration == 0){
+				setTimeout(function(){
+					token.css('visibility', '');
+				},100)
+			}
+			if(centerView){	
+				let playerTokenId = $(`.token[data-id*='${window.PLAYER_ID}']`).attr("data-id");
+				if(window.TOKEN_OBJECTS[data.id].isCurrentPlayer() || 
+					window.TOKEN_OBJECTS[data.id].options.share_vision == true || 
+					window.TOKEN_OBJECTS[data.id].options.share_vision == window.myUser || 
+					window.TOKEN_OBJECTS[data.id].options.player_owned ||
+					(playerTokenId == undefined && window.TOKEN_OBJECTS[data.id].options.itemType == 'pc')){
+						window.TOKEN_OBJECTS[data.id].highlight();
+				}	
+			}
 
 		}	
 		else if(data.left){

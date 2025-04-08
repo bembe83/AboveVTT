@@ -411,13 +411,18 @@ button .ddbc-tab-options__header-heading .menu-option{
 
 
 
-.door.background{
+.door.background,
+.portal.background{
     border: 2px ridge #060606;
     height: 130%;
     width: 100%;
     position: absolute;
 }
-.door.foreground{
+
+
+.door.foreground,
+.curtain.foreground,
+.teleporter.foreground{
     background: #fff6;
     height: calc(130% - 2px);
     width: calc(100% - 2px);
@@ -429,6 +434,7 @@ button .ddbc-tab-options__header-heading .menu-option{
     transform: rotateY(0deg);
     transition: 200ms transform 0ms linear;
 }
+
 .door-icon{
     width: 15%;
     height: 33%;
@@ -436,7 +442,54 @@ button .ddbc-tab-options__header-heading .menu-option{
     top: 34%;
     left: 74%;  
 }
-.door-button:hover .door.foreground {
+.teleporter.background,
+.teleporter.foreground{
+    border:none;
+    border-radius: 50%;
+    background: linear-gradient(#fff6, #fff6);
+    box-shadow: 0px 0px 2px 0px #000;
+}
+.linked .teleporter.background,
+.linked .teleporter.foreground{
+    background: linear-gradient(#fff6, #fff6), radial-gradient(ellipse at center, #00F 20%, transparent);
+    box-shadow: 0px 0px 5px 0px #00F;
+}
+.linked:hover .teleporter.foreground{
+    background: linear-gradient(#fff6, #fff6), radial-gradient(ellipse at center, #00F 20%, transparent);
+    box-shadow: 0px 0px 5px 0px #00F, inset 0px 0px 5px 2px #7c98ff;
+}
+.curtain.foreground{
+  --s: 2.2px; /* control the wave*/
+  border:none !important;
+  color: #fff;
+  --_s: calc(var(--s)*4) 51% repeat-x;
+  --_r: calc(1.4*var(--s)) at left 50%;
+  --_g1: #000 99%,#0000 101%;
+  --_g2: #0000 99%,#000 101%;
+  --mask:
+    radial-gradient(var(--_r) top    calc(var(--s)* 1.9),var(--_g1)) 
+     calc(100% - 2*var(--s) - var(--_i,0px)) 0/var(--_s),
+    radial-gradient(var(--_r) top    calc(var(--s)*-0.9),var(--_g2)) 
+     calc(100% - var(--_i,0px)) var(--s)/var(--_s),
+    radial-gradient(var(--_r) bottom calc(var(--s)* 1.9),var(--_g1)) 
+     calc(-40% - 2*var(--s) + var(--_i,0px)) 100%/var(--_s),
+    radial-gradient(var(--_r) bottom calc(var(--s)*-0.9),var(--_g2)) 
+     calc(-40% + var(--_i,0px)) calc(100% - var(--s))/var(--_s);
+  -webkit-mask: var(--mask);
+          mask: var(--mask);
+  background: linear-gradient(to right, #eeeeeeaa 0% 20%, #aaa5a577 50%, #eeeeeeaa 60%, #33333377)
+}
+
+.door-button:hover .curtain.foreground{
+    background: linear-gradient(to right, #eeeeeeee 0% 20%, #aaa5a5aa 50%, #eeeeeeee 60%, #333333aa)
+}
+
+
+.door-button:hover .portal.foreground{
+    background: linear-gradient(#fffc, #fffc), radial-gradient(ellipse at center, #00F 20%, transparent) !important;
+}
+.door-button:hover .door.foreground,
+{
     background: #fff;
 }
 
@@ -460,6 +513,7 @@ button .ddbc-tab-options__header-heading .menu-option{
     transform: rotateY(57deg) skew(0deg, 16deg);
     transition: 200ms transform 0ms linear;
 }
+
 
 .door-button.locked .door-icon{
     content: "";
@@ -580,6 +634,10 @@ button .ddbc-tab-options__header-heading .menu-option{
     position: absolute;
     transition: 200ms transform 0ms linear;
 }
+.door-button.open .curtain.foreground{
+    transform: scale(0.5, 1);
+    transition: 200ms transform 0ms linear;
+}
 
 .door-button:not(.ignore-hover):not(.locked):hover .window.background>div{
     transform: translateY(7px);
@@ -596,6 +654,15 @@ button .ddbc-tab-options__header-heading .menu-option{
 }
 .door-button.open:not(.ignore-hover):hover .door.foreground{
     transform: rotateY(45deg) skew(0deg, 10deg);
+    transition: 50ms transform 100ms linear;
+}
+
+.door-button:not(.ignore-hover):not(.locked):hover .curtain.foreground{
+    transform: scale(0.8, 1);
+    transition: 50ms transform 100ms linear;
+}
+.door-button.open:not(.ignore-hover):hover .curtain.foreground{
+     transform: scale(0.7, 1);
     transition: 50ms transform 100ms linear;
 }
 
@@ -1016,7 +1083,9 @@ div#scene_selector,
     bottom: 0;
     position: absolute !important;
 }
-
+#edit_dialog{
+    overflow: auto;
+}
 #edit_dialog button:not(.rc-switch),
 #edit_scene_form button:not(.rc-switch){
     background:none;
@@ -3100,6 +3169,7 @@ button.roll-button-mod.minus {
     mix-blend-mode:lighten;
     opacity:1;
     background:#000;
+    filter: blur(3px);
 }
 .ruler-svg-text{
     fill: #000;
@@ -3145,17 +3215,11 @@ button.roll-button-mod.minus {
     stroke-width: max(0.5px, calc(0.5px / var(--window-zoom)));
     r: max(1px, calc(1px / var(--window-zoom)));
 }
-#raycastingCanvas,
-#light_overlay,
-.aura-element-container-clip:not([data-animation])>.islight,
-.aura-element-container-clip>div:not(.islight){
-    filter: blur(calc(5px / var(--scene-scale)));
-}
 
-#light_container{
-    filter: blur(calc(3px / var(--scene-scale)));
 
-}
+
+
+
 .remote-dice-video{
     display:none;
 }
@@ -3547,10 +3611,10 @@ div#selectedTokensBorder {
     background-repeat: no-repeat, repeat;
 }
 .aoe-style-bludgeoning{
-    background-image: url(https://www.tilingtextures.com/wp-content/uploads/2020/06/17064578-0145-512x512.jpg);
+    background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/bludgeoning.jpg);
 }
 .aoe-style-default{
-    background-image: url(https://www.tilingtextures.com/wp-content/uploads/2021/06/188-comp-512x512.jpg);
+    background-image: linear-gradient(rgb(66 0 253 / 49%), rgb(0 29 253 / 49%));
 }
 .aoe-style-force{
     background-image: url(https://www.myfreetextures.com/wp-content/uploads/2014/10/electbubbles-900x900.jpg);
@@ -3560,29 +3624,53 @@ div#selectedTokensBorder {
     background-image: url(https://3djungle.net/upload/resize_cache/iblock/849/400_400_1/8495c4591433cffedbe8a19a13fbc7eb.jpg);
 }
 .aoe-style-nature{
-    background-image: url(https://www.tilingtextures.com/wp-content/uploads/2017/04/0527-1-512x512.jpg);
+    background-image: url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/nature.jpg);
     filter: brightness(1.2) contrast(1.2);
 }
 .aoe-style-necrotic {
-    background-image: url(https://www.myfreetextures.com/wp-content/uploads/2014/10/abstract8-900x900.jpg);
+    background-image: radial-gradient(rgb(132 255 206) 0%, rgb(132 255 206 / 70%) 10%, rgb(0, 0, 0) 100%), radial-gradient(rgb(132 255 206) 0%, rgb(43 167 255) 30%, rgb(0 255 45) 70%, rgb(0 0 0) 100%), url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/necrotic.jpg);
+    background-blend-mode: screen, color, normal !important;
+    background-size: cover !important;
+    background-repeat: no-repeat !important;
+}
+
+.aoe-style-necrotic:not(.aoe-shape-circle){
+    background-position: bottom center !important;
+    background-size: auto 200% !important;
 }
 .aoe-style-piercing{
     background-image: url(https://previews.123rf.com/images/sylverarts/sylverarts1801/sylverarts180100741/92992928-horror-style-horrible-seamless-pattern-vector-background-blackthorn-branches-with-thorns-stylish-end.jpg);
 }
 .aoe-style-poison {
-    background:linear-gradient(rgba(119, 247, 0, 0.52), rgba(119, 247, 0, 0.52)), url(https://www.tilingtextures.com/wp-content/uploads/2017/02/0005-512x512.jpg);
+    background:linear-gradient(rgba(119, 247, 0, 0.52), rgba(119, 247, 0, 0.52)), url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/poison.jpg);
     background-repeat: no-repeat, repeat;
 }
 .aoe-style-psychic {
-    background:linear-gradient(rgba(115, 10, 235, 0.49), rgba(115, 10, 235, 0.49)), url(https://images.assetsdelivery.com/compings_v2/almagami/almagami1912/almagami191200125.jpg);
-    background-repeat: no-repeat, repeat;
+    background: radial-gradient(#9500ff 0%, #ec77ff 50%), url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/psychic.jpg), radial-gradient(#00000094 0%, #00000066 100%);
+    background-blend-mode: hue, hard-light, normal !important;
+    background-size: cover !important;
+    background-repeat: no-repeat !important;
+}
+
+.aoe-style-psychic:not(.aoe-shape-circle){
+    background-position: bottom center !important;
+    background-size: auto 200% !important;
 }
 .aoe-style-radiant {
-    background-image: url(https://www.tilingtextures.com/wp-content/uploads/2019/06/0097-512x512.jpg);
-    background-size: 200px
+    background-image: radial-gradient(rgb(255 255 255) 6% 20%, rgb(247 255 127 / 64%), rgb(255 131 24 / 27%)), repeating-conic-gradient(from 0deg, transparent 0deg 1deg, #0006 3deg 5deg, transparent 7deg), url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/radiant.jpg);
+    background-size: contain, contain, 100px !important;
+    background-blend-mode: lighten, luminosity, luminosity;
+}
+.aoe-style-radiant:not(.aoe-shape-circle){
+    background-image:radial-gradient(circle at top center, rgb(255 255 255) 6% 20%, rgb(247 255 127 / 64%), rgb(255 131 24 / 27%)), repeating-conic-gradient(from 0deg at top center, transparent 0deg 1deg, #000000c4 3deg 5deg, transparent 7deg), url(https://abovevtt-assets.s3.eu-central-1.amazonaws.com/aoe/radiant.jpg);
 }
 .aoe-style-thunder{
-    background-image: url(https://www.tilingtextures.com/wp-content/uploads/2018/11/0069-512x512.jpg);
+    background: repeating-radial-gradient(rgb(0 0 0 / 0%) calc(20px * var(--scene-scale, 1)), rgb(0 0 0 / 44%) calc(30px * var(--scene-scale, 1)), rgb(246 246 246 / 47%)  calc(32px * var(--scene-scale, 1)), rgb(0 0 0 / 0%)  calc(35px * var(--scene-scale, 1))), #7d7dff6e;
+    background-repeat: no-repeat, repeat !important;
+    background-size: contain, 300px !important;
+}
+.aoe-style-thunder:not(.aoe-shape-circle) {
+    background: repeating-radial-gradient(circle at top center, rgb(0 0 0 / 0%) calc(20px * var(--scene-scale, 1)), rgb(0 0 0 / 44%) calc(30px * var(--scene-scale, 1)), rgb(246 246 246 / 47%)  calc(32px * var(--scene-scale, 1)), rgb(0 0 0 / 0%)  calc(35px * var(--scene-scale, 1))), #7d7dff6e;
 }
 .aoe-style-water{
     background:linear-gradient(rgba(49, 177, 246, 0.49), rgba(49, 177, 246, 0.49)), url(https://opengameart.org/sites/default/files/styles/medium/public/oga-textures/12976/caust_009.png);
@@ -3712,10 +3800,10 @@ div#selectedTokensBorder {
 }
 @keyframes mymove {
     from{
-        --opacity: 0.2
+        --opacity: 0.4
     }
     to {
-        --opacity: 0.5
+        --opacity: 0.6
     }
   }
 .above-vtt-container-roll-output{
@@ -4116,7 +4204,34 @@ audio::-webkit-media-controls-time-remaining-display{
 .note .mce-panel { 
     border:  none;
 }
-
+.note-text>p:first-of-type{
+    margin-top: 0px !important;
+}
+.note .note-pin{
+    background: url(https://drive.google.com/thumbnail?id=1excaNtaLfn_Hj5EHuH-h8iimpzC36i0M);
+    position: absolute;
+    display: block;
+    width: 40px;
+    height: 40px;
+    background-size: contain;
+    z-index: 1000000;
+    filter: drop-shadow(1px 2px 1px black);
+}
+.note .note-pin:after{
+    position: absolute;
+    content: attr(data-label);
+    pointer-events: none;
+    z-index: 1000000;
+    color: #fff;
+    text-shadow: 0px 0px #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    font-size: 12px;
+    white-space: nowrap;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    transform: translate(-50%);
+    left: 50%;
+    bottom: -12px;
+}
 #help-overlay{
     position: fixed;
     left: 0;
@@ -4205,7 +4320,7 @@ body {
   }
 
   .help-tabs a {
-    display: block;
+    display: flex;
     padding: 10px 15px;
     color: rgb(0, 0, 0);
   }
@@ -4621,11 +4736,12 @@ button.applyDamageButton svg {
 
 
 td button.block-send-to-game-log {
-    position: relative;
+    position: absolute;
     display: block;
-    top: auto;
-    right: auto;
-    
+    float: unset;
+    top:50%;
+    right: -2px;
+    transform: translate(0px, -50%);
 }
 td button.block-send-to-game-log span{
     font-size:9px !important;
@@ -5220,10 +5336,11 @@ button.block-send-to-game-log span {
 #playersFolder .players-popout-button{
     position: absolute;
     top: 0px;
-    right: 30px;
+    left: 100px;
     margin-right: 5px;
     margin-top: 5px; 
 }
+
 #playersFolder .hp-attribute.death-saves.ct-health-summary__data.ct-health-summary__deathsaves {
     float: right;
     margin: 2px 6px 2px 2px;
@@ -5296,9 +5413,31 @@ button.block-send-to-game-log span {
     bottom: 0;
     transform: scale(0.8);
 }
+#playersFolder .folder-item-list>.folder>.sidebar-list-item-row-item>.token-row-gear{
+    display: block;
+    width: 30px;
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+    background-color: rgb(242, 246, 248);
+    cursor: pointer;
+    min-width: 30px;
+    padding: 7px;
+    border-left: 1px solid rgb(216, 225, 232);
+    margin: -4px -4px -4px 2px;
+    height:auto;
+    border-radius: 0px;
+    padding: 7px;
+}
+#playersFolder .folder-item-list>.folder>.sidebar-list-item-row-item>.token-row-gear img{
+    transform:initial;
+    position:initial
+}
 #playersFolder .token-row-button .material-icons{
     font-size: 18px;
     padding: 0px;
+}
+#playersFolder>.sidebar-list-item-row-item:first-of-type>.token-row-button .material-icons {
+    font-size:25px;
 }
 #playersFolder .ddbc-box-background svg path{
     fill: var(--player-border-color, #F00);
@@ -5371,6 +5510,20 @@ span.exhaustion-pip.last{
 }
 .example-token{
     --window-zoom: 1;
+}
+.example-token.selected:before {
+    content: 'Customizing';
+    font-weight:bold;
+    text-shadow:0px 0px #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    display:flex;
+    font-size:10px;
+    position:absolute;
+    color: #FFF;
+    width:100%;
+    height:100%;
+    z-index:1;
+    flex-direction: row-reverse;
+    justify-content: center;
 }
 /* all the rc-switch styles were lifted from the content sharing screen /campaigns/<campaign_id>/content-management and then tweaked slightly */
 .rc-switch {
@@ -5573,11 +5726,10 @@ div.sidebar__pane-content div.tooltip::after {
     background: #f5f5f5;
     padding: 0px 5px;
     margin: 9px 10px;
-    position: relative;
 }
 .dm-eyes-only:before {
     display:block;
-    position:absolute;
+    position:relative;
     content:'DM Eyes Only';
     top: -10px;
     right: 2px;
@@ -10542,6 +10694,32 @@ div#addAuraPreset{
     background: rgb(235, 241, 245);
     transform: scale(0.8);
 }
+
+
+
+table#light_presets_properties th,
+table#aura_presets_properties th {
+    position:sticky;
+    top:10px;
+    z-index:1;
+}
+table#light_presets_properties tr,
+table#aura_presets_properties tr{
+    display: table-row;
+}
+table#light_presets_properties :is(td, th),
+table#aura_presets_properties :is(td, th) {
+    display: table-cell;
+    vertical-align: middle;
+}
+table#light_presets_properties,
+table#aura_presets_properties  {
+   display:table;
+    border-collapse: unset;
+    border-spacing: 10px;    
+}
+
+
 #light_presets_properties div.removePreset svg rect,
 #animation_presets_properties div.removePreset svg rect,
 #aura_presets_properties div.removePreset svg rect{

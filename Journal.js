@@ -1070,13 +1070,23 @@ class JournalManager{
 
 			            }   
 	            	};   
-	            	menuItems["copyLink"] = {
-		                name: "Copy Note Link",
-		                callback: function(itemKey, opt, originalEvent) {
-		                	let copyLink = `[note]${note_id};${self.notes[note_id].title}[/note]`
-		                    navigator.clipboard.writeText(copyLink);
-			            }   
-	            	};   
+	            	if(!self.notes[note_id].ddbsource){
+		            	menuItems["copyLink"] = {
+			                name: "Copy Tooltip Link",
+			                callback: function(itemKey, opt, originalEvent) {
+			                	let copyLink = `[note]${note_id};${self.notes[note_id].title}[/note]`
+			                    navigator.clipboard.writeText(copyLink);
+				            }   
+		            	};   
+		            	menuItems["copyEmbed"] = {
+			                name: "Copy Embed Tags",
+			                callback: function(itemKey, opt, originalEvent) {
+			                	let copyLink = `[note embed]${note_id};${self.notes[note_id].title}[/note]`
+			                    navigator.clipboard.writeText(copyLink);
+				            }   
+		            	};
+	            	}
+	            	
             		menuItems['export'] = {
             	        name: "Export Note",
             	        callback: function (itemKey, opt, e) {
@@ -1142,7 +1152,177 @@ class JournalManager{
 		}
 	}
 	
-	
+	positionNotePins(id, note_text){
+		let pins = $(note_text).find(`.note-pin`);
+
+		if(pins.length == 0)
+			return;
+
+		pins.each(function(){
+			const pinId = $(this).attr('data-id');
+			let noteText = $(this).attr('data-text');
+			const label = $(this).attr('data-label');
+			let noteTitle = (typeof label == 'string' && label != '') ? label : 'pin';
+			
+
+			let noteId = $(this).attr('data-note');
+			if(noteId.replace(/[-+*&<>]/gi, '') == noteText.replace(/[-+*&<>\s]/gi, '')){
+				noteId = Object.keys(window.JOURNAL.notes).filter(d=> window.JOURNAL.notes[d]?.title?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')?.includes(noteText?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')))[0]
+			}
+		
+			if(window.JOURNAL.notes[noteId] != undefined){
+				noteText = window.JOURNAL.notes[noteId].text;
+				noteTitle = window.JOURNAL.notes[noteId].title;
+			}
+
+			
+
+			let noteHover = `<div>
+				<div class="tooltip-header">
+		       	 	<div class="tooltip-header-icon">
+		            
+			        	</div>
+			        <div class="tooltip-header-text">
+			            ${noteTitle}
+			        </div>
+			        <div class="tooltip-header-identifier tooltip-header-identifier-condition">
+			           Note
+			        </div>
+	    		</div>
+		   		<div class="tooltip-body note-text">
+			        <div class="tooltip-body-description">
+			            <div class="tooltip-body-description-text note-text">
+			                ${noteText}
+			            </div>
+			        </div>
+			    </div>
+			</div>`
+			if(window.JOURNAL.notes[id].pins != undefined && window.JOURNAL.notes[id].pins[pinId] != undefined){
+				const left = window.JOURNAL.notes[id].pins[pinId].x
+				const top = window.DM ? window.JOURNAL.notes[id].pins[pinId].y : `${parseFloat(window.JOURNAL.notes[id].pins[pinId].y) - 43}px`;
+
+				$(this).css({
+					'left': left,
+					'top': top
+				})
+			}
+			if(window.DM){
+				$(this).draggable({
+					containment: `div.note[data-id='${id}']`,
+					start: function(){
+						clearTimeout(hoverNoteTimer)
+						remove_tooltip(500);
+					},
+					stop: function () {
+						if(window.JOURNAL.notes[id].pins == undefined){
+							window.JOURNAL.notes[id].pins = {};
+						}
+						window.JOURNAL.notes[id].pins[pinId] = {
+							x: $(this).css('left'),
+							y: $(this).css('top')
+						}	
+						window.JOURNAL.persist();
+						debounceSendNote(id, window.JOURNAL.notes[id])
+					}
+				})
+			}
+			let hoverNoteTimer;
+			$(this).on({
+					'mouseover': function(e){
+						hoverNoteTimer = setTimeout(function () {
+			            	build_and_display_sidebar_flyout(e.clientY, function (flyout) {
+					            flyout.addClass("prevent-sidebar-modal-close"); // clicking inside the tooltip should not close the sidebar modal that opened it
+					            flyout.addClass('note-flyout');
+					            const tooltipHtml = $(noteHover);
+								window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);	
+								add_journal_roll_buttons(tooltipHtml);
+								window.JOURNAL.add_journal_tooltip_targets(tooltipHtml);
+								add_stat_block_hover(tooltipHtml);
+								add_aoe_statblock_click(tooltipHtml);
+
+								$(tooltipHtml).find('.add-input').each(function(){
+								    let numberFound = $(this).attr('data-number');
+								    const spellName = $(this).attr('data-spell');
+								    const remainingText = $(this).hasClass('each') ? '' : `${spellName} slots remaining`
+								    const track_ability = function(key, updatedValue){	    	
+										if (window.JOURNAL.notes[noteId].abilityTracker === undefined) {
+											window.JOURNAL.notes[noteId].abilityTracker = {};
+										}
+										const asNumber = parseInt(updatedValue); 
+										window.JOURNAL.notes[noteId].abilityTracker[key] = asNumber;
+										window.JOURNAL.persist();
+										debounceSendNote(noteId, window.JOURNAL.notes[noteId])
+							    	}
+								    if (window.JOURNAL.notes[noteId].abilityTracker?.[spellName]>= 0){
+							    		numberFound = window.JOURNAL.notes[noteId].abilityTracker[spellName]
+							    	} 
+							    	else{
+								    	track_ability(spellName, numberFound)
+								    }
+
+								    let input = createCountTracker(window.JOURNAL.notes[noteId], spellName, numberFound, remainingText, "", track_ability);
+								    $(this).find('p').remove();
+								    $(this).after(input)
+							    })
+					            flyout.append(tooltipHtml);
+					            let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
+					            sendToGamelogButton.css({ "float": "right" });
+					            sendToGamelogButton.on("click", function(ce) {
+					                ce.stopPropagation();
+					                ce.preventDefault();
+									
+					                send_html_to_gamelog(noteHover);
+					            });
+					            let flyoutLeft = e.clientX+20
+					            if(flyoutLeft + 400 > window.innerWidth){
+					            	flyoutLeft = window.innerWidth - 420
+					            }
+					            flyout.css({
+					            	left: flyoutLeft,
+					            	width: '400px'
+					            })
+
+					            const buttonFooter = $("<div></div>");
+					            buttonFooter.css({
+					                height: "40px",
+					                width: "100%",
+					                position: "relative",
+					                background: "#fff"
+					            });
+					            window.JOURNAL.block_send_to_buttons(flyout);
+					            flyout.append(buttonFooter);
+					            buttonFooter.append(sendToGamelogButton);
+					            flyout.find("a").attr("target","_blank");
+					      		flyout.off('click').on('click', '.int_source_link', function(event){
+									event.preventDefault();
+									render_source_chapter_in_iframe(event.target.href);
+								});
+								
+
+					            flyout.hover(function (hoverEvent) {
+					                if (hoverEvent.type === "mouseenter") {
+					                    clearTimeout(removeToolTipTimer);
+					                    removeToolTipTimer = undefined;
+					                } else {
+					                    remove_tooltip(500);
+					                }
+					            });
+
+					            flyout.css("background-color", "#fff");
+					        });
+			        	}, 500);		
+					
+					},
+					'mouseout': function(e){
+						clearTimeout(hoverNoteTimer)
+						remove_tooltip(500);
+					}
+			
+			    });
+
+
+		})
+	}
 	display_note(id, statBlock = false){
 		let self=this;
 		let noteAlreadyOpen = $(`div.note[data-id='${id}']`).length>0;
@@ -1249,7 +1429,7 @@ class JournalManager{
 		}
 		note_text.append(self.notes[id].text); // valid tags are controlled by tinyMCE.init()
 		
-		this.translateHtmlAndBlocks(note_text);	
+		this.translateHtmlAndBlocks(note_text, id);	
 		add_journal_roll_buttons(note_text);
 		this.add_journal_tooltip_targets(note_text);
 		this.block_send_to_buttons(note_text);
@@ -1345,7 +1525,7 @@ class JournalManager{
 				render_source_chapter_in_iframe(event.target.href);
 			});
 		}
-
+		this.positionNotePins(id, note_text);
 	}
 	add_journal_tooltip_targets(target){
 		$(target).find('.tooltip-hover').each(function(){
@@ -1393,11 +1573,11 @@ class JournalManager{
 						            flyout.addClass("prevent-sidebar-modal-close"); // clicking inside the tooltip should not close the sidebar modal that opened it
 						            flyout.addClass('note-flyout');
 						            const tooltipHtml = $(noteHover);
-									window.JOURNAL.translateHtmlAndBlocks(tooltipHtml);	
+									window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);	
 									add_journal_roll_buttons(tooltipHtml);
 									window.JOURNAL.add_journal_tooltip_targets(tooltipHtml);
 									add_stat_block_hover(tooltipHtml);
-									add_aoe_statblock_click(note_text);
+									add_aoe_statblock_click(tooltipHtml);
 						            flyout.append(tooltipHtml);
 						            let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
 						            sendToGamelogButton.css({ "float": "right" });
@@ -1483,6 +1663,8 @@ class JournalManager{
 		let itemId = (url.matchAll(urlRegex).next().value) ? url.matchAll(urlRegex).next().value[1] : 0;
 		let itemType = url.matchAll(urlType).next().value[1];
 		url = url.toLowerCase();
+		if(itemType == 'sources')
+			return 
 		if(itemId == 0 || itemType == 'equipment'){
 			if(window.spellIdCache[url]){
 				callback(`www.dndbeyond.com/${window.spellIdCache[url].type}/${window.spellIdCache[url].id}-tooltip?disable-webm=1`, itemType.slice(0, -1));	
@@ -1534,9 +1716,9 @@ class JournalManager{
 	        e.stopPropagation();
 	        e.preventDefault();
 	        let targetBlock = $(e.currentTarget).parent().clone();
-	        targetBlock.find('button').remove();
+	        targetBlock.find('button.block-send-to-game-log').remove();
 	        targetBlock.find('img').removeAttr('width height style').toggleClass('magnify', true);
-	        send_html_to_gamelog(targetBlock[0].outerHTML);
+	        send_html_to_gamelog(`<p>${targetBlock[0].outerHTML}</p>`);
 	    });
 		blocks.wrap(function(){
 			if(this instanceof HTMLImageElement){
@@ -1553,16 +1735,40 @@ class JournalManager{
        
 		if(allDiceRegex.test($(tables).find('tr:first-of-type>:first-child').text())){
 			let result = $(tables).find(`tbody > tr td:last-of-type`);
+			$(tables).find('td').css({
+				'position': 'relative',
+				'padding-right': '10px'
+			});
 			result.append(sendToGamelogButton); 
 		}
 	}
 				   
+	replaceNoteEmbed(text, notesIncluded=[]){
+
+		return text.replace(/\[note embed\](.*?)\[\/note\]/gi, function(m, m1){
+    		let noteId = m1.replace(/\s/g, '-').split(';')[0];
+        	let noteText = (m1.split(';')[1]) ? m1.split(';')[1] : m1;
+        	if(noteId.replace(/[-+*&<>]/gi, '') == noteText.replace(/[-+*&<>\s]/gi, '')){
+				noteId = Object.keys(window.JOURNAL.notes).filter(d=> window.JOURNAL.notes[d]?.title?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')?.includes(noteText?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')))[0]
+			}
+		
+			if(window.JOURNAL.notes[noteId] != undefined){
+				if(notesIncluded.includes(noteId))
+					noteText = `<em style="color:#f00 !important">Warning: Note embeds that include parent notes are not supported to avoid infinite loop.</em>`;
+				else{
+					notesIncluded.push(noteId);
+					noteText = window.JOURNAL.replaceNoteEmbed(window.JOURNAL.notes[noteId].text, notesIncluded);
+				}
+			}
+			noteText = noteText.replace(/\[pin(.*?)id=([\w-]+?)(.*?)?\]([\s\S]+?)\[\/pin\]/gi,`<em style="color:#F00 !important">Warning: Pins do not function inside embeds</em>`)
+        	return noteText;
+        });
+	}
 
 
 
-
-    translateHtmlAndBlocks(target) {
-    	let pastedButtons = target.find('.avtt-roll-button, [data-rolltype="recharge"], .integrated-dice__container');
+    translateHtmlAndBlocks(target, displayNoteId) {
+    	let pastedButtons = target.find('.avtt-roll-button, [data-rolltype="recharge"], .integrated-dice__container, span[data-dicenotation]');
 
 		for(let i=0; i<pastedButtons.length; i++){
 			$(pastedButtons[i]).replaceWith($(pastedButtons[i]).text());
@@ -1580,51 +1786,50 @@ class JournalManager{
 		}
 		const iframes = target.find('.journal-site-embed')
 		for(let i=0; i<iframes.length; i++){
-			$(iframes[i]).replaceWith(`<iframe class='journal-site-embed' src='${$(iframes[i]).text()}'></iframe>`);
+			let url = $(iframes[i]).text();
+			if(url.includes('dropbox.com')){
+				url = url.replace('dl=0', 'raw=1')
+			}
+			else if(url.match(/drive\.google\.com.*\/view\?usp=/gi)){
+				url = url.replace(/view\?usp=/gi, 'preview?usp=')
+			}
+			$(iframes[i]).replaceWith(`<iframe class='journal-site-embed' src='${url}'></iframe>`);
 		}
     	let data = $(target).clone().html();
 
-        let lines = data.split(/(<br \/>|<br>|<p>|\n)/g);
+
+
+
+        data = data.replace(/\[pin(.*?)\]([\s\S]+?)\[\/pin\]/gi, function(m, m1, m2){
+          let label = '';
+          let id;
+          if(m1.match(/id=([\w-]+?)(\s+?|[\w]+?=|$)/gi)){
+            id = m1.matchAll(/id=([\w-]+?)(\s+?|[\w]+?=|$)/gi).next().value[1]
+          }
+          if(id == undefined)	
+            return `<p><em style="color: #F00 !important">Warning: Pin missing id. Ids should be unique Example: [pin id=idhere][/pin]<br><span style="padding-left: 20px;">Original text:${m}</span></em></p>`;
+          if(m1.match(/label=(.*?)([\w]+?=|$)/gi)){
+            label = m1.matchAll(/label=(.*?)([\w]+?=|$)/gi).next().value[1]
+          }
+
+
+        	let text = m2;
+        	let noteId = '';
+        	if(text.match(/\[note( embed)?\](.*?)\[\/note\]/gi)){
+        		const insideText = text.matchAll(/\[note( embed)?\](.*?)\[\/note\]/gi).next().value[2];
+        		noteId = insideText.replace(/\s/g, '-').split(';')[0];
+            	text = (insideText.split(';')[1]) ? insideText.split(';')[1] : insideText;
+        	}
+        	return `<div class="note-pin" data-id="${id}" data-text="${text}" data-note="${noteId}" data-label="${label}"></div>`
+        });
+
+       	data = this.replaceNoteEmbed(data, [displayNoteId]);
+
+        let lines = data.split(/(<br \/>|<br>|<p>|<\/p>|\n)/g);
         lines = lines.map((line, li) => {
             let input = line;
 
-            input.replace(/^(<(strong|em)><(strong|em)>([a-z0-9\s])<\/(strong|em)><\/(strong|em)>)/gi, '$4');
-
-            input = input.replace(/&nbsp;/g,' ')
-
-
-            // Remove space between letter ranges
-            // e.g. a- b
-            input = input.replace(/([a-z])- ([a-z])/gi, '$1$2');
-            // Replace with right single quote
-            input = input.replace(/'/g, '’');
-            // e.g. Divine Touch. Melee Spell Attack:
-            input = input.replace(
-                /^(([a-z0-9]+[\s]?){1,7})(\([^\)]+\))?(\.)([\s]+)?((Melee|Ranged|Melee or Ranged) (Weapon Attack:|Spell Attack:|Attack Roll:))?/gi,
-                /(lair|legendary) actions/g.test(data)
-                    ? '<strong>$1$4</strong><em>$3$5$6</em>'
-                    : '<em><strong>$1$4</strong></em><em>$3$5$6</em>'
-            ).replace(/[\s]+\./gi, '.');
-
-            // Find actions requiring saving throws
-            input = input.replace(
-                /(?<!\])(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) Saving Throw:/gi,
-                '<em>$1 Saving Throw:</em>'
-            );
-            // Emphasize hit
-            input = input.replace(/Hit:/g, '<em>Hit:</em>');
-            // Emphasize hit or miss
-            input = input.replace(/Hit or Miss:/g, '<em>Hit or Miss:</em>');
-            // Emphasize trigger (2024 monsters)
-            input = input.replace(/Trigger:/g, '<em>Trigger:</em>');
-            // Emphasize response (2024 monsters)
-            input = input.replace(/Response:/g, '<em>Response:</em>');
-            // Emphasize failure/success (2024 monsters)
-            input = input.replace(/Failure:/g, '<em>Failure:</em>');
-            input = input.replace(/Success:/g, '<em>Success:</em>');
-            input = input.replace(/Success or Failure:/g, '<em>Success or Failure:</em>');
-            input = input.replace(/Failure or Success:/g, '<em>Failure or Success:</em>');
-  			
+            input = general_statblock_formating(input);
         
             // Find cover rules
             input = input.replace(
@@ -1714,17 +1919,20 @@ class JournalManager{
             if (
                 spellcasting >= 0 &&
                 spellcasting < li &&
-                (input.startsWith('At will:') ||
-                    input.startsWith('Cantrips (at will):') ||
+                (input.match('At will:') ||
+                    input.match('Cantrips (at will):') ||
                     input.match(/(\d+\/day( each)?|\d+\w+ level \(\d slots?\))\:/gi))
             ) {
             	let eachNumberFound = (input.match(/\d+\/day( each)?/gi)) ? parseInt(input.match(/[0-9]+(?![0-9]?px)/gi)[0]) : undefined;
             	let slotsNumberFound = (input.match(/\d+\w+ level \(\d slots?\)\:/gi)) ? parseInt(input.match(/[0-9]+/gi)[1]) : undefined;
             	let spellLevelFound = (slotsNumberFound) ? input.match(/\d+\w+ level/gi)[0] : undefined;
-                let parts = input.split(/(:\s(?<!left:\s?)|:(?<!left:\s?)<\/strong>(\s)?)/g);
+                let parts = input.split(/(:\s(?<!(left:\s?|style="[\s\S]+?))|:(?<!(left:\s?|style="[\s\S]+?))<\/strong>(\s)?)/gi);
                 let i = parts.length - 1;
                 parts[i] = parts[i].split(/,\s(?![^(]*\))/gm);
                 for (let p in parts[i]) {
+
+                	if(parts[i][p].match(/^((\s+?)?(<a|<span))/gi) && $(parts[i][p])?.is('a, span[data-spell]'))
+                		continue;
                 	parts[i][p] = parts[i][p].replace(/<(\/)?em>|<(\/)?b>|<(\/)?strong>/gi, '')
                 	let spellName = (parts[i][p].startsWith('<a')) ? $(parts[i][p]).text() : parts[i][p].replace(/<\/?p[a-zA-z'"0-9\s]+?>/g, '').replace(/\s?\[spell\]\s?|\s?\[\/spell\]\s?/g, '').replace('[/spell]', '').replace(/\s|&nbsp;/g, '');
 
@@ -1812,7 +2020,7 @@ class JournalManager{
                 return `<a class="tooltip-hover magic-item-tooltip" href="https://www.dndbeyond.com/magic-items/${spellUrl}" aria-haspopup="true" target="_blank">${spell}</a>`
             })
 
-             input = input.replace(/\[source\](.*?)\[\/source\]/g, function(m){
+            input = input.replace(/\[source\](.*?)\[\/source\]/g, function(m){
             	let source = m.replace(/<\/?p>/g, '').replace(/\s?\[source\]\s?|\s?\[\/source\]\s?/g, '').replace('[/source]', '');   	
             	const sourceUrl = source.replace(/\s/g, '-').split(';')[0];
             	source = (source.split(';')[1]) ? source.split(';')[1] : source;
@@ -2858,6 +3066,7 @@ class JournalManager{
 			   	]}
 			],
 			plugins: 'save,hr,image,link,lists,media,paste,tabfocus,textcolor,colorpicker,autoresize, code, table, template',
+			table_cell_advtab: true,
 			add_toolbar: "template",
 			templates: [
 			    {
@@ -3006,7 +3215,8 @@ class JournalManager{
 <p>5th level (1 slot): cone of cold</p>`
 			    },
 			],
-			toolbar1: 'undo styleselect template | horizontalrules | bold italic underline strikethrough | alignleft aligncenter alignright justify| outdent indent | bullist numlist | forecolor backcolor | fontsizeselect | link unlink | image media | table | code',
+		  	table_grid: false,
+			toolbar: 'undo styleselect template | horizontalrules | bold italic underline strikethrough | alignleft aligncenter alignright justify| outdent indent | bullist numlist | forecolor backcolor | fontsizeselect | link unlink | image media table tableCustom | code',
 			image_class_list: [
 				{title: 'Magnify', value: 'magnify'},
 			],

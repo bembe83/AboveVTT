@@ -73,12 +73,12 @@ $(function() {
         window.MYSTREAMID = uuid();
         window.JOINTHEDICESTREAM = window.EXPERIMENTAL_SETTINGS['streamDiceRolls'];
         
-        const allDiceRegex = /\d+d(?:100|20|12|10|8|6|4)(?:kh\d+|kl\d+|ro(<|<=|>|>=|=)\d+)*/g; // ([numbers]d[diceTypes]kh[numbers] or [numbers]d[diceTypes]kl[numbers]) or [numbers]d[diceTypes]
-        const validExpressionRegex = /^[dkhlro<=>\s\d+\-\(\)]*$/g; // any of these [d, kh, kl, spaces, numbers, +, -] // Should we support [*, /] ?
+        const allDiceRegex = /\d+d(?:100|20|12|10|8|6|4)(?:kh\d+|kl\d+|ro(<|<=|>|>=|=)\d+)*/gi; // ([numbers]d[diceTypes]kh[numbers] or [numbers]d[diceTypes]kl[numbers]) or [numbers]d[diceTypes]
+        const validExpressionRegex = /^[dkhlro<=>\s\d+\-\(\)]*$/gi; // any of these [d, kh, kl, spaces, numbers, +, -] // Should we support [*, /] ?
         const validModifierSubstitutions = /(?<!\w)(str|dex|con|int|wis|cha|pb)(?!\w)/gi // case-insensitive shorthand for stat modifiers as long as there are no letters before or after the match. For example `int` and `STR` would match, but `mint` or `strong` would not match.
-        const diceRollCommandRegex = /^\/(r|roll|save|hit|dmg|skill|heal)\s/; // matches only the slash command. EG: `/r 1d20` would only match `/r`
-        const multiDiceRollCommandRegex = /\/(ir|r|roll|save|hit|dmg|skill|heal) [^\/]*/g; // globally matches the full command. EG: `note: /r 1d20 /r2d4` would find ['/r 1d20', '/r2d4']
-        const allowedExpressionCharactersRegex = /^(d\d|\d+d\d+|kh\d+|kl\d+|ro(<|<=|>|>=|=)\d+|\+|-|\d+|\s+|STR|str|DEX|dex|CON|con|INT|int|WIS|wis|CHA|cha|PB|pb)*/; // this is explicitly different from validExpressionRegex. This matches an expression at the beginning of a string while validExpressionRegex requires the entire string to match. It is also explicitly declaring the modifiers as case-sensitive because we can't search the entire thing as case-insensitive because the `d` in 1d20 needs to be lowercase.
+        const diceRollCommandRegex = /^\/(r|roll|save|hit|dmg|skill|heal)\s/gi; // matches only the slash command. EG: `/r 1d20` would only match `/r`
+        const multiDiceRollCommandRegex = /\/(ir|r|roll|save|hit|dmg|skill|heal) [^\/]*/gi; // globally matches the full command. EG: `note: /r 1d20 /r2d4` would find ['/r 1d20', '/r2d4']
+        const allowedExpressionCharactersRegex = /^(d\d|\d+d\d+|kh\d+|kl\d+|ro(<|<=|>|>=|=)\d+|\+|-|\d+|\s+|STR|DEX|CON|INT|WIS|CHA|PB)*/gi; // this is explicitly different from validExpressionRegex. This matches an expression at the beginning of a string while validExpressionRegex requires the entire string to match. It is also explicitly declaring the modifiers as case-sensitive because we can't search the entire thing as case-insensitive because the `d` in 1d20 needs to be lowercase.
 
         if(window.EXPERIMENTAL_SETTINGS['streamDiceRolls']){
           enable_dice_streaming_feature(window.JOINTHEDICESTREAM );
@@ -224,16 +224,12 @@ $(function() {
                   window.Projecting = true;
                   if(event.data.zoom == false || (windowRatio != 1 && window.ZOOM == event.data.zoom * windowRatio)){
                     let viewPos = convert_point_from_map_to_view(event.data.mapPos.x, event.data.mapPos.y) 
-                    window.scroll(viewPos.x - window.innerWidth/2 + sidebarSize/2 - 20, viewPos.y - window.innerHeight/2 - 20);  //20 for scrollbar  
-                  }
-                  else if(windowRatio != 1){
-                    change_zoom(event.data.zoom);
-                    window.scroll(event.data.x - window.innerWidth/2 + sidebarSize/2, event.data.y - window.innerHeight/2);          
-                    change_zoom(event.data.zoom * windowRatio)
+                    window.scroll(viewPos.x-window.innerWidth/2+sidebarSize/2+20, viewPos.y-window.innerHeight/2+20); //20 for scrollbar width
                   }
                   else{              
                     change_zoom(event.data.zoom);
-                    window.scroll(event.data.x - window.innerWidth/2 + sidebarSize/2, event.data.y - window.innerHeight/2);    
+                    let viewPos = convert_point_from_map_to_view(event.data.mapPos.x, event.data.mapPos.y) 
+                    window.scroll(viewPos.x-window.innerWidth/2+sidebarSize/2+20, viewPos.y-window.innerHeight/2+20); //20 for scrollbar width    
                   }
                 })
                 

@@ -289,14 +289,14 @@ function peer_disconnected(peerId, playerId) {
 
 //#region game logic
 
-let peer_animation_timout = 20;
+var peer_animation_timout = 20;
 
 /** Set this to true to avoid sending cursor events and ruler events at the same time
  * Don't forget to unpause it */
-let pauseCursorEventListener = false;
+var pauseCursorEventListener = false;
 
 /** used by {@link start_sending_cursor_to_peers} to avoid doubling up on even listeners */
-let isTrackingCursor = false;
+var isTrackingCursor = false;
 
 /** adds an event listener that calls {@link sendCursorPositionToPeers} */
 function start_sending_cursor_to_peers() {
@@ -474,8 +474,14 @@ function init_peer_fade_function(playerId) {
       noisy_log("executing PEER_FADE_CURSOR_FUNCTIONS", playerId);
       if (playerId === dm_id) {
         $(`#cursorPosition-DM`).fadeOut();
+
       } else {
         $(`#cursorPosition-${playerId}`).fadeOut();
+      }
+      if (window.PEER_TOKEN_DRAGGING != undefined && window.PEER_TOKEN_DRAGGING[playerId]) {
+        const html = window.PEER_TOKEN_DRAGGING[playerId];
+        delete window.PEER_TOKEN_DRAGGING[playerId];
+        $(html).remove();
       }
     });
   }
@@ -509,7 +515,7 @@ const sendCursorPositionToPeers = throttle( (mouseMoveEvent) => {
       return;  // ideally, we would add the event listener to the map only, but I couldn't find a clean way to do that without restructuring things
     }
 
-    const [mouseX, mouseY] = get_event_cursor_position(mouseMoveEvent, true);
+    let [mouseX, mouseY] = get_event_cursor_position(mouseMoveEvent, true);
     noisy_log("sendCursorPositionToPeers", mouseX, mouseY);
     window.PeerManager.send(PeerEvent.cursor(mouseX, mouseY, undefined, false));
   } catch (error) {
@@ -589,7 +595,7 @@ function update_peer_cursor(eventData) {
   fade_peer_cursor(eventData.playerId);
 
   if (typeof eventData.tokenId === "string" && eventData.tokenId.length > 0) {
-    peer_is_dragging_token(eventData); // they allow rulers to be drawn so also show the token being dragged if applicable
+    peer_is_dragging_token(eventData); 
     return;
   }
 
@@ -612,8 +618,8 @@ function update_peer_cursor(eventData) {
   cursorPosition.css('background', eventData.color);
   cursorPosition.stop();
   cursorPosition.animate({
-    top: eventData.y,
-    left: eventData.x
+    top: eventData.y-cursorPosition.width()/2,
+    left: eventData.x-cursorPosition.height()/2
   }, peer_animation_timout, "linear");
   cursorPosition.fadeIn();
 }
@@ -682,7 +688,7 @@ function peer_is_dragging_token(eventData) {
     html.attr("data-clone-id", `dragging-${eventData.tokenId}`);
     html.attr("data-id", ``);
     html.removeClass('tokenselected underDarkness');
-    html.css('opaicty', '0.5')
+    html.css('opacity', '0.5')
     if (!html || html.length === 0) {
       noisy_log("peer_is_dragging_token no token on scene matching", `#tokens div[data-id='${eventData.tokenId}']`, eventData);
       return;
