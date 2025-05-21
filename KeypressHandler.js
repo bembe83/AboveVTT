@@ -69,25 +69,136 @@ function unhide_interface() {
     }
 }
 
-//for number key binds that aren't enabled yet
+/*
+Adds num key dice rolls together or rolls them if auto roll is set
+Will remove if ctrl/mod is held.
+Simple 1d# rolls are grouped together.
+
+Other rolls are added/subtracted individually such as 2d20kh1. As 4d20kh2 would not always produce the same result. 
+
+To do: Support grouping semi-simple rolls together such as 2d4+4 -> 4d4+8 instead of 2d4+4+2d4+4. 
+Adjusting this from regex adjusting a string to roll groupings in json or an array then building the formula would probably make this easier. 
+*/
 function hotkeyDice(nthDice){
 
-    if (!$(".dice-toolbar__dropdown").hasClass("dice-toolbar__dropdown-selected")) {
-        $(".dice-toolbar__dropdown-die").click();
-    }
-    const dieButton = $(`.dice-toolbar__dropdown-top>.dice-die-button:nth-of-type(${8-nthDice})`); 
-    if(ctrlHeld){
-        dieButton.triggerHandler('contextmenu');
-            let element = dieButton[0];
-            let e = element.ownerDocument.createEvent('MouseEvents');
-            e.initMouseEvent('contextmenu', true, true,
-                    element.ownerDocument.defaultView, 1, 0, 0, 0, 0, false,
-                    false, false, false, 2, null);
-            element.dispatchEvent(e);
+
+    const rollSetting = get_avtt_setting_value('quickRoll')["customDieRoll"+nthDice];
+    const autoRoll = get_avtt_setting_value('quickRoll')['autoRoll'];
+    
+    if(autoRoll == true){
+        const rollData = DiceRoll.fromSlashCommand(`/r ${rollSetting}`);
+        window.diceRoller.roll(rollData); 
     }
     else{
-        dieButton.click();
+        simpleDice = ['1d4', '1d6', '1d8', '1d100', '1d10', '1d12', '1d20'];
+
+        if(shiftHeld){
+            if(window.numpadRollFormula === undefined){
+                window.numpadRollFormula = ``;
+            }
+            window.numpadRollFormula = window.numpadRollFormula.replace(diceRollCommandRegex, "").match(allowedExpressionCharactersRegex)?.[0]
+        
+            if(simpleDice.includes(rollSetting)){
+                const rollRegex = new RegExp(`([+-][\\d]+)?(${rollSetting.replace('1d', 'd')}($|[+-]))`, "gi");
+                if(window.numpadRollFormula.match(rollRegex) != null){
+                    window.numpadRollFormula = window.numpadRollFormula.replace(rollRegex, function(m, m1, m2, m3){
+                        const newAmount = parseInt(m1) - 1;
+                        if(newAmount != 0){
+                           return `${newAmount > 0 ? `+${newAmount}` : `${newAmount}`}${m2}`;
+                        }
+                        else{
+                           return m3;
+                        }
+                    })
+                }
+                else{
+                    window.numpadRollFormula = `${window.numpadRollFormula}-${rollSetting}`
+                }
+            }
+            else{
+                const rollRegex = new RegExp(`(\\+${rollSetting.replace(/\+/gi, '\\+')})($|[+-])`, "i");
+                
+                if(window.numpadRollFormula.match(rollRegex) != null){
+                    window.numpadRollFormula = window.numpadRollFormula.replace(rollRegex, function(m, m1, m2){
+                        return m2;
+                    })
+                }
+                else{
+                    window.numpadRollFormula = `${window.numpadRollFormula}-${rollSetting}` 
+                }
+            }
+        }
+        else{
+            if(window.numpadRollFormula === undefined){
+                window.numpadRollFormula = ``;
+            } 
+            window.numpadRollFormula = window.numpadRollFormula.replace(diceRollCommandRegex, "").match(allowedExpressionCharactersRegex)?.[0]
+        
+            if(simpleDice.includes(rollSetting)){
+                const rollRegex = new RegExp(`([+-][\\d]+)?(${rollSetting.replace('1d', 'd')}($|[+-]))`, "gi");
+                if(window.numpadRollFormula.match(rollRegex) != null){
+                    window.numpadRollFormula = window.numpadRollFormula.replace(rollRegex, function(m, m1, m2, m3){
+                        const newAmount = parseInt(m1) + 1;
+                        if(newAmount != 0){
+                           return `${newAmount > 0 ? `+${newAmount}` : `${newAmount}`}${m2}`;
+                        }
+                        else{
+                           return m3;
+                        }
+                    })
+                }
+                else{
+                    window.numpadRollFormula = `${window.numpadRollFormula}+${rollSetting}`
+
+                }
+            }
+            else{
+                const rollRegex = new RegExp(`(\\-${rollSetting.replace(/\+/gi, '\\+')})($|[+-])`, "i");
+                
+                if(window.numpadRollFormula.match(rollRegex) != null){
+                    window.numpadRollFormula = window.numpadRollFormula.replace(rollRegex, function(m, m1, m2){
+                        return m2;
+                    });
+                }
+                else{
+                    window.numpadRollFormula = `${window.numpadRollFormula}+${rollSetting}` 
+                }
+            }
+        }
+
+        updateDisplayedDiceFormula();
     }
+
+   
+}
+
+function updateDisplayedDiceFormula(){
+   
+    let wrapper = $('#displayedDiceFormula')
+    if($('#displayedDiceFormula').length == 0){
+        wrapper = $(`<div id='displayedDiceFormula'>Number key Formula to Roll:<span class='rollFormula'></span></div>`)
+        const exitButton = $(`<button id='displayedDiceFormulaExit'>X</button>`);
+        exitButton.off('click.exitNumDice').on('click.exitNumDice', function(){
+            wrapper.remove();
+            delete window.numpadRollFormulaMod;
+            delete window.numpadRollFormula
+        })
+        wrapper.append(exitButton);
+        $('#VTTWRAPPER').append(wrapper);
+    }
+     if(window.numpadRollFormulaMod == undefined)
+        window.numpadRollFormulaMod = 0;
+    let displayMod = window.numpadRollFormulaMod
+    if(displayMod == 0)
+        displayMod = '';
+    const action = window.numpadRollFormula.replace(diceRollCommandRegex, "").replace(allowedExpressionCharactersRegex, "");
+    const expression = window.numpadRollFormula.replace(diceRollCommandRegex, "").match(allowedExpressionCharactersRegex)?.[0].replace(/\s*([+-])\s*|\s+$/gi, '$1');
+   
+    const displayText = `${expression}${window.numpadRollFormulaMod > 0 ? `+${window.numpadRollFormulaMod}` : window.numpadRollFormulaMod  == 0 ? '' : `${window.numpadRollFormulaMod}`} ${action}`
+    if(displayText == '')
+        $('#displayedDiceFormulaExit').click();
+    else
+        wrapper.find('.rollFormula').text(`${displayText.replace(/^\+/, '')}`)
 }
 
 function init_keypress_handler(){
@@ -149,26 +260,39 @@ Mousetrap.bind('v', function () {       //video toggle
 });
 
 Mousetrap.bind('shift+v', function () {       //check token vision
-    if(window.SelectedTokenVision == true && $('#selected_token_vision .ddbc-tab-options__header-heading--is-active').length==0)
+    if(window.SelectedTokenVision == true && $('#selected_token_vision .ddbc-tab-options__header-heading--is-active').length==0){
         window.SelectedTokenVision = false;
-    else
+        if(window.DM)
+            do_check_token_visibility();       
+    }
+    else{
         window.SelectedTokenVision = true;
+    }
 
    redraw_light();
 });
 
 Mousetrap.bind('=', function () {       //zoom plus
-    if($('.roll-mod-container').hasClass('show'))
+    if($('.roll-mod-container').hasClass('show')){
         $('.roll-button-mod.plus').click();
-    else
+    }
+    else if(window.numpadRollFormula != undefined){
+        if(window.numpadRollFormulaMod == undefined)
+            window.numpadRollFormulaMod = 0;
+        window.numpadRollFormulaMod = window.numpadRollFormulaMod+1
+        updateDisplayedDiceFormula();
+    }
+    else{
         $('#zoom_plus').click()
+    }
 });
 
-Mousetrap.bind(["1","2","3","4","5","6","7","mod+1","mod+2","mod+3","mod+4","mod+5","mod+6","mod+7",], function (e, combo) {
+Mousetrap.bind(["1","2","3","4","5","6","7","8","9","shift+1","shift+2","shift+3","shift+4","shift+5","shift+6","shift+7","shift+8","shift+9"], function (e, combo) {
     e.preventDefault();  
-    let numberPressed = parseInt(combo.replace('mod+',''));
+    let numberPressed = parseInt(combo.replace('shift+',''));
     hotkeyDice(numberPressed);
 });
+
 
 Mousetrap.bind("n", function (e) {
     $('#combat_next_button').click();
@@ -188,22 +312,62 @@ Mousetrap.bind(["1","2","3","4","5","6","7","8","9"], function (e) {
 });*/
 
 Mousetrap.bind('+', function () {       //zoom plus
-    if($('.roll-mod-container').hasClass('show'))
-        $('.roll-button-mod.plus').click(); 
-    else
+    if($('.roll-mod-container').hasClass('show')){
+        $('.roll-button-mod.plus').click();
+    }
+    else if(window.numpadRollFormula != undefined){
+        if(window.numpadRollFormulaMod == undefined)
+            window.numpadRollFormulaMod = 0;
+        window.numpadRollFormulaMod = window.numpadRollFormulaMod+1;
+        updateDisplayedDiceFormula();
+    }
+    else{
         $('#zoom_plus').click()
+    }
 });
 
 Mousetrap.bind('-', function () {       //zoom minus
-    if($('.roll-mod-container').hasClass('show'))
+    if($('.roll-mod-container').hasClass('show')){
         $('.roll-button-mod.minus').click();
-    else
+    }
+    else if(window.numpadRollFormula != undefined){
+        if(window.numpadRollFormulaMod == undefined)
+            window.numpadRollFormulaMod = 0;
+        window.numpadRollFormulaMod = window.numpadRollFormulaMod-1;
+        updateDisplayedDiceFormula();
+    }
+    else{
         $('#zoom_minus').click()
+    }
 });
 Mousetrap.bind('enter', function () {       //zoom minus
-    if(!$('.roll-mod-container').hasClass('show'))
-        return;
-    $('.roll-mod-container>.roll-button').click(); 
+    if($('.roll-mod-container').hasClass('show')){
+        $('.roll-mod-container>.roll-button').click(); 
+    }   
+    else if(window.numpadRollFormula != undefined){
+        if(window.numpadRollFormulaMod == undefined)
+            window.numpadRollFormulaMod = 0
+
+        let rollFormula;
+        const action = window.numpadRollFormula.replace(diceRollCommandRegex, "").replace(allowedExpressionCharactersRegex, "");
+        const expression = window.numpadRollFormula.replace(diceRollCommandRegex, "").match(allowedExpressionCharactersRegex)?.[0];
+   
+        if(window.numpadRollFormula.match(/^-/)){
+            rollFormula = `${window.numpadRollFormulaMod}${expression}`
+        }
+        else if(window.numpadRollFormulaMod == 0){
+            rollFormula = expression.replace(/^\+/, '');
+        }
+        else{
+            rollFormula = `${expression.replace(/^\+/, '')}${window.numpadRollFormulaMod > 0 ? `+${window.numpadRollFormulaMod}` : `${window.numpadRollFormulaMod}`}`
+        }
+        const rollData = DiceRoll.fromSlashCommand(`/r ${rollFormula}${action}`);
+        window.diceRoller.roll(rollData); 
+        
+        $('#displayedDiceFormula').remove();
+        delete window.numpadRollFormulaMod;
+        delete window.numpadRollFormula;
+    }
 });
 
 Mousetrap.bind('ctrl+space', function (e) {    
@@ -262,6 +426,19 @@ Mousetrap.bind('shift+w', function () {
     }
        
 });
+Mousetrap.bind('shift+e', function () {
+    if(window.DM){
+        $('#show_elev').toggleClass(['button-enabled', 'ddbc-tab-options__header-heading--is-active']);
+        if($('#show_elev').hasClass('button-enabled')){
+            redraw_elev(true);
+        }
+        else{
+            redraw_elev();
+            $('#elev_legend_window').remove();
+        }
+    }
+       
+});
 Mousetrap.bind('l', function () {
     if(shiftHeld)
         return;
@@ -274,6 +451,11 @@ Mousetrap.bind('shift+l', function () {
 });
 
 Mousetrap.bind('esc', function () {     //deselect all buttons
+
+    $('#displayedDiceFormula').remove();
+    delete window.numpadRollFormulaMod;
+    delete window.numpadRollFormula;
+
     stop_drawing();
 
     if(!$("#wall_button").hasClass("button-enabled")){

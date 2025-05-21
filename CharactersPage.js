@@ -119,19 +119,37 @@ const buffsDebuffs = {
         "tohit": "0",
         "dmg": "+2",
         "save": "0",
-        "check": "0"
+        "check": "0",
+        "replace": /^1d20/gi,
+        "replaceType": {
+          "check": '.ct-skills__item:has(.ct-skills__col--stat:contains("STR")), .ddbc-ability-summary .ddbc-ability-summary__abbr:contains("str")', 
+          "save": '.ddbc-saving-throws-summary__ability--str' 
+        },
+        "newRoll": '2d20kh1',
       },
       "+3": {
         "tohit": "0",
         "dmg": "+3",
         "save": "0",
-        "check": "0"
+        "check": "0",
+        "replace": /^1d20/gi,
+        "replaceType": {
+          "check": '.ct-skills__item:has(.ct-skills__col--stat:contains("STR")), .ddbc-ability-summary .ddbc-ability-summary__abbr:contains("str")', 
+          "save": '.ddbc-saving-throws-summary__ability--str' 
+        },
+        "newRoll": '2d20kh1',
       },
       "+4": {
         "tohit": "0",
         "dmg": "+4",
         "save": "0",
-        "check": "0"
+        "check": "0",
+        "replace": /^1d20/gi,
+        "replaceType": {
+          "check": '.ct-skills__item:has(.ct-skills__col--stat:contains("STR")), .ddbc-ability-summary .ddbc-ability-summary__abbr:contains("str")', 
+          "save": '.ddbc-saving-throws-summary__ability--str' 
+        },
+        "newRoll": '2d20kh1',
       },
     },
     "type": "class",
@@ -408,10 +426,72 @@ const buffsDebuffs = {
       "save": "0",
       "check": "-d6",
       "type": "spell"
-  }
+  },
+  "Trance of Order": {
+      "tohit": "0",
+      "dmg": "0",
+      "save": "0",
+      "check": "0",
+      "replace": /1d20/gi,
+      "newRoll": '1d20min10',
+      "type": "sorcerer"
+  },
+  "Reliable Talent": {
+      "tohit": "0",
+      "dmg": "0",
+      "save": "0",
+      "check": "0",
+      "replace": /1d20/gi,
+      "replaceType": {
+        "check": '.ct-skills__item:has(.ct-skills__col--proficiency>:is([aria-label="Expert"], [aria-label="Proficient"]))' //looks for proficient or expertise class before a check
+      },
+      "newRoll": '1d20min10',
+      "type": "class",
+      "class": "rogue",
+  },
+  "Pass Without a Trace":{
+    "tohit": "0",
+    "dmg": "0",
+    "save": "0",
+    "check": "0",
+    "replace": /^1d20/gi,
+    "replaceType": {
+      "check": '.ct-skills__item:contains("Stealth")' //looks for stealth
+    },
+    "newRoll": '1d20+10',
+    "type": "spell",
+  },
+  "Great Weapon Fighting": {
+    "multiOptions": {
+      "2024": { 
+        "tohit": "0",
+        "dmg": "0",
+        "save": "0",
+        "check": "0",
+        "replace": /^(\d+d\d+)/gi,//find first roll
+        "replaceType": {
+          "damage": 'button:has(.ddbc-damage--versatile), .ddbc-combat-item-attack--melee:has(.ddbc-note-components__component:contains("Two-Handed"))' //looks for versatile 2 hand button or two-handed trait in item note
+        },
+        "newRoll": '$1min3',//replace with original roll with minimum roll of 3
+      },
+      "Legacy": {
+        "tohit": "0",
+        "dmg": "0",
+        "save": "0",
+        "check": "0",
+        "replace": /^(\d+d\d+)/gi,//find first roll
+        "replaceType": {
+            "damage": 'button:has(.ddbc-damage--versatile), .ddbc-combat-item-attack--melee:has(.ddbc-note-components__component:contains("Two-Handed"))' //looks for versatile 2 hand button or two-handed trait in item note
+        },
+        "newRoll": '$1ro<3',//reroll 1 & 2
+      },
+    },
+    "type": "feat",
+  },  
 }
 var rollBuffFavorites = [];
 var rollBuffContext = [];
+var rollBuffPins = [];
 
 /** @param changes {object} the changes that were observed. EX: {hp: 20} */
 function character_sheet_changed(changes) {
@@ -912,20 +992,27 @@ function init_character_list_page_without_avtt() {
   window.location_href_observer = new MutationObserver(function(mutationList, observer) {
     if (oldHref !== document.location.href) {
       if(is_characters_builder_page()){
-         window.oldHref = document.location.href;
-        if (window.location_href_observer) {
-          window.location_href_observer.disconnect();
-          delete window.location_href_observer;
-        }
-        $('#site-main').css({
-          'visibility':'',
-          'display': ''
-        });
-        setTimeout(function(){
-          $(".builder-sections-sheet-icon").off().on("click", function(){
-            window.location.href = `https://www.dndbeyond.com${$(".builder-sections-sheet-icon").attr("href")}?abovevtt=true`;
+        
+        if(oldHref.includes('abovevtt=true')){
+          window.oldHref = document.location.href;
+          if (window.location_href_observer) {
+            window.location_href_observer.disconnect();
+            delete window.location_href_observer;
+          }
+          $('#site-main').css({
+            'visibility':'',
+            'display': ''
           });
-        }, 1000)
+          setTimeout(function(){
+            $(".builder-sections-sheet-icon").off().on("click", function(){
+              window.location.href = `https://www.dndbeyond.com${$(".builder-sections-sheet-icon").attr("href")}?abovevtt=true`;
+            });
+          }, 1000)
+        }
+        else{
+          window.oldHref = document.location.href;
+        }
+      
       }
       else if (!is_characters_list_page()) {
         console.log("Detected location change from", oldHref, "to", document.location.href);
@@ -958,9 +1045,10 @@ function inject_dice_roll(element, clear=true) {
     console.debug("inject_dice_roll slashCommands", slashCommands);
     let updatedInnerHtml = element.text();
     for (const command of slashCommands) {
+      let originalCommand = command[0];
       try {
         let iconRoll = command[0].startsWith('/ir');
-        let originalCommand = command[0];
+        
         if(iconRoll){
           command[0] = command[0].replace(/^(\/ir)/i, '/r')
           command[1] = 'r';
@@ -969,7 +1057,7 @@ function inject_dice_roll(element, clear=true) {
         updatedInnerHtml = updatedInnerHtml.replace(originalCommand, `<button class='avtt-roll-formula-button integrated-dice__container ${iconRoll ? 'abovevtt-icon-roll' : ''}' title="${diceRoll.action?.toUpperCase() ?? "CUSTOM"}: ${diceRoll.rollType?.toUpperCase() ?? "ROLL"}" data-slash-command="${command[0]}">${diceRoll.expression}</button>`);
       } catch (error) {
         console.warn("inject_dice_roll failed to parse slash command. Removing the command to avoid infinite loop", command, command[0]);
-        updatedInnerHtml = updatedInnerHtml.replace(command[0], '');
+        updatedInnerHtml = updatedInnerHtml.replace(originalCommand, '');
       }
     }
     if(clear == true){
@@ -1042,6 +1130,20 @@ function register_buff_row_context_menu() {
 
         }
       };
+      menuItems["pin"] = {
+        name: rollBuffPins.includes(rowBuff) ? "Unpin from Sheet" : "Pin to Sheet",
+        callback: function(itemKey, opt, originalEvent) {
+            if(rollBuffPins.includes(rowBuff)){
+              rollBuffPins = rollBuffPins.filter(d=> d != rowBuff)
+            }
+            else{
+              rollBuffPins.push(rowBuff)
+            }
+            localStorage.setItem('rollBuffPins' + window.PLAYER_ID, JSON.stringify(rollBuffPins));
+            rebuild_buffs();
+
+        }
+      };
       /**** To do: Allow select menus to be added to roll context menus for this to work. Checkbox inputs can just be added as list items ****/
       /*
       menuItems["addToContext"] = {
@@ -1064,7 +1166,23 @@ function register_buff_row_context_menu() {
 }
 function rebuild_buffs(fullBuild = false){
   window.rollBuffs = JSON.parse(localStorage.getItem('rollBuffs' + window.PLAYER_ID)) || [];
+  const buffDebuffKeys=Object.keys(buffsDebuffs);
+  for(let i in window.rollBuffs){
+    if(Array.isArray(window.rollBuffs[i])){
+      if(!buffDebuffKeys.includes(window.rollBuffs[i][0])){
+        window.rollBuffs.splice(i, 1);
+        localStorage.setItem('rollBuffs' + window.PLAYER_ID, JSON.stringify(window.rollBuffs));
+      }
+    }
+    else{
+      if(!buffDebuffKeys.includes(window.rollBuffs[i])){
+        window.rollBuffs.splice(i, 1);
+        localStorage.setItem('rollBuffs' + window.PLAYER_ID, JSON.stringify(window.rollBuffs));
+      }
+    }
+  }
   rollBuffFavorites = JSON.parse(localStorage.getItem('rollFavoriteBuffs' + window.PLAYER_ID)) || [];
+  rollBuffPins = JSON.parse(localStorage.getItem('rollBuffPins' + window.PLAYER_ID)) || [];
   let avttBuffSelect;
   const innerBuffHtml = `
     <ul id='favoriteBuffs'><li>Favorite</li></ul>
@@ -1107,7 +1225,7 @@ function rebuild_buffs(fullBuild = false){
     if(avttBuffSelect.hasClass('visible')){
       $(document).on('click.blurHandle', function(e){
         if($(e.target).closest('#avtt-buff-options, .context-menu-list').length == 0){
-          avttBuffSelect.toggleClass('visible')
+          avttBuffSelect.toggleClass('visible', false)
           $(document).off('click.blurHandle');
         }
       })  
@@ -1125,13 +1243,26 @@ function rebuild_buffs(fullBuild = false){
     }, 
     {}
   );
+  const pinWrapper = $(`<div id='avttBuffSheetPins'></div>`);
+  $('#avttBuffSheetPins').remove()
+ 
   for(let i in sortedBuffs){
     const headerRow = avttBuffItems.find(`ul#${buffsDebuffs[i].type == 'class' ? buffsDebuffs[i].class : buffsDebuffs[i].type == 'species' ? buffsDebuffs[i].species : buffsDebuffs[i].type}Buffs`);
     const replacedName = i.replace("'", '');
     const addToFavorite = rollBuffFavorites.includes(replacedName);
+    const addToPins = rollBuffPins.includes(replacedName);
 
     if(buffsDebuffs[i]['multiOptions'] != undefined){
-      const row = $(`<li><select id='buff_${replacedName}' data-buff='${replacedName}'/><option value='0'></option></select><label for='buff_${replacedName}'>${i}</label></li>`)
+      const row = $(`<li>
+        <select id='buff_${replacedName}' data-buff='${replacedName}'/>
+          <option value='0'></option>
+        </select>
+        <label for='buff_${replacedName}'>${i}</label>
+        <div class='iconButtons'>
+          <span title='Pin to sheet' class="material-symbols-outlined pinToSheet ${rollBuffPins.includes(replacedName) ? 'enabled' : ''}"> </span>
+          <span title='Favorite' class="material-symbols-outlined favorite ${rollBuffFavorites.includes(replacedName) ? 'enabled' : ''}"> </span>
+        </div>
+      </li>`)
       const select = row.find('select');
       const currentSelected = window.rollBuffs.find(d => d.includes(i));
 
@@ -1154,12 +1285,58 @@ function rebuild_buffs(fullBuild = false){
         }
         localStorage.setItem('rollBuffs' + window.PLAYER_ID, JSON.stringify(window.rollBuffs));
       })
+      row.find('span.favorite').off('click.favorite').on('click.favorite', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if(rollBuffFavorites.includes(replacedName)){
+          rollBuffFavorites = rollBuffFavorites.filter(d=> d != replacedName)
+        }
+        else{
+          rollBuffFavorites.push(replacedName)
+        }
+        localStorage.setItem('rollFavoriteBuffs' + window.PLAYER_ID, JSON.stringify(rollBuffFavorites));
+        rebuild_buffs();
+      })
+      row.find('span.pinToSheet').off('click.pinToSheet').on('click.pinToSheet', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if(rollBuffPins.includes(replacedName)){
+          rollBuffPins = rollBuffPins.filter(d=> d != replacedName)
+        }
+        else{
+          rollBuffPins.push(replacedName)
+        }
+        localStorage.setItem('rollBuffPins' + window.PLAYER_ID, JSON.stringify(rollBuffPins));
+        rebuild_buffs();
+      })
       if(addToFavorite)
         avttBuffItems.find(`ul#favoriteBuffs`).append(row);  
       else    
         headerRow.append(row);
+
+      if(addToPins){
+        const cloneRow = row.clone(true, true);
+        const cloneSelect = cloneRow.find('select');
+        if(currentSelected != undefined){
+          cloneSelect.val(currentSelected[1])
+        }
+        cloneSelect.off('change.syncRollBuff').on('change.syncRollBuff', function(e){
+          row.find('select').val($(this).val())
+        })
+        select.off('change.syncRollBuff').on('change.syncRollBuff', function(e){
+          cloneRow.find('select').val($(this).val());
+        })
+        pinWrapper.append(cloneRow);
+      }
     }else{
-      const row = $(`<li><input type="checkbox" id='buff_${replacedName}' data-buff='${replacedName}'/><label for='buff_${replacedName}'>${i}</label></li>`);
+      const row = $(`<li>
+        <input type="checkbox" id='buff_${replacedName}' data-buff='${replacedName}'/>
+        <label for='buff_${replacedName}'>${i}</label>
+        <div class='iconButtons'>
+          <span title='Pin to sheet' class="material-symbols-outlined pinToSheet ${rollBuffPins.includes(replacedName) ? 'enabled' : ''}"> </span>
+          <span title='Favorite' class="material-symbols-outlined favorite ${rollBuffFavorites.includes(replacedName) ? 'enabled' : ''}"> </span>
+        </div>
+      </li>`)
       if(window.rollBuffs.includes(i))
         row.find('input').prop('checked', true);
       row.find('input').off('change.setRollBuff').on('change.setRollBuff', function(e){
@@ -1173,10 +1350,45 @@ function rebuild_buffs(fullBuild = false){
         }
         localStorage.setItem('rollBuffs' + window.PLAYER_ID, JSON.stringify(window.rollBuffs));
       })
+      row.find('span.favorite').off('click.favorite').on('click.favorite', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if(rollBuffFavorites.includes(replacedName)){
+          rollBuffFavorites = rollBuffFavorites.filter(d=> d != replacedName)
+        }
+        else{
+          rollBuffFavorites.push(replacedName)
+        }
+        localStorage.setItem('rollFavoriteBuffs' + window.PLAYER_ID, JSON.stringify(rollBuffFavorites));
+        rebuild_buffs();
+      })
+      row.find('span.pinToSheet').off('click.pinToSheet').on('click.pinToSheet', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if(rollBuffPins.includes(replacedName)){
+          rollBuffPins = rollBuffPins.filter(d=> d != replacedName)
+        }
+        else{
+          rollBuffPins.push(replacedName)
+        }
+        localStorage.setItem('rollBuffPins' + window.PLAYER_ID, JSON.stringify(rollBuffPins));
+        rebuild_buffs();
+      })
       if(addToFavorite)
         avttBuffItems.find(`ul#favoriteBuffs`).append(row);
       else   
         headerRow.append(row);
+
+      if(addToPins){
+        const cloneRow = row.clone(true, true);
+         cloneRow.find('input').off('change.syncRollBuff').on('change.syncRollBuff', function(e){
+            row.find('input').prop('checked', $(this).is(':checked'));
+         })
+         row.find('input').off('change.syncRollBuff').on('change.syncRollBuff', function(e){
+            cloneRow.find('input').prop('checked', $(this).is(':checked'));
+         })
+        pinWrapper.append(cloneRow);
+      }
     }
 
   }
@@ -1187,6 +1399,9 @@ function rebuild_buffs(fullBuild = false){
 
   if(fullBuild)
     $('.ct-primary-box__tab--actions .ct-actions h2, .ct-actions-mobile .ct-actions h2, .ct-actions-tablet .ct-tablet-box__header').after(avttBuffSelect)
+  
+  const tabContent = $(`#avtt-buff-options~[class*='styles_tabFilter']>[class*='styles_content'], #avtt-buff-options~.ct-tablet-box__content [class*='styles_tabFilter']>[class*='styles_content']`);
+  tabContent.prepend(pinWrapper);
   register_buff_row_context_menu();
 }
 
@@ -1305,30 +1520,33 @@ function observe_character_sheet_changes(documentToObserve) {
     //for character page snippets and sidebar text. Can add anything else that's text isn't modified without removing parent.
     const snippets = documentToObserve.find(`
       .ddbc-snippet__content p:not('.above-vtt-visited'), 
-      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane'])>div>div:not(.ct-item-detail__customize):not([class*='__intro']) p:not(.above-vtt-visited),
-      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane'])>div>div[class*='ct-item-detail__customize']:nth-child(4) p:not(.above-vtt-visited),
-      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane'])>div>div:not(.ct-item-detail__customize):not([class*='__intro']) tr:not(.above-vtt-visited),
-      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane'])>div>div:not(.ct-item-detail__customize):not([class*='__intro']) div[class*='--damage']:not([class*='__modifier']):not(.above-vtt-visited),
-      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane'])>div>div:not(.ct-item-detail__customize):not([class*='__intro']) span:not([class*='button']):not([class*='casting']):not([class*='__modifier']):not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane']):last-of-type>div>div:not(.ct-item-detail__customize):not([class*='__intro']) p:not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane']):last-of-type>div>div[class*='ct-item-detail__customize']:nth-child(4) p:not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane']):last-of-type>div>div:not(.ct-item-detail__customize):not([class*='__intro']) tr:not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane']):last-of-type>div>div:not(.ct-item-detail__customize):not([class*='__intro']) div[class*='--damage']:not([class*='__modifier']):not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane']):last-of-type>div>div:not(.ct-item-detail__customize):not([class*='__intro']) span:not([class*='button']):not([class*='casting']):not([class*='__modifier']):not(.above-vtt-visited),
       [class*='spell-damage-group'] span[class*='__value']:not(.above-vtt-visited)
     `);
-
+  
     if(add_journal_roll_buttons && snippets.length > 0){
+
       snippets.addClass("above-vtt-visited");
-      snippets.find('.ddbc-snippet__tag, .ddbc-tooltip[data-origintal-tile]').each(function(){
+      snippets.find('.ddbc-snippet__tag, .ddbc-tooltip[data-origintal-tile]').each(function(){   
         $(this).parent().replaceWith($(this).text());
       })
       snippets.find('td').each(function(){
-          let text = $(this).text();
-          text = text.replace("–", "-");
-          $(this).text(text);
+        let text = $(this).text();
+        text = text.replace("–", "-");
+        $(this).text(text);
       })
       snippets.each(function(){
+        if($(this).closest(`[class*='styles_maxHeight']>div:not(.sidebar-panel-content)`).has('input[type="search"]').length>0)
+          return; // do not adjust side bar when it includes a search such as adding extras as it causes crashing
         add_journal_roll_buttons($(this));
         add_aoe_statblock_click($(this), `/profile/${window.myUser}/characters/${window.PLAYER_ID}`);
       })
     }
-
+ 
     // for buttons text that changes based on input, such as damage change from adjusting spell level in the sidebar
     const manualSetRollbuttons = documentToObserve.find(`.ct-spell-caster__modifier-amount:not(.above-vtt-visited)`) 
     if(manualSetRollbuttons.length > 0){
@@ -1766,7 +1984,56 @@ function observe_character_sheet_changes(documentToObserve) {
       if($(`style#advantageHover`).length == 0){
           $('body').append(`
             <style id='advantageHover'>
-
+              #avtt-buff-options span.material-symbols-outlined {
+                  opacity: 0.2;
+                  font-size:16px;
+                  margin-right: 2px;
+                  cursor: pointer;
+              }
+              #avtt-buff-options span.material-symbols-outlined.enabled {
+                  opacity: 1;
+              }
+              .pinToSheet.material-symbols-outlined:before{
+                   content:"\\f3ab";
+              }
+              .favorite.material-symbols-outlined:before{
+                  content:"\\e8d0";
+              }
+              #avttBuffSheetPins div.iconButtons{
+                display:none;
+              }
+              #avtt-buff-options .iconButtons {
+                  position:absolute;
+                  display:flex;
+                  right:0px;
+              }
+              #avtt-buff-options .collapsed .iconButtons {
+                  display: none;
+              }
+              #avtt-buff-options li:has(label) {
+                  width:calc(100% - 30px);
+              }
+              #avtt-buff-options~[class*='styles_tabFilter']>[class*='styles_buttons']{
+                margin-bottom:2px;
+              }
+              div#avttBuffSheetPins {
+                display: flex;
+                flex-wrap: wrap;
+                margin: 5px 0px;
+              }
+              div#avttBuffSheetPins li {
+                list-style: none; 
+                display: flex;
+                align-items: center;
+              }
+              div#avttBuffSheetPins li input {
+                margin-right: 5px;
+                width: 16px;
+                height: 16px;
+              }
+              div#avttBuffSheetPins li {
+                  margin-right: 20px;
+              }
               .avtt-ability-roll-button{
                   color: #b43c35;
                   border: 1px solid #b43c35;
@@ -1781,7 +2048,8 @@ function observe_character_sheet_changes(documentToObserve) {
                   padding: 1px 4px 0;
                   cursor: pointer;
               }
-              ul.avttBuffItems select {
+              ul.avttBuffItems select,
+              div#avttBuffSheetPins select {
                 -webkit-appearance: none;
                 -moz-appearance: none;
                 text-indent: 1px;
@@ -1792,13 +2060,17 @@ function observe_character_sheet_changes(documentToObserve) {
                 width:16px;
                 height:16px;
                 border-radius:3px;
-                background: #fff !important;
-                color: var(--theme-contrast) !important;
+                background: #fff;
+                color: var(--theme-contrast);
                 text-shadow: none !important;
                 font-weight: bold; 
               }
-              .ct-character-sheet--dark-mode ul.avttBuffItems select{
+              .ct-character-sheet--dark-mode ul.avttBuffItems select,
+              .ct-character-sheet--dark-mode div#avttBuffSheetPins select {
                 background: #363636 !important;
+              }
+              div#avttBuffSheetPins select{
+                font-size: 10px;
               }
               .ct-character-sheet--dark-mode .dropdown-check-list ul.avttBuffItems>ul>li:first-of-type:hover{
                   backdrop-filter:brightness(3);
@@ -1808,7 +2080,7 @@ function observe_character_sheet_changes(documentToObserve) {
                 position: absolute;
                 left: 130px;
                 font-size: 10px;
-                width: 200px;
+                width: 250px;
               }
               .ct-tablet-box__header ~ .dropdown-check-list {
                 left: unset;
@@ -1820,7 +2092,7 @@ function observe_character_sheet_changes(documentToObserve) {
                 padding: 0px 50px 0px 10px;
                 border: 1px solid #ccc;
                 border-radius: 5px 5px 0px 0px;
-                width: 200px;
+                width: 250px;
               }
 
               .dropdown-check-list .clickHandle:after {
@@ -1847,7 +2119,7 @@ function observe_character_sheet_changes(documentToObserve) {
                 height: 300px;
                 overflow: auto;
                 scrollbar-width: thin;
-                width: 200px;
+                width: 250px;
               }
               .dropdown-check-list ul.avttBuffItems>ul.collapsed,
               .dropdown-check-list ul.avttBuffItems>ul>ul.collapsed {

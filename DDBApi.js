@@ -57,14 +57,19 @@ class DDBApi {
   }
 
   static async fetchHtmlWithToken(url, extraConfig = {}) {
-   const token = await DDBApi.#refreshToken();
-    const config = {...extraConfig,
-      headers: {
-        'Authorization': `Bearer ${token}`,
+    try{
+      const token = await DDBApi.#refreshToken();
+      const config = {...extraConfig,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
       }
+      const request = await fetch(url, config)
+      return await request.text();
+    }   
+    catch{
+      console.warn(`Failed to Fetch: ${url}`);
     }
-    const request = await fetch(url, config).then(DDBApi.lookForErrors)
-    return await request.text();
   }
 
     static async fetchJsonWithTokenOmitCred(url, extraConfig = {}) {
@@ -162,6 +167,7 @@ class DDBApi {
         }
       }    
     }
+    return find_game_id(); // return this here to be used in createAboveVttEncounter - this return being here seems to prevent bugged encounters. Maybe something do with going ahead to create without finishing deleting, not sure but haven't been able to replicate it with it here.
   }
 
   static async createAboveVttEncounter(campaignId = find_game_id()) {

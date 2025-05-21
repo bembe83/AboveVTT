@@ -3433,18 +3433,18 @@ function init_help_menu() {
 							<dd>Zoom in</dd>
 						</dl>
 						<dl>
-							<dt>1-7</dt>
-							<dd> Add Dice to Dice Pool</dd>
+							<dt>1-9</dt>
+							<dd>Add Custom Numkey Dice to Dice Pool</dd>
 						</dl>
-							<dt>${getModKeyName()}+1-7</dt>
-							<dd>Remove Dice from Dice Pool</dd>
+							<dt>${getModKeyName()}+1-9</dt>
+							<dd>Remove Custom Numkey Dice from Dice Pool</dd>
 						</dl>
 						<dl>
-							<dt>- (with Dice Pool Mod visibile)</dt>
+							<dt>- (with Dice Pool or Mod adjuster visibile)</dt>
 							<dd>Subtract from Roll Mod</dd>
 						</dl>
 						<dl>
-							<dt>= / + (with Dice Pool Mod visibile)</dt>
+							<dt>= / + (with Dice Pool or Mod adjuster visibile)</dt>
 							<dd>Add to Roll Mod</dd>
 						</dl>
 						<dl>
@@ -3484,6 +3484,10 @@ function init_help_menu() {
 							<dd>Toggle always show walls. Will also show 'hidden icon' doors/windows.</dd>
 						</dl>
 						<dl>
+							<dt>${getShiftKeyName()}+E</dt>
+							<dd>Toggle always show elevation. Will always show elevation areas.</dd>
+						</dl>
+						<dl>
 							<dt>${getShiftKeyName()}+S</dt>
 							<dd>Toggle snap drawings to grid. This includes drawings from most menus - fog, draw, light, walls etc.</dd>
 						</dl>
@@ -3510,6 +3514,14 @@ function init_help_menu() {
 						<dl>
 							<dt>Hold ${getShiftKeyName()} while drawing walls</dt>
 							<dd>Create Segemented Wall. This keeps walls from having pin point holes.</dd>
+						</dl>
+						<dl>
+							<dt>${getModKeyName()}+click scenes/tokens while reordering (DM only)</dt>
+							<dd>While reordering the scenes listing or token listing this will to add/remove scenes to multi-selection</dd>
+						</dl>
+						<dl>
+							<dt>${getShiftKeyName()}+click scenes/tokens while reordering (DM only)</dt>
+							<dd>While reordering the scenes listing this will add scenes between clicked scene and other selected scenes in the same folder to multi-selection</dd>
 						</dl>
 						<dl>
 							<dt>UP/DOWN arrows</dt>
@@ -3868,7 +3880,7 @@ function show_player_sheet() {
 	$("#character-tools-target").css({
 		"display": "",
 	});
-	$(".ct-character-sheet__inner").css({
+	$(".ct-character-sheet__inner, [class*='styles_mobileNav']>div>button[class*='styles_navToggle']").css({
 		"display": "",
 		"z-index": 110
 	});

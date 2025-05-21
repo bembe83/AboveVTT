@@ -107,18 +107,18 @@ class JournalManager{
 	persist(allowPlayerPersist=false){
 		if(window.DM || allowPlayerPersist){ 
 
-			let statBlocks = Object.fromEntries(Object.entries(this.notes).filter(([key, value]) => this.notes[key].statBlock == true));
-			let chapters = this.chapters
-			let journal = Object.fromEntries(Object.entries(this.notes).filter(([key, value]) => this.notes[key].statBlock != true));
+			const statBlocks = Object.fromEntries(Object.entries(this.notes).filter(([key, value]) => this.notes[key].statBlock == true));
+			const chapters = this.chapters
+			const journal = Object.fromEntries(Object.entries(this.notes).filter(([key, value]) => this.notes[key].statBlock != true));
 
 
-			let storeImage = gameIndexedDb.transaction([`journalData`], "readwrite")
-			let objectStore = storeImage.objectStore(`journalData`)
+			const storeImage = gameIndexedDb.transaction([`journalData`], "readwrite")
+			const objectStore = storeImage.objectStore(`journalData`)
 
-			let globalObjectStore = globalIndexedDB.transaction(["journalData"], "readwrite").objectStore(`journalData`)
+			const globalObjectStore = globalIndexedDB.transaction(["journalData"], "readwrite").objectStore(`journalData`)
 
 			if(window.DM){ // store your own statblocks as DM
-				let deleteRequest = globalObjectStore.delete(`JournalStatblocks`);
+				const deleteRequest = globalObjectStore.delete(`JournalStatblocks`);
 				deleteRequest.onsuccess = (event) => {
 				  const objectStoreRequest = globalObjectStore.add({journalId: `JournalStatblocks`, 'journalData': statBlocks});
 				};
@@ -127,7 +127,7 @@ class JournalManager{
 				};
 			}
 			else{ // store other DMs statblocks for use when DM isn't online; We keep these seperate so we don't override our own statblocks with another DMs statblock set.
-				let deleteRequest = globalObjectStore.delete(`JournalStatblocks_${window.CAMPAIGN_INFO.dmId}`);
+				const deleteRequest = globalObjectStore.delete(`JournalStatblocks_${window.CAMPAIGN_INFO.dmId}`);
 				deleteRequest.onsuccess = (event) => {
 				  const objectStoreRequest = globalObjectStore.add({journalId: `JournalStatblocks_${window.CAMPAIGN_INFO.dmId}`, 'journalData': statBlocks});
 				};
@@ -137,7 +137,7 @@ class JournalManager{
 			}
 
 
-			let journalDeleteRequest = objectStore.delete(`Journal`);
+			const journalDeleteRequest = objectStore.delete(`Journal`);
 			journalDeleteRequest.onsuccess = (event) => {
 			  const objectStoreRequest = objectStore.add({journalId: `Journal`, 'journalData': journal});
 			};
@@ -146,7 +146,7 @@ class JournalManager{
 			};
 
 	
-			let chapterDeleteRequest = objectStore.delete(`JournalChapters`);
+			const chapterDeleteRequest = objectStore.delete(`JournalChapters`);
 			chapterDeleteRequest.onsuccess = (event) => {
 			  const objectStoreRequest = objectStore.add({journalId: `JournalChapters`, 'journalData': chapters});
 			};
@@ -1074,14 +1074,14 @@ class JournalManager{
 		            	menuItems["copyLink"] = {
 			                name: "Copy Tooltip Link",
 			                callback: function(itemKey, opt, originalEvent) {
-			                	let copyLink = `[note]${note_id};${self.notes[note_id].title}[/note]`
+			                	const copyLink = `[note]${note_id};${self.notes[note_id].title}[/note]`
 			                    navigator.clipboard.writeText(copyLink);
 				            }   
 		            	};   
 		            	menuItems["copyEmbed"] = {
 			                name: "Copy Embed Tags",
 			                callback: function(itemKey, opt, originalEvent) {
-			                	let copyLink = `[note embed]${note_id};${self.notes[note_id].title}[/note]`
+			                	const copyLink = `[note embed]${note_id};${self.notes[note_id].title}[/note]`
 			                    navigator.clipboard.writeText(copyLink);
 				            }   
 		            	};
@@ -1572,6 +1572,7 @@ class JournalManager{
 				            	build_and_display_sidebar_flyout(e.clientY, function (flyout) {
 						            flyout.addClass("prevent-sidebar-modal-close"); // clicking inside the tooltip should not close the sidebar modal that opened it
 						            flyout.addClass('note-flyout');
+						            $(self).toggleClass('loading-tooltip', false);
 						            const tooltipHtml = $(noteHover);
 									window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);	
 									add_journal_roll_buttons(tooltipHtml);
@@ -1708,39 +1709,99 @@ class JournalManager{
 	    }
 	}
 	block_send_to_buttons(target){
-		let blocks = target.find('img:not(.mon-stat-block__separator-img), .text--quote-box, .rules-text, .block-torn-paper, .read-aloud-text')
+		const blocks = target.find('img:not(.mon-stat-block__separator-img), .text--quote-box, .rules-text, .block-torn-paper, .read-aloud-text')
 
-		let sendToGamelogButton = $('<button class="block-send-to-game-log"><span class="material-symbols-outlined">login</span></button>')
-		let container = $(`<div class='note-text' style='position:relative; width:'></div>`)
+		const sendToGamelogButton = $('<button class="block-send-to-game-log"><span class="material-symbols-outlined">login</span></button>')
+		const container = $(`<div class='note-text' style='position:relative; width:'></div>`)
+		
+	
+
+	    const whisper_container=$("<div class='whisper-container'/>");
+
+        for(let i in window.playerUsers){
+			if(whisper_container.find(`input[name='${window.playerUsers[i].userId}']`).length == 0){
+				const randomId = uuid();
+				let whisper_toggle=$(`<input type='checkbox' name='${window.playerUsers[i].userId}'/>`);
+				let whisper_row = $(`<div class='whisper_toggle_row'><label>${window.playerUsers[i].userName}</label></div>`)
+				whisper_toggle.off('click.toggle').on('click.toggle', function(e){
+
+					e.stopPropagation();
+				})
+				whisper_row.find('label').off('click.stopProp').on('click.stopProp', function(e){
+					e.stopPropagation();
+					e.preventDefault();
+					$(this).next('input[type=checkbox]').click();
+				})
+				whisper_row.append(whisper_toggle)
+
+				
+				whisper_container.append(whisper_row);
+			}
+		}
+		sendToGamelogButton.off('contextmenu').on("contextmenu", function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			const checkedInputs=$(this).find('.whisper-container input:checked');
+	        checkedInputs.click();
+			$(this).find('.whisper-container').toggleClass('visible');
+
+			if($(this).find('.whisper-container').hasClass('visible')){
+		      $(document).on('click.blurWhisperHandle', function(e){
+		        if($(e.target).closest('.whisper-container').length == 0){
+		          $('.whisper-container').toggleClass('visible', false)
+		          $(document).off('click.blurWhisperHandle');
+		        }
+		      })  
+		    }
+		})
+		$(sendToGamelogButton).append(whisper_container);
 		sendToGamelogButton.off('click').on("click", function(e) {
 	        e.stopPropagation();
 	        e.preventDefault();
+	        
 	        let targetBlock = $(e.currentTarget).parent().clone();
 	        targetBlock.find('button.block-send-to-game-log').remove();
 	        targetBlock.find('img').removeAttr('width height style').toggleClass('magnify', true);
-	        send_html_to_gamelog(`<p>${targetBlock[0].outerHTML}</p>`);
+	       	const whisper_container=$(this).find('.whisper-container');
+	        if(whisper_container.hasClass('visible')){
+	        	const checkedInputs = whisper_container.find('input:checked');
+	        	const whisperArray = [];
+	        	checkedInputs.each(function () {
+			       whisperArray.push($(this).attr('name'));
+			  	});
+			  	send_html_to_gamelog(`<p>${targetBlock[0].outerHTML}</p>`, whisperArray)
+	        }
+	        else{
+	        	send_html_to_gamelog(`<p>${targetBlock[0].outerHTML}</p>`);
+	        }
+	        
 	    });
-		blocks.wrap(function(){
+
+
+		const tables = target.find('table');
+		
+		const allDiceRegex = /(\d+)?d(?:100|20|12|10|8|6|4)((?:kh|kl|ro(<|<=|>|>=|=)|min=)\d+)*/g; // ([numbers]d[diceTypes]kh[numbers] or [numbers]d[diceTypes]kl[numbers]) or [numbers]d[diceTypes]
+       	
+   		blocks.wrap(function(){
 			if(this instanceof HTMLImageElement){
 				container.css('width', 'fit-content');
 				$(this).attr('href', $(this).attr('src'));
 			}
+
 			return container;
 		});
-		blocks.after(sendToGamelogButton); 
-
-		let tables = target.find('table');
-		
-		const allDiceRegex = /(\d+)?d(?:100|20|12|10|8|6|4)(?:kh\d+|kl\d+|ro(<|<=|>|>=|=)\d+)*/g; // ([numbers]d[diceTypes]kh[numbers] or [numbers]d[diceTypes]kl[numbers]) or [numbers]d[diceTypes]
-       
+		sendToGamelogButton.clone(true, true).insertAfter(blocks);
 		if(allDiceRegex.test($(tables).find('tr:first-of-type>:first-child').text())){
 			let result = $(tables).find(`tbody > tr td:last-of-type`);
 			$(tables).find('td').css({
 				'position': 'relative',
 				'padding-right': '10px'
 			});
-			result.append(sendToGamelogButton); 
+			result.append(sendToGamelogButton.clone(true, true)); 
 		}
+
+
+		
 	}
 				   
 	replaceNoteEmbed(text, notesIncluded=[]){
@@ -1769,7 +1830,7 @@ class JournalManager{
 
     translateHtmlAndBlocks(target, displayNoteId) {
     	let pastedButtons = target.find('.avtt-roll-button, [data-rolltype="recharge"], .integrated-dice__container, span[data-dicenotation]');
-
+    	target.find('>style:first-of-type, >style#contentStyles').remove();
 		for(let i=0; i<pastedButtons.length; i++){
 			$(pastedButtons[i]).replaceWith($(pastedButtons[i]).text());
 		}
@@ -1920,7 +1981,7 @@ class JournalManager{
                 spellcasting >= 0 &&
                 spellcasting < li &&
                 (input.match('At will:') ||
-                    input.match('Cantrips (at will):') ||
+                    input.match(/Cantrips \(at will\):/gi) ||
                     input.match(/(\d+\/day( each)?|\d+\w+ level \(\d slots?\))\:/gi))
             ) {
             	let eachNumberFound = (input.match(/\d+\/day( each)?/gi)) ? parseInt(input.match(/[0-9]+(?![0-9]?px)/gi)[0]) : undefined;
@@ -2605,6 +2666,9 @@ class JournalManager{
 			.custom-initiative.custom-stat{
 				 color: #007900;
 			}
+			.custom-challenge-rating.custom-stat{
+				 color: #007979;
+			}
 			.custom-pc-sheet.custom-stat{
 				 color: #08a1e3;
 			}
@@ -3061,6 +3125,7 @@ class JournalManager{
 			      { title: 'Average HP', inline: 'b',classes: 'custom-avghp custom-stat' },
 			      { title: 'HP Roll', inline: 'b', classes: 'custom-hp-roll custom-stat' },
 			      { title: 'Initiative', inline: 'b', classes: 'custom-initiative custom-stat' },
+			      { title: 'CR', inline: 'b', classes: 'custom-challenge-rating custom-stat' },
 			      { title: 'Custom PC Sheet Link', inline: 'b', classes: 'custom-pc-sheet custom-stat' },
 			      { title: 'AboveVTT Slash Command Roll Button', inline: 'span', classes: 'abovevtt-slash-command-journal custom-stat' }
 			   	]}
@@ -3072,7 +3137,7 @@ class JournalManager{
 			    {
 			      "title": "2014 Monster Sheet",
 			      "description": "Add a monster sheet template",
-			      "content": `<style>${contentStyles}</style><div class="Basic-Text-Frame stat-block-background one-column-stat" style="font-family: 'Scala Sans Offc', Roboto, Helvetica, sans-serif;">
+			      "content": `<style id='contentStyles'>${contentStyles}</style><div class="Basic-Text-Frame stat-block-background one-column-stat" style="font-family: 'Scala Sans Offc', Roboto, Helvetica, sans-serif;">
 								<div class="mon-stat-block__name"><span class="mon-stat-block__name-link"> Bandit Captain <br /></span></div>
 								<div class="mon-stat-block__meta">Medium Humanoid (Any Race), Any Non-Lawful Alignment</div>
 								<p><img class="mon-stat-block__separator-img" src="https://www.dndbeyond.com/file-attachments/0/579/stat-block-header-bar.svg" alt="" /></p>

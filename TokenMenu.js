@@ -179,7 +179,20 @@ function token_context_menu_expanded(tokenIds, e) {
 
 	$('body').append(moveableTokenOptions);
 	$('body').append(tokenOptionsClickCloseDiv);
+	$("#tokenOptionsPopup").addClass("moveableWindow");
+	$("#tokenOptionsPopup").draggable({
+		addClasses: false,
+		scroll: false,
+		handle: "div:not(:has(select)), button, label, input",
+		start: function () {
+			$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
+			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+		},
+		stop: function () {
+			$('.iframeResizeCover').remove();
 
+		}
+	});
 
 	if(door?.length == 1){
 
@@ -622,19 +635,7 @@ function token_context_menu_expanded(tokenIds, e) {
 			
 
 		}
-		$("#tokenOptionsPopup").addClass("moveableWindow");
-		$("#tokenOptionsPopup").draggable({
-				addClasses: false,
-				scroll: false,
-				start: function () {
-					$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-					$("#sheet").append($('<div class="iframeResizeCover"></div>'));
-				},
-				stop: function () {
-					$('.iframeResizeCover').remove();
 
-				}
-			});
 		
 
 		if(e.touches?.length>0){
@@ -855,20 +856,6 @@ function token_context_menu_expanded(tokenIds, e) {
 				close_token_context_menu();
 		 	});
 		 }
-	
-		$("#tokenOptionsPopup").addClass("moveableWindow");
-		$("#tokenOptionsPopup").draggable({
-				addClasses: false,
-				scroll: false,
-				start: function () {
-					$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-					$("#sheet").append($('<div class="iframeResizeCover"></div>'));
-				},
-				stop: function () {
-					$('.iframeResizeCover').remove();
-
-				}
-			});
 		
 
 		if(e.touches?.length>0){
@@ -1125,8 +1112,9 @@ function token_context_menu_expanded(tokenIds, e) {
 					combatGroupToken: group,
 					ct_show: !allHidden,
 					revealname: allVisibleNames,
-					name: `${tokens[0].options.name} Group`
+					name: `${tokens[0].options.name} Group`,
 				});
+				delete t.options.groupId; 
 				window.TOKEN_OBJECTS[group] = t;
 				if(window.all_token_objects[group] == undefined){
 					window.all_token_objects[group] = t;
@@ -1453,21 +1441,6 @@ function token_context_menu_expanded(tokenIds, e) {
 			close_token_context_menu();
 	 	});
 	 }
-
-
-	$("#tokenOptionsPopup").addClass("moveableWindow");
-	$("#tokenOptionsPopup").draggable({
-			addClasses: false,
-			scroll: false,
-			start: function () {
-				$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-				$("#sheet").append($('<div class="iframeResizeCover"></div>'));
-			},
-			stop: function () {
-				$('.iframeResizeCover').remove();
-
-			}
-		});
 	
 
 	
@@ -2944,13 +2917,15 @@ function build_notes_flyout_menu(tokenIds, flyout) {
 			});
 
 			deleteNoteButton.off().on("click", function(){
-				if(id in window.JOURNAL.notes){
-					delete window.JOURNAL.notes[id];
-					window.JOURNAL.persist();
-					window.TOKEN_OBJECTS[id].place();	
-					body.remove();
-					if(flyout != undefined)
-						flyout.append(build_notes_flyout_menu(tokenIds, flyout))		
+				if (window.confirm(`Are you sure you want to delete this note?`)) {
+					if(id in window.JOURNAL.notes){
+						delete window.JOURNAL.notes[id];
+						window.JOURNAL.persist();
+						window.TOKEN_OBJECTS[id].place();	
+						body.remove();
+						if(flyout != undefined)
+							flyout.append(build_notes_flyout_menu(tokenIds, flyout))		
+					}
 				}
 			});
 		}
@@ -3025,6 +3000,13 @@ function build_conditions_and_markers_flyout_menu(tokenIds) {
 							token.removeCondition(conditionName);
 						}
 						token.addCondition(conditionName, $(this).val());
+						if(conditionItem.find(`.condition-lock.locked`).length>0){
+							lockedConditions = {
+								...lockedConditions,
+								[conditionName] : $(this).val(),
+							}
+							localStorage.setItem(`lockedConditions.${window.gameId}`, JSON.stringify(lockedConditions));
+						}
 					}	
 					token.place_sync_persist();	
 				});
@@ -4378,9 +4360,9 @@ function add_to_quick_roll_menu(token){
 	//qrm_entry_name_hp_bonus = $("<td style='width:60%;'/>")
 	qrm_entry_name = $("<td style='display:block; width:100%; overflow:hidden;'/>")
 	qrm_entry_row = $("<td style='display:block; width:100%;'/>")
-	qrm_entry_row_rolls = $("<td style='display:inline-flex; width:40%;'/>")
+	qrm_entry_row_rolls = $("<td style='display:inline-flex; width:30%;'/>")
 	qrm_entry_row_hp = $("<td style='display:inline-flex; width:25%; white-space: nowrap;'/>")
-	qrm_entry_row_buttons = $("<td style='display:inline-flex; width:35%;'/>")
+	qrm_entry_row_buttons = $("<td style='display:inline-flex; width:45%;'/>")
 
 	name_line = $("<div class='qrm_name_line'>"+token.options.name+"</div>")
 
@@ -4529,9 +4511,17 @@ function add_to_quick_roll_menu(token){
 		maxhp_input.keydown(function(e) { if (e.keyCode == '13') token.update_from_page(); e.preventDefault(); });
 	}
 
-	qrm_entry_buttons = $("<td style='height:100%; text-align: right; width:100%; top: 1px; position: relative; white-space:nowrap'>");
+	const qrm_resistance_button = $(`<button title="resistance" class='resistanceButton qrm_buttons_bar' style="display:inline-flex;"><span class="material-symbols-outlined">person_shield</span></button>`);
+
+
+	qrm_entry_buttons = $("<td style='height:100%; text-align: right; width:100%; top: 1px; position: relative; white-space:nowrap; display:flex'>");
 	
-	find=$('<button class="qrm_buttons_bar" title="Find Token" style="display:inline-block;"><svg class="findSVG" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 11c1.33 0 4 .67 4 2v.16c-.97 1.12-2.4 1.84-4 1.84s-3.03-.72-4-1.84V13c0-1.33 2.67-2 4-2zm0-1c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm6 .2C18 6.57 15.35 4 12 4s-6 2.57-6 6.2c0 2.34 1.95 5.44 6 9.14 4.05-3.7 6-6.8 6-9.14zM12 2c4.2 0 8 3.22 8 8.2 0 3.32-2.67 7.25-8 11.8-5.33-4.55-8-8.48-8-11.8C4 5.22 7.8 2 12 2z"/></svg></button>');
+	qrm_resistance_button.off('click.resistance').on('click.resistance', function(){
+		$(this).toggleClass('enabled');
+	});
+	qrm_entry_buttons.append(qrm_resistance_button);
+
+	find=$('<button class="qrm_buttons_bar" title="Find Token" style="display:inline-flex;"><svg class="findSVG" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 11c1.33 0 4 .67 4 2v.16c-.97 1.12-2.4 1.84-4 1.84s-3.03-.72-4-1.84V13c0-1.33 2.67-2 4-2zm0-1c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm6 .2C18 6.57 15.35 4 12 4s-6 2.57-6 6.2c0 2.34 1.95 5.44 6 9.14 4.05-3.7 6-6.8 6-9.14zM12 2c4.2 0 8 3.22 8 8.2 0 3.32-2.67 7.25-8 11.8-5.33-4.55-8-8.48-8-11.8C4 5.22 7.8 2 12 2z"/></svg></button>');
 	//find.tooltip({show: { duration: 1000 }})
 	find.click(function(){
 		let target=$(this).parent().parent().parent().parent().attr('data-target');
@@ -4547,7 +4537,7 @@ function add_to_quick_roll_menu(token){
 	});
 	qrm_entry_buttons.append(find);
 
-	remove_from_list=$('<button title="Remove from menu" id="qrm_remove" class="qrm_buttons_bar" style="display:inline-block;"><svg class="delSVG" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"/></svg></button>');
+	remove_from_list=$('<button title="Remove from menu" id="qrm_remove" class="qrm_buttons_bar" style="display:inline-flex;"><svg class="delSVG" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"/></svg></button>');
 	//remove_from_list.tooltip({show: { duration: 1000 }})
 	remove_from_list.click(
 		function() {
@@ -4561,7 +4551,7 @@ function add_to_quick_roll_menu(token){
 	qrm_entry_buttons.append(remove_from_list);
 	
 	if(token.options.statBlock){
-		stat_block=$('<button title="Open Monster Stat Block" class="qrm_buttons_bar" style="display:inline-block;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
+		stat_block=$('<button title="Open Monster Stat Block" class="qrm_buttons_bar" style="display:inline-flex;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
 		
 		stat_block.click(function(){
 			window.JOURNAL.display_note(token.options.statBlock);
@@ -4571,7 +4561,7 @@ function add_to_quick_roll_menu(token){
 		}
 	}
 	else if(token.isMonster() == true){
-		stat_block=$('<button title="Open Monster Stat Block" class="qrm_buttons_bar" style="display:inline-block;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
+		stat_block=$('<button title="Open Monster Stat Block" class="qrm_buttons_bar" style="display:inline-flex;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
 		
 		stat_block.click(function(){
 			load_monster_stat(token.options.monster, token.options.id);
@@ -4581,13 +4571,13 @@ function add_to_quick_roll_menu(token){
 		}
 	}	
 	else if (token.isPlayer() == true) {
-		stat_block=$('<button title="Open Player Stat Block" class="qrm_buttons_bar" style="display:inline-block;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
+		stat_block=$('<button title="Open Player Stat Block" class="qrm_buttons_bar" style="display:inline-flex;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
 		stat_block.click(function(){
 			open_player_sheet(token.options.id);
 		});
 	}
 	else{
-		stat_block=$('<button title="No Stat Block for custom tokens" disabled="true" class="qrm_buttons_bar" style="display:inline-block;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
+		stat_block=$('<button title="No Stat Block for custom tokens" disabled="true" class="qrm_buttons_bar" style="display:inline-flex;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
 		//can add the below if people don't like the disabled button
 		//stat_block.click(function(){
 		//	alert('Sorry, this appears to be a custom token, there was no stat block to fetch.');
@@ -4630,6 +4620,7 @@ function save_type_change(dropdown){
 }
 
 function qrm_fetch_stat(token) {
+	let roll_bonus
 	//if its a monster it needs to be calulated.
 	if(token.options.monster > 0 || token.options.monster == 'open5e'){
 		let stat = (cached_monster_items[token.options.monster]?.monsterData) ? cached_monster_items[token.options.monster]?.monsterData : cached_open5e_items[token.options.itemId]?.monsterData;
@@ -4865,36 +4856,42 @@ function qrm_apply_hp_adjustment(healing=false){
 		let hp_adjustment_failed_save = $('#hp_adjustment_failed_save').val()
 		let half_damage_save_success = $('#half_damage_save').val()
 
-		hp_adjustment_failed_save = hp_adjustment_failed_save.replace(/[^\d.-]/g, '');
-		half_damage_save_success = half_damage_save_success.replace(/[^\d.-]/g, '');
+		hp_adjustment_failed_save = parseInt(hp_adjustment_failed_save.replace(/[^\d.-]/g, ''));
+		half_damage_save_success = parseInt(half_damage_save_success.replace(/[^\d.-]/g, ''));
 
 		let damage;
-		if (result.includes('Fail')){
-			damage = hp_adjustment_failed_save || 0
-			let conditions = $('#qrm_apply_conditions')
-			let conditionName = conditions.val()
-			if(conditionName == 'conditions'){
-				//Do nothing
-			} 
-			else if(conditionName == "remove_all"){
-				//guess this is fine, we update the token immediately. Probably a better way to clear though
-				token.options.conditions = []
-				token.options.custom_conditions = []
-			}
-			else{
-				if(!token.hasCondition(conditionName)){
-					token.addCondition(conditionName, conditionName);
-				}
-			}	
-		}
-		else {
-			damage = half_damage_save_success || 0
-		}
 		if (healing == true){
-			damage = -damage
+			damage = -hp_adjustment_failed_save || 0
 		}
+		else{
+			
+			damage = hp_adjustment_failed_save || 0
+			
+			if(!result.includes('Fail') && damage > 0) {
+				damage = Math.max(half_damage_save_success, 1) || 0
+			}	
+			if($(this).find('button.resistanceButton.enabled').length>0 && damage>0){
+				damage = Math.max(Math.floor(damage/2), 1);
+			}
+		}
+	
+		let conditions = $('#qrm_apply_conditions')
+		let conditionName = conditions.val()
+		if(conditionName == 'conditions'){
+			//Do nothing
+		} 
+		else if(conditionName == "remove_all"){
+			//guess this is fine, we update the token immediately. Probably a better way to clear though
+			token.options.conditions = []
+			token.options.custom_conditions = []
+		}
+		else if(result.includes('Fail')){
+			if(!token.hasCondition(conditionName)){
+				token.addCondition(conditionName, conditionName);
+			}
+		}	
 		
-		if(token.options.hitPointInfo.maximum>0 && token.options.itemType != 'pc'){
+		if(token.options?.hitPointInfo?.maximum>0 && token.options?.itemType != 'pc'){
 			let _hp = $(this).find('#qrm_hp');
 			let _max_hp = $(this).find('#qrm_maxhp');
 
@@ -4911,20 +4908,21 @@ function qrm_apply_hp_adjustment(healing=false){
 			_hp.trigger('change');
 		}
 		else {
-			// doing it this way, because Players might also have resistances or abilites and they should manage their own HP. 
-			let dmg_heal_text;
-			if (damage >= 0){
-				dmg_heal_text = token.options.name + " takes " + damage +" damage (adjust manually)";
+			if (damage != 0){
+				let dmg_heal_text;
+				if (damage > 0){
+					dmg_heal_text = token.options.name + " takes " + damage +" damage (adjust manually)";
+				}
+				else{
+					dmg_heal_text = token.options.name + " heals for " + -damage +" (adjust manually)";
+				}
+					let msgdata = {
+					player: window.PLAYER_NAME,
+					img: window.PLAYER_IMG,
+					text: dmg_heal_text,
+				};
+				window.MB.inject_chat(msgdata);
 			}
-			else{
-				dmg_heal_text = token.options.name + " heals for " + damage +" (adjust manually)";
-			}
-				let msgdata = {
-				player: window.PLAYER_NAME,
-				img: window.PLAYER_IMG,
-				text: dmg_heal_text,
-			};
-			window.MB.inject_chat(msgdata);
 		}
 		//token.place_sync_persist();	
 		// bit of overlap with place_sync_persist nad update_and_sync, so probably break it up, just to only sync once.

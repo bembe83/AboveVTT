@@ -2059,7 +2059,13 @@ function display_tooltip(tooltipJson, container, clientY, tokenId=undefined) {
 var removeToolTipTimer = undefined;
 function remove_tooltip(delay = 0, removeHoverNote = true) {
     if (delay > 0) {
+      if($('.prevent-sidebar-modal-close:hover').length>0){
+        clearTimeout(removeToolTipTimer);
+        removeToolTipTimer = undefined;
+      }
+      else{
         removeToolTipTimer = setTimeout(function(){remove_sidebar_flyout(removeHoverNote)}, delay);
+      } 
     } else {
         clearTimeout(removeToolTipTimer);
         removeToolTipTimer = undefined;
@@ -2152,7 +2158,7 @@ function add_stat_block_hover(statBlockContainer, tokenId) {
 
 }
 
-function send_html_to_gamelog(outerHtml) {
+function send_html_to_gamelog(outerHtml, whisper) {
     console.log("send_html_to_gamelog", outerHtml);
     outerHtml = outerHtml.replace('disableremoteplayback', 'disableremoteplayback autoplay loop');
     let html = window.MB.encode_message_text(outerHtml);
@@ -2161,6 +2167,8 @@ function send_html_to_gamelog(outerHtml) {
         img: window.PLAYER_IMG,
         text: html
     };
+    if(whisper != undefined)
+      data.whisper = whisper
     window.MB.inject_chat(data);
     notify_gamelog();
 }

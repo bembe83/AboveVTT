@@ -2923,6 +2923,7 @@ button.roll-button-mod.minus {
     }
     .material-icons{
         padding: 1px 0px 0px 0px;
+        color:#000;
     }
 }
 
@@ -2980,8 +2981,8 @@ button.roll-button-mod.minus {
     padding: 0px;
 }
 .note-list .sidebar-list-item-row-item {
-    margin-left:2px;
-    width:calc(100% - 1px);
+    margin-left: 6px;
+    width: calc(100% - 12px);
 }
 .journal-chapter-title:hover {
     text-decoration: underline;
@@ -3041,10 +3042,10 @@ button.roll-button-mod.minus {
 
 #journal-panel .folder.collapsed > .note-list,
 #journal-panel .folder.collapsed > .folder{
-    display: none;
+    display: none !important;
 }
 #journal-panel .folder>.folder{
-    transform: scale(0.98);
+    transform: scale(0.96);
 }
 
 .journal-chapter-title {
@@ -4665,7 +4666,7 @@ div#importer_area>div>div:first-of-type {
 .avtt-small-settings-edit{
     height:fit-content;
     width:fit-content;
-    margin: 5px 0px;
+    margin: 2px 0px 0px 0px;
     padding:5px;
 }
 .token-image-modal-add-button {
@@ -4732,12 +4733,13 @@ button.applyDamageButton svg {
     border: none;
     outline: none !important;
     align-items: center;
+    direction: rtl;
 }
 
 
 td button.block-send-to-game-log {
     position: absolute;
-    display: block;
+    display: flex;
     float: unset;
     top:50%;
     right: -2px;
@@ -4745,6 +4747,26 @@ td button.block-send-to-game-log {
 }
 td button.block-send-to-game-log span{
     font-size:9px !important;
+}
+button.block-send-to-game-log:has(.whisper-container.visible){
+    border:1px solid #000;
+    z-index:10000;
+}
+.whisper-container.visible {
+    display: flex;
+    position: relative;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    margin-right:10px;
+}
+
+.whisper-container {
+    display: none;
+}
+.whisper_toggle_row {
+    display: flex;
+    align-items: center;
 }
 h3#error-message{
     max-height:100px;
@@ -4893,12 +4915,26 @@ button.block-send-to-game-log span {
     text-align: center;
     color: lightgray;
 }
+.list-item-identifier.selected{
+    border: 2px solid #66Fd;
+}
 .sidebar-flyout {
     position: fixed;
     z-index: 100000;
     box-shadow: 1px 1px 10px black, -1px -1px 10px black;
     border-radius: 5px;
     overflow: hidden;
+}
+.sidebar-flyout .flyout-text-input {
+    background: none rgb(255, 255, 255);
+    border: 1px solid rgb(221, 221, 221);
+    border-radius: 4px;
+    box-shadow: rgba(0, 0, 0, 0.075) 0px 1px 1px inset;
+    color: rgb(0, 0, 0);
+    padding: 4px;
+    transition: border 0.2s linear, box-shadow 0.2s linear;
+    font-family: Roboto, Helvetica, sans-serif;
+    font-size: 100%;
 }
 .list-item-image-flyout {
     width: 400px;
@@ -4968,6 +5004,7 @@ button.block-send-to-game-log span {
     width: 100%;
     margin: 2px 0px;
     border: 1px solid #d8e1e8;
+    border-color: #3d6e9352;
     border-radius: 3px;
     background-color: #fff;
     cursor: pointer;
@@ -5236,6 +5273,9 @@ button.block-send-to-game-log span {
     height: 100%;
     fill: #738694;
 }
+button.token-row-button.token-row-edit-encounter{
+    padding:0px;
+}
 .sidebar-list-item-row.encounter .player-row > .sidebar-list-item-row-item,
 .sidebar-list-item-row.folder .player-row > .sidebar-list-item-row-item {
     height: 42px; /* players are taller than everything else */
@@ -5340,7 +5380,10 @@ button.block-send-to-game-log span {
     margin-right: 5px;
     margin-top: 5px; 
 }
-
+#playersFolder .players-popout-button.subfolder-popout{
+    left:unset;
+    right:30px;
+}
 #playersFolder .hp-attribute.death-saves.ct-health-summary__data.ct-health-summary__deathsaves {
     float: right;
     margin: 2px 6px 2px 2px;
@@ -5636,15 +5679,15 @@ span.exhaustion-pip.last{
     transition: opacity 1s ease-in-out;
     position: absolute;
     z-index: 1;
-    left: 5%;
+    right: 5%;
     margin-top: 30px;
     width: 90%;
 }
 
 #edit_scene_form .sidebar-hovertext:before,
 #edit_scene_form .sidebar-hovertext:hover:before{
-    width: fit-content;
-    white-space: nowrap;
+    max-width: 300px;
+    width: max-content;
 }
 .ct-sidebar{
     inset: 0px 0px 0px auto !important;
@@ -5839,6 +5882,12 @@ button.avtt-roll-button:has(button.avtt-roll-button) {
 .ct-sidebar__portal{
     overflow: unset !important;
     z-index: 57000 !important;
+    width:100%; /* allows positioning of menus to be correct, remove pointer-events to stop it from taking up all clicks*/
+    pointer-events: none;
+}
+.ct-sidebar__portal .ct-sidebar__inner,
+.ct-sidebar__portal>[role='presentation']:not([aria-hidden=true]) .MuiBackdrop-invisible{
+    pointer-events: auto; /*override pointer events of portal to allow clicking in the actual sidebar*/
 }
 .ct-sidebar__portal>[role='presentation'] .MuiPopover-paper{
     width: fit-content;
@@ -7161,6 +7210,83 @@ input.max_hp[disabled]{
         1px 1px 0  #000;
     padding-left: 3px;
 }
+
+.resize_drag_window .encounter-body{
+    background: #fff;
+    height: calc(100% - 25px);
+    border-radius: 0px 0px 5px 5px;
+}
+.resize_drag_window .encounter-listing {
+    max-height:calc(100% - 166px);
+    width:100%;
+    overflow:auto;
+    padding:10px;
+}
+div#encounterRulesLine {
+    float: right;
+    display:inline-flex;
+    align-items: center;
+    position: absolute;
+    justify-content: flex-end;
+    right: 10px;
+}
+
+div#encounterRulesLine span{
+    padding: 5px;
+    font-weight:bold;
+}
+#encounterDifficultyLine span{
+    padding:5px;
+    font-weight:bold;
+}
+#encounterDifficultyLine{
+    display:inline-flex;
+    width: 100%;
+    flex-wrap: wrap;
+    flex-direction: column;
+}
+.encounter-listing :is(.token-row-gear, .token-row-add, .sidebar-list-item-row-item~*, .token-row-button, .sidebar-list-item-row[id^='/profile'] .sidebar-list-item-row-details-subtitle) {
+    display: none;
+}
+
+.encounter-listing .sidebar-list-item-row.player-row{
+    height:initial;
+}
+.encounter-body div#allyTitle {
+    display:flex;
+    font-weight:bold;
+    justify-content: flex-end;
+    padding:0px 20px;
+}
+.encounter-listing .removeItem svg.delSVG {
+    width:24px;
+    height:24px;
+}
+.encounter-listing .removeItem{
+    width:24px;
+    height:24px;
+    margin-right:5px;
+    display: flex;
+    padding: 1px;
+}
+.encounter-body .xpLine.current{
+    margin-top:20px;
+}
+.encounter-body :is(.xpLine, .difficultyLine).low span:nth-of-type(2) {
+    color: #0055b6;
+}
+.encounter-body :is(.xpLine, .difficultyLine).mid span:nth-of-type(2) {
+    color: #019d11;
+}
+.encounter-body :is(.xpLine, .difficultyLine).high span:nth-of-type(2) {
+    color: #c48e05;
+}
+.encounter-body :is(.xpLine, .difficultyLine).deadly span:nth-of-type(2) {
+    color: #620000;
+}
+#encounterRulesLine .rc-switch:before{
+    width:fit-content;
+}
 #combat_tracker_inside{
     margin: 0px;
 }
@@ -8096,7 +8222,8 @@ button span.onedrive-btn-status{
     fill: #fff;
     stroke: #000;
     text-anchor: middle;
-    dominant-baseline: middle;
+    alignment-baseline: text-before-edge;
+    transform: translate(50%, 0%);  
     paint-order: stroke;
     text-shadow: 1px 1px 2px #000;
     pointer-events:none;
@@ -8104,7 +8231,11 @@ button span.onedrive-btn-status{
 .custom-condition.text{
     pointer-events:auto;
 }
-
+.condition-img svg {
+    width:100%;
+    height:100%;
+    border-radius:50%;    
+}
 
 .duration-badge {
     position: absolute;
@@ -9855,7 +9986,19 @@ button.journal-view-button.journal-button {
     font-weight: 600;
 
 }
-
+button.resistanceButton.qrm_buttons_bar span {
+    font-size: 16px;
+    text-align:center;
+}
+#qrm_dialog button.resistanceButton{
+    outline:none; 
+    margin-right:20px;
+}
+#qrm_dialog button.resistanceButton.enabled {
+    color:#00c400;
+    box-shadow: inset 1px 1px 3px 0px #196a00, inset -1px -1px 3px 0px #82ff5b;
+    transition: none;
+}
 #qrm-block-send-to-game-log {
     width: 22px;
     height: 22px;
@@ -12549,6 +12692,43 @@ div#playlistFields {
     background-size: contain;
     content: '';
 }
+
+#displayedDiceFormula{
+    position: fixed;
+    bottom: 20px;
+    left: calc(50% - 180px);
+    transform: translateX(-50%);
+    z-index: 1000000;
+    display: block;
+    pointer-events: none;
+    border: 1px solid #ddd;
+    background: #000000f0;
+    color: #fff;
+    width: fit-content;
+    font-size: 12px;
+    padding: 10px;
+    border-radius: 5px;
+}
+#displayedDiceFormula span{
+    display:block;
+    text-align:center;
+    font-size:16px;
+}
+button#displayedDiceFormulaExit {
+    position:absolute;
+    font-size:12px;
+    background:#00000000;
+    color:#fff;
+    border-radius:5px;
+    outline:none;
+    pointer-events:auto;
+    top: 0px;
+    right:-3px;
+    border:none;
+}
+button#displayedDiceFormulaExit:hover {
+    color:#f00;
+}
 @media print,(min-width: 1480px) {
     .mon-stat-block-2024 {
         -webkit-column-count:2;
@@ -14025,7 +14205,7 @@ div#playlistFields {
 }
 /* remove hover tooltips for touch devices */
 @media (pointer: coarse) {
-  .hasTooltip::after,
+  .hasTooltip:not(.token)::after,
   .sidebar-hover-text-flyout{
     display:none;
   }

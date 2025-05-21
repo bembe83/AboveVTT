@@ -479,10 +479,8 @@ function build_flyout_input(settingOption, currentValue, changeHandler){
         build_and_display_sidebar_flyout(clickEvent.clientY, function (flyout) {
           let currentValue = get_avtt_setting_value(settingOption.name);
             let optionsContainer = build_sidebar_token_options_flyout(settingOption.options, currentValue, function(name, value) {
-                if(window.defaultToggles == undefined)
-                  window.defaultToggles = get_avtt_setting_value('quickToggleDefaults');
-                window.defaultToggles[name] = value;
-            }, function(){changeHandler(settingOption.name, window.defaultToggles)}, false, true);
+                currentValue[name] = value;
+            }, function(){changeHandler(settingOption.name, currentValue)}, false, true);
             flyout.append(optionsContainer);
             position_flyout_left_of($('#settings-panel .sidebar-panel-body'), flyout);
         });
@@ -490,6 +488,24 @@ function build_flyout_input(settingOption, currentValue, changeHandler){
     wrapper.append(flyoutButton)
     return wrapper;
 }
+
+function build_text_input(settingOption, currentValue, changeHandler) {
+  if (typeof changeHandler !== 'function') {
+    changeHandler = function(){};
+  }
+  let wrapper = $(`
+     <div class="token-image-modal-footer-select-wrapper" data-option-name="${settingOption.name}">
+       <div class="token-image-modal-footer-title">${settingOption.label}</div>
+     </div>
+  `);
+  const input = $(`<input class='flyout-text-input' type="text" name="${settingOption.name}" value="${currentValue != undefined ? currentValue : settingOption.defaultValue}" size="30"/>`);
+  input.on('blur',function() { 
+    changeHandler(settingOption.name, $(this).val()) 
+  });
+  wrapper.append(input);
+  return wrapper;
+}
+
 //#endregion UI Construction
 
 
@@ -512,7 +528,7 @@ class SidebarListItem {
    * @param folderPath {string} the folder this item is in
    * @param parentId {string|undefined} a string id of the folder this item is in
    */
-  constructor(id, name, image, type, folderPath = RootFolder.Root.path, parentId = "root", color = undefined) {
+  constructor(id, name, image, type, folderPath = RootFolder.Root.path, parentId = "root", color = undefined, monsterData=undefined) {
     this.id = id;
     this.name = name;
     this.image = image;
@@ -520,6 +536,13 @@ class SidebarListItem {
     this.folderPath = sanitize_folder_path(folderPath);
     this.parentId = parentId;
     this.color = color;
+    if (typeof monsterData === "object") {
+      this.monsterData = {...monsterData};
+    }
+  }
+
+  static fromJson(obj){
+    return new SidebarListItem(obj.id, obj.name, obj.image, obj.type, obj.folderPath, obj.parentId, obj.color, obj.monsterData);
   }
 
   /**
@@ -800,7 +823,9 @@ class SidebarListItem {
           case ItemType.MyToken:
           case ItemType.Scene:
           case ItemType.PC:
-            return true;
+          case ItemType.Encounter:
+            if(this.encounterId == undefined)
+              return true;
           default:
             return false;
         }
@@ -811,7 +836,11 @@ class SidebarListItem {
       case ItemType.Monster:
       case ItemType.isTypeOpen5eMonster:
       case ItemType.BuiltinToken:
-      case ItemType.Encounter: // we technically could support this, but I don't think we should
+      case ItemType.Encounter:
+        if(this.encounterId != undefined)
+          return false;
+        else
+          return true;
       case ItemType.Aoe: // we technically could support this, but I don't think we should
       default:
         return false;
@@ -1167,9 +1196,18 @@ function build_sidebar_list_row(listItem) {
   let subtitle = $(`<div class="sidebar-list-item-row-details-subtitle"></div>`);
   details.append(subtitle);
 
+  const isCustomEncounterFolder = !listItem.isRootFolder() && listItem.folderType == ItemType.Encounter;
 
-
-  if (!listItem.isTypeFolder() && !listItem.isTypeScene()) {
+  if ((!listItem.isTypeFolder() && !listItem.isTypeScene()) || isCustomEncounterFolder) {
+    if(isCustomEncounterFolder){
+      let editEncounter = $(`<button class="token-row-button token-row-edit-encounter" title="Edit Encounter">
+         <span class="material-symbols-outlined">
+           person_edit
+         </span>
+       </button>`)
+      rowItem.append(editEncounter);
+      editEncounter.on("click", edit_encounter);
+    }
     let addButton = $(`
         <button class="token-row-button token-row-add" title="Add Token to Scene">
             <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.2 10.8V18h3.6v-7.2H18V7.2h-7.2V0H7.2v7.2H0v3.6h7.2z"></path></svg>
@@ -1189,19 +1227,20 @@ function build_sidebar_list_row(listItem) {
       if (listItem.collapsed === true) {
         row.addClass("collapsed");
       }
-      if(listItem.id == "playersFolder"){
+      if(listItem.id == RootFolder.Players.id){
 
 
         let popoutButton = $(`<div class="players-popout-button"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"/></svg></div>`);
         row.append(popoutButton);
         popoutButton.off('click.popout').on('click.popout', function(){      
-          popoutWindow('Players', row, '350px');
+          popoutWindow('Players', row, '325px');
           let playersWindow = $(childWindows['Players'].document)
           playersWindow.find('#playersFolder > .sidebar-list-item-row-item, .players-popout-button').remove();
           playersWindow.find('body').append($(`
             <style id='playersPopoutCSS'>
               .folder-item-list > .sidebar-list-item-row {
-                width: 320px;
+                max-width:310px;
+                min-width:285px;
                 display: inline-block;
                 margin-right:5px;
                 cursor: pointer;
@@ -1209,6 +1248,7 @@ function build_sidebar_list_row(listItem) {
               }
               #playersFolder{
                 border: none;
+                padding-right:8px;
               }
               #playersFolder > .folder-item-list{
                   display: flex;
@@ -1222,10 +1262,11 @@ function build_sidebar_list_row(listItem) {
             </style>`))
 
           playersWindow.find('.ui-draggable').draggable('disable')
-        
+          redraw_token_list($('[name="token-search"]').val());
         });
 
         if (listItem.isRootFolder()) {
+          
           let addFolder = $(`<button class="token-row-button" title="Create New Folder"><span class="material-icons">create_new_folder</span></button>`);
           rowItem.append(addFolder);
           addFolder.on("click", function (clickEvent) {
@@ -1234,6 +1275,8 @@ function build_sidebar_list_row(listItem) {
             let clickedItem = find_sidebar_list_item(clickedRow);
             create_folder_inside(clickedItem);
           });
+        
+        
           let reorderButton = $(`<button class="token-row-button reorder-button" title="Reorder Tokens"><span class="material-icons">reorder</span></button>`);
           rowItem.append(reorderButton);
           reorderButton.on("click", function (clickEvent) {
@@ -1243,9 +1286,60 @@ function build_sidebar_list_row(listItem) {
             } else {
               enable_draggable_change_folder(ItemType.PC);
             }
-          });
-        }
-       
+          });               
+        }      
+      }
+     
+      
+      if (listItem.isRootFolder() && listItem.id == RootFolder.Encounters.id) {
+        let addFolder = $(`<button class="token-row-button" title="Create New Folder"><span class="material-icons">create_new_folder</span></button>`);
+        rowItem.append(addFolder);
+        addFolder.on("click", function (clickEvent) {
+          clickEvent.stopPropagation();
+          let clickedRow = $(clickEvent.target).closest(".list-item-identifier");
+          let clickedItem = find_sidebar_list_item(clickedRow);
+          create_folder_inside(clickedItem);
+        });     
+      }
+      
+      if(listItem.folderType === ItemType.PC && listItem.id !== RootFolder.Players.id){
+        let popoutButton = $(`<div class="players-popout-button subfolder-popout"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"/></svg></div>`);
+        row.append(popoutButton);
+        popoutButton.off('click.popout').on('click.popout', function(){      
+          popoutWindow('Players', row.find(`>.folder-item-list`), '325px');
+          let playersWindow = $(childWindows['Players'].document)
+          playersWindow.find(`body>.folder-item-list`).wrap(`<div id='playersFolder' class='sidebar-list-item-row list-item-identifier folder'></div>`);
+          playersWindow.find('#playersFolder > .sidebar-list-item-row-item, .players-popout-button').remove();
+
+
+          playersWindow.find('body').append($(`
+            <style id='playersPopoutCSS'>
+              .folder-item-list > .sidebar-list-item-row {
+                max-width:310px;
+                min-width:285px;
+                display: inline-block;
+                margin-right:5px;
+                cursor: pointer;
+                flex-shrink: 0;
+              }
+              #playersFolder{
+                border: none;
+                padding-right:8px;
+              }
+              #playersFolder > .folder-item-list{
+                  display: flex;
+                  width: 100%;
+                  flex-wrap: wrap;
+              }
+              .ability_score,
+              .ability_name{
+                margin-top: 3px;
+              }
+            </style>`))
+
+          playersWindow.find('.ui-draggable').draggable('disable')
+          redraw_token_list($('[name="token-search"]').val());
+        });
       }
       if (listItem.folderType === ItemType.MyToken) {
         // add buttons for creating subfolders and tokens
@@ -1580,7 +1674,33 @@ function did_click_row(clickEvent) {
   let clickedItem = find_sidebar_list_item(clickedRow);
   console.log("did_click_row", clickedItem);
 
+  let rowId = clickedRow.attr('data-id');
+
+
   switch (clickedItem.type) {
+    case ItemType.Scene:
+    case ItemType.MyToken:
+    case ItemType.PC:
+      if(window.reorderState == clickedItem.type){
+        if(ctrlHeld && rowId != undefined){
+          clickedRow.toggleClass('selected');
+        }
+        else if(shiftHeld && rowId != undefined){
+          if($('.list-item-identifier.selected.selected').length>0){
+            if(clickedRow.nextAll('.selected').length>0){
+              const nextRows = clickedRow.nextUntil('.selected').addBack();
+              nextRows.toggleClass('selected', true);
+            }else if(clickedRow.prevAll('.selected').length>0){
+              const nextRows = clickedRow.prevUntil('.selected').addBack();
+              nextRows.toggleClass('selected', true);
+            }
+          }
+        }
+        else{
+          $('.list-item-identifier.selected').toggleClass('selected', false);
+          clickedRow.toggleClass('selected', true);
+        }  
+      }
     case ItemType.Encounter:
     case ItemType.Folder:
       if (clickedRow.hasClass("collapsed")) {
@@ -1619,19 +1739,22 @@ function did_click_row(clickEvent) {
       // display_builtin_token_details_modal(clickedItem);
       break;
     case ItemType.Scene:
-      // show the preview
-      build_and_display_sidebar_flyout(clickEvent.clientY, function (flyout) {
-        if (clickedItem.isVideo) {
-          flyout.append(`<div style="background:lightgray;padding:10px;">This map is a video. We don't currently support previewing videos.</div>`);
-        } else {
-          flyout.append(`<img class='list-item-image-flyout' src="${clickedItem.image}" alt="scene map preview" />`);
-        }
-        flyout.css("right", "340px");
-      });
-      clickedRow.off("mouseleave").on("mouseleave", function (mouseleaveEvent) {
-        $(mouseleaveEvent.currentTarget).off("mouseleave");
-        remove_sidebar_flyout();
-      });
+      if(window.reorderState != 'scene'){
+        // show the preview
+        build_and_display_sidebar_flyout(clickEvent.clientY, function (flyout) {
+          if (clickedItem.isVideo) {
+            flyout.append(`<div style="background:lightgray;padding:10px;">This map is a video. We don't currently support previewing videos.</div>`);
+          } else {
+            flyout.append(`<img class='list-item-image-flyout' src="${clickedItem.image}" alt="scene map preview" />`);
+          }
+          flyout.css("right", "340px");
+        });
+        clickedRow.off("mouseleave").on("mouseleave", function (mouseleaveEvent) {
+          $(mouseleaveEvent.currentTarget).off("mouseleave");
+          remove_sidebar_flyout();
+        });
+      }
+      
       break;
     case ItemType.Aoe:
       // bain todo open context menu to choose style / size
@@ -1653,6 +1776,568 @@ function did_click_row_gear(clickEvent) {
   display_sidebar_list_item_configuration_modal(clickedItem);
 }
 
+
+
+/**
+ * When an AddToken (plus) button on a row in the sidebar is clicked, this handles that click based on the item represented by the row, and adds a token to the scene for that item.
+ * This should only be called with someElement.on("click", did_click_add_button);
+ * @param clickEvent {Event} the click event
+ */
+function edit_encounter(clickEvent) {
+  $('#encounterWindow .title_bar_close_button').click();
+  const xpTable2024 = {
+      '1':{
+        'low': 50,
+        'mid': 75,
+        'high': 100 
+      },
+      '2':{
+        'low': 100,
+        'mid': 150,
+        'high': 200
+      },
+      '3':{
+        'low': 150,
+        'mid': 225,
+        'high': 400
+      },
+      '4':{
+        'low': 250,
+        'mid': 375,
+        'high': 500
+      },
+      '5':{
+        'low': 500,
+        'mid': 750,
+        'high': 1100
+      },
+      '6':{
+        'low': 600,
+        'mid': 1000,
+        'high': 1400
+      },
+      '7':{
+        'low': 750,
+        'mid': 1300,
+        'high': 1700
+      },
+      '8':{
+        'low': 1000,
+        'mid': 1700,
+        'high': 2100
+      },
+      '9':{
+        'low': 1300,
+        'mid': 2000,
+        'high': 2600
+      },
+      '10':{
+        'low': 1600,
+        'mid': 2300,
+        'high': 3100
+      },
+      '11':{
+        'low': 1900,
+        'mid': 2900,
+        'high': 4100
+      },
+      '12':{
+        'low': 2200,
+        'mid': 3700,
+        'high': 4700
+      },
+      '13':{
+        'low': 2600,
+        'mid': 4200,
+        'high': 5400
+      },
+      '14':{
+        'low': 2900,
+        'mid': 4900,
+        'high': 6200
+      },
+      '15':{
+        'low': 3300,
+        'mid': 5400,
+        'high': 7800
+      },
+      '16':{
+        'low': 3800,
+        'mid': 6100,
+        'high': 9800
+      },
+      '17':{
+        'low': 4500,
+        'mid': 7200,
+        'high': 11700
+      },
+      '18':{
+        'low': 5000,
+        'mid': 8700,
+        'high': 14200
+      },
+      '19':{
+        'low': 5500,
+        'mid': 10700,
+        'high': 17200
+      },
+      '20':{
+        'low': 6400,
+        'mid': 13200,
+        'high': 22000
+      }
+  }
+
+  const xpTable2014 = {
+      '1':{
+        'low': 25,
+        'mid': 50,
+        'high': 75,
+        'deadly': 100 
+      },
+      '2':{
+        'low': 50,
+        'mid': 100,
+        'high': 150,
+        'deadly': 200
+      },
+      '3':{
+        'low': 75,
+        'mid': 150,
+        'high': 225,
+        'deadly': 400
+      },
+      '4':{
+        'low': 125,
+        'mid': 250,
+        'high': 375,
+        'deadly': 500
+      },
+      '5':{
+        'low': 250,
+        'mid': 500,
+        'high': 750,
+        'deadly': 1100
+      },
+      '6':{
+        'low': 300,
+        'mid': 600,
+        'high': 900,
+        'deadly': 1400
+      },
+      '7':{
+        'low': 350,
+        'mid': 750,
+        'high': 1100,
+        'deadly': 1700
+      },
+      '8':{
+        'low': 450,
+        'mid': 900,
+        'high': 1400,
+        'deadly': 2100
+      },
+      '9':{
+        'low': 550,
+        'mid': 1100,
+        'high': 1600,
+        'deadly': 2400
+      },
+      '10':{
+        'low': 600,
+        'mid': 1200,
+        'high': 1900,
+        'deadly': 2800
+      },
+      '11':{
+        'low': 800,
+        'mid': 1600,
+        'high': 2400,
+        'deadly': 3600
+      },
+      '12':{
+        'low': 1000,
+        'mid': 2000,
+        'high': 3000,
+        'deadly': 4500
+      },
+      '13':{
+        'low': 1100,
+        'mid': 2200,
+        'high': 3400,
+        'deadly': 5100
+      },
+      '14':{
+        'low': 1250,
+        'mid': 2500,
+        'high': 3800,
+        'deadly': 5700
+      },
+      '15':{
+        'low': 1400,
+        'mid': 2800,
+        'high': 4300,
+        'deadly': 6400
+      },
+      '16':{
+        'low': 1600,
+        'mid': 3200,
+        'high': 4800,
+        'deadly': 7200
+      },
+      '17':{
+        'low': 2000,
+        'mid': 3900,
+        'high': 5900,
+        'deadly': 8800
+      },
+      '18':{
+        'low': 2100,
+        'mid': 4200,
+        'high': 6300,
+        'deadly': 9500
+      },
+      '19':{
+        'low': 2400,
+        'mid': 4900,
+        'high': 7300,
+        'deadly': 10900
+      },
+      '20':{
+        'low': 2800,
+        'mid': 5700,
+        'high': 8500,
+        'deadly': 12700
+      }
+  }
+  const crXpTable = {
+    "0":0,
+    "0.125":25,
+    "0.25":50,
+    "0.5":100,
+    "1":200,
+    "2":450,
+    "3":700,
+    "4":1100,
+    "5":1800,
+    "6":2300,
+    "7":2900,
+    "8":3900,
+    "9":5000,
+    "10":5900,
+    "11":7200,
+    "12":8400,
+    "13":10000,
+    "14":11500,
+    "15":13000,
+    "16":15000,
+    "17":18000,
+    "18":20000,
+    "19":22000,
+    "20":25000,
+    "21":33000,
+    "22":41000,
+    "23":50000,
+    "24":62000,
+    "25":75000,
+    "26":90000,
+    "27":105000,
+    "28":120000,
+    "29":135000,
+    "30":155000
+  }
+
+  clickEvent.stopPropagation();
+  const clickedRow = $(clickEvent.target).closest(".list-item-identifier");
+  const clickedItem = find_sidebar_list_item(clickedRow);
+  console.log('edit encounter clicked');
+
+  const customization = find_or_create_token_customization(ItemType.Folder, clickedItem.id);
+
+  const encounterContainer = find_or_create_generic_draggable_window(`encounterWindow`, clickedItem.name, false, false, undefined, '350px', undefined, undefined, 'calc(100% - 700px)', false);
+
+  encounterContainer.attr('data-encounter-id', clickedItem.id)
+  encounterContainer.find('.title_bar_close_button').off('click.save').on('click.save', function(){
+    rebuild_token_items_list();
+    redraw_token_list($('[name="token-search"]').val() ? $('[name="token-search"]').val() : "");
+  })
+ function form_toggle(name, hoverText, defaultOn, callback){
+    const toggle = $(
+      `<button id="${name}_toggle" name=${name} type="button" role="switch" data-hover="${hoverText}"
+      class="rc-switch sidebar-hovertext"><span class="rc-switch-inner" /></button>`)
+    if (!hoverText) toggle.removeClass("sidebar-hovertext")
+    toggle.on("click", callback)
+    if (defaultOn){
+      toggle.addClass("rc-switch-checked")
+    }
+    return toggle
+  }
+
+  const encounterBody = $(`<div class="encounter-body"></div>`)
+  const encounterListing = $(`<div class="encounter-listing"></div>`);
+
+  const rulesToggle = form_toggle('Rules Version', 'Rules Version', customization.encounterData?.rules != undefined ? customization.encounterData.rules : true, function(){
+    const customization = find_or_create_token_customization(ItemType.Folder, clickedItem.id);
+    if(customization.encounterData == undefined)
+      customization.encounterData = {}
+    const enabled = $(this).hasClass("rc-switch-checked")
+
+    $(this).toggleClass('rc-switch-checked', !enabled);
+    customization.encounterData.rules = !enabled;
+    persist_token_customization(customization);
+    encounterContainer.trigger('redrawListing');
+  }); 
+
+  const rulesLine = $(`<div id='encounterRulesLine'><span>2014</span><span class='toggle'></span><span>2024</span></div>`)
+  rulesLine.find('.toggle').append(rulesToggle);
+
+  const difficultyLine = $(`<div id='encounterDifficultyLine'>
+
+     <div class='xpLine low'>
+      <span>Low XP:</span>
+      <span class='lowDifficulty'></span>
+    </div>
+    <div class='xpLine mid'>
+      <span>Moderate XP:</span>
+      <span class='midDifficulty'></span>
+    </div>
+    <div class='xpLine high'>
+      <span>High XP:</span>
+      <span class='highDifficulty'></span>
+    </div>
+    <div class='xpLine deadly'>
+      <span>Deadly XP:</span>
+      <span class='deadlyDifficulty'></span>
+    </div>
+    <div class='xpLine multiplier'>
+      <span>XP Multiplier:</span>
+      <span class='difficultyMulti'></span>
+    </div>
+
+    <div class='xpLine current'>
+      <span>XP:</span>
+      <span class='encounterXp'>0</span>
+    </div>
+    <div class='difficultyLine'>
+      <span>Difficulty:</span>
+      <span class='encounterDifficulty'>Low</span>
+    </div>
+    </div>`)
+
+  const allyTitle = $(`<div id='allyTitle'>
+      Is Ally
+    </div>`)
+  
+
+  encounterContainer.off('redrawListing').on('redrawListing',function() {
+    encounterListing.empty();
+
+    if(customization.encounterData?.tokenItems != undefined){
+      let xp = 0;
+      let xpLowMax = 0;
+      let xpMidMax = 0;
+      let xpHighMax = 0;
+      let xpDeadlyMax = 0;
+      const isOldrules = customization.encounterData.rules == false;
+      const xpTable = isOldrules ? xpTable2014 : xpTable2024;
+
+
+
+      for(let i in customization.encounterData.tokenItems){
+        const item = customization.encounterData.tokenItems[i];
+        const itemCustomization = find_token_customization(customization.encounterData.tokenItems[i].type, customization.encounterData.tokenItems[i].id);
+        const hasCustomStatBlock = itemCustomization?.tokenOptions?.statBlock != undefined;
+        let statBlock = hasCustomStatBlock ? $(`<div>${window.JOURNAL.notes[itemCustomization.tokenOptions.statBlock].text}</div>`) : new MonsterStatBlock(item.monsterData);       
+        let cr;
+        if(!hasCustomStatBlock && item.monsterData != undefined){
+          const foundCR = statBlock.findObj("challengeRatings", statBlock.data.challengeRatingId).value;
+          cr = foundCR;
+        }
+        else if(hasCustomStatBlock){
+          if(window.JOURNAL.notes[itemCustomization.tokenOptions.statBlock] != undefined){
+           
+            statBlock.find('style').remove();
+            statBlock=statBlock[0].innerHTML;
+            let crText = $(statBlock).find('.custom-challenge-rating.custom-stat').text();
+            if(crText == '' || crText == undefined){
+              let searchText = statBlock.replaceAll('mon-stat-block-2024', '').replaceAll(/\&nbsp\;/g,' ')
+
+              let statBlockCR = searchText.matchAll(/[\s>]CR[\s]+([0-9]+(\/[0-9])?)/gi).next()
+              if(statBlockCR.value != undefined){
+                if(statBlockCR.value[1] != undefined)
+                    crText = statBlockCR.value[1];
+              } 
+              else{
+                statBlockCR = searchText.matchAll(/[\s>](CR[\W]|challenge)[\s\S]*?[\s>]([0-9]+(\/[0-9])?)/gi).next()
+
+                if(statBlockCR.value != undefined){
+                    if(statBlockCR.value[2] != undefined)
+                        crText = statBlockCR.value[2];
+                }  
+              }
+
+                    
+            }
+            if(crText != '' && crText != undefined)
+              cr = eval(crText);   
+            else
+              cr = 0;
+          }
+        }
+        for(let j = 0; j<item.quantity; j++ ){
+          if(item.type != 'pc'){
+            if((item.isAllyQuantity == undefined && item.isAlly == true) || item.isAllyQuantity > j){         
+              let addedLowXp, addedMidXp, addedHighXp, addedDeadlyXp;          
+              cr = Math.min(30, cr);
+              xpLowMax += isOldrules ? crXpTable[cr]/4 :crXpTable[cr]/2;
+              xpMidMax += isOldrules ? crXpTable[cr]/2 : crXpTable[cr]*3/4;
+              xpHighMax += isOldrules ? crXpTable[cr]*3/4 : crXpTable[cr];
+              if(isOldrules){
+                xpDeadlyMax += crXpTable[cr];
+              } 
+            }
+            else{
+              const xpValue = hasCustomStatBlock ? crXpTable[cr]: statBlock.findObj("challengeRatings", statBlock.data.challengeRatingId).xp;
+              xp += xpValue;
+            }
+          } else if(item.type == 'pc' && ((item.isAllyQuantity == undefined && item.isAlly == true) || item.isAllyQuantity > j)){
+            const pc = find_pc_by_player_id(item.id);
+            const pcLevel = pc.level
+            xpLowMax += xpTable[pcLevel].low;
+            xpMidMax += xpTable[pcLevel].mid;
+            xpHighMax += xpTable[pcLevel].high;
+            if(isOldrules){
+              xpDeadlyMax += xpTable[pcLevel].deadly;
+            }
+          }
+          else if(item.type == 'pc' && (item.isAlly == false || item.isAllyQuantity <= j)){
+            const pc = find_pc_by_player_id(item.id);
+            const pcLevel = pc.level
+            xp += crXpTable[pcLevel];
+          }
+          let row = build_sidebar_list_row(SidebarListItem.fromJson(item));
+          const removeButton = $('<button class="removeItem" style="font-size:24px;"><svg class="delSVG" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"></path><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"></path></svg></button>')
+          removeButton.off('click.removeItem').on('click.removeItem', function(){
+            const customization = find_or_create_token_customization(ItemType.Folder, clickedItem.id);
+
+            if(item.quantity>1){
+              customization.encounterData.tokenItems[i].quantity-=1;
+            }
+            else{
+              delete customization.encounterData.tokenItems[i];
+            }
+            persist_token_customization(customization);
+            encounterContainer.trigger('redrawListing');
+          })
+
+          const allyToggle = form_toggle('isAlly', 'Is Ally', ((item.isAllyQuantity == undefined && item.isAlly == true) || item.isAllyQuantity > j) ? true : item.type == 'pc' ? item.isAlly : false, function(){
+              const customization = find_or_create_token_customization(ItemType.Folder, clickedItem.id);      
+              const enabled = $(this).hasClass("rc-switch-checked")
+              const item = customization.encounterData.tokenItems[i];
+              $(this).toggleClass('rc-switch-checked', !enabled);
+              item.isAlly = !enabled;
+              if(item.quantity != undefined){
+                if(item.isAllyQuantity == undefined){
+                  if(!enabled)
+                    item.isAllyQuantity = 1;
+                  else
+                    item.isAllyQuantity = 0
+                }
+                else{
+                  item.isAllyQuantity = !enabled ? item.isAllyQuantity + 1 : item.isAllyQuantity - 1;
+                }
+              }
+              persist_token_customization(customization)
+              encounterContainer.trigger('redrawListing');
+            }); 
+          $(encounterListing).append(row);
+          row.find('.sidebar-list-item-row-item').append(removeButton, allyToggle);
+        }
+      }
+      difficultyLine.find('.lowDifficulty').text(Math.round(xpLowMax));
+      difficultyLine.find('.midDifficulty').text(Math.round(xpMidMax));
+      difficultyLine.find('.highDifficulty').text(Math.round(xpHighMax));
+
+      if(!isOldrules){
+        difficultyLine.find('.xpLine.deadly, .xpLine.multiplier').css('visibility', 'hidden');
+      }
+      else{
+        difficultyLine.find('.xpLine.deadly, .xpLine.multiplier').css('visibility', '');
+        difficultyLine.find('.deadlyDifficulty').text(Math.round(xpDeadlyMax));
+      }
+      if(!isOldrules){
+        if(xp <= xpLowMax){
+          difficultyLine.find('.encounterDifficulty').text('Low');
+          difficultyLine.find('.difficultyLine').toggleClass('low', true);
+          difficultyLine.find('.difficultyLine').toggleClass(['mid', 'high', 'deadly'], false);
+        }
+        else if(xp > xpLowMax && xp <= xpMidMax){
+          difficultyLine.find('.encounterDifficulty').text('Moderate');
+          difficultyLine.find('.difficultyLine').toggleClass('mid', true);
+          difficultyLine.find('.difficultyLine').toggleClass(['low', 'high', 'deadly'], false);
+        }else if(xp > xpMidMax && xp <= xpHighMax){
+          difficultyLine.find('.encounterDifficulty').text('High');
+          difficultyLine.find('.difficultyLine').toggleClass('high', true);
+          difficultyLine.find('.difficultyLine').toggleClass(['mid', 'low', 'deadly'], false);
+        }
+        else{
+          difficultyLine.find('.encounterDifficulty').text('Greater than High');
+          difficultyLine.find('.difficultyLine').toggleClass('deadly', true)
+          difficultyLine.find('.difficultyLine').toggleClass(['mid', 'high', 'low'], false)
+        }
+      }else{
+        const numberOfEnemies = encounterListing.find('.rc-switch:not(.rc-switch-checked)').length;
+        const xpMultipler = numberOfEnemies >= 15 ? 4 : numberOfEnemies >= 11 ? 3 : numberOfEnemies >= 7 ? 2.5 : numberOfEnemies >= 3 ? 2 : numberOfEnemies == 2 ? 1.5 : 1;
+
+        xp = xp*xpMultipler;
+
+        if(xp <= xpMidMax){
+          difficultyLine.find('.encounterDifficulty').text('Low');
+          difficultyLine.find('.difficultyLine').toggleClass('low', true)
+          difficultyLine.find('.difficultyLine').toggleClass(['mid', 'high', 'deadly'], false)
+        }
+        else if(xp > xpMidMax && xp <= xpHighMax){
+          difficultyLine.find('.encounterDifficulty').text('Moderate');
+          difficultyLine.find('.difficultyLine').toggleClass('mid', true)
+          difficultyLine.find('.difficultyLine').toggleClass(['low', 'high', 'deadly'], false)
+        }else if(xp > xpHighMax && xp <= xpDeadlyMax){
+          difficultyLine.find('.encounterDifficulty').text('High');
+          difficultyLine.find('.difficultyLine').toggleClass('high', true)
+          difficultyLine.find('.difficultyLine').toggleClass(['mid', 'low', 'deadly'], false)
+        }
+        else{
+          difficultyLine.find('.encounterDifficulty').text('Deadly');
+          difficultyLine.find('.difficultyLine').toggleClass('deadly', true)
+          difficultyLine.find('.difficultyLine').toggleClass(['mid', 'high', 'low'], false)
+        }
+        difficultyLine.find('.difficultyMulti').text(`x${xpMultipler}`);
+        
+      }
+      difficultyLine.find('.encounterXp').text(Math.round(xp));
+
+
+     
+    }
+    encounterListing.children('.sidebar-list-item-row').sort(function(a, b) {
+      const aAlly = $(a).find('.rc-switch-checked').length>0;
+      if (aAlly) {
+        return -1;
+      } else {
+        return 1;
+      }
+    }).appendTo(encounterListing);
+    
+   
+  });
+  
+
+   
+
+  encounterBody.append(rulesLine, difficultyLine, allyTitle, encounterListing);
+  encounterContainer.append(encounterBody);
+  encounterContainer.trigger('redrawListing');
+
+}
 /**
  * When an AddToken (plus) button on a row in the sidebar is clicked, this handles that click based on the item represented by the row, and adds a token to the scene for that item.
  * This should only be called with someElement.on("click", did_click_add_button);
@@ -1729,7 +2414,9 @@ function create_folder_inside(listItem) {
     create_scene_folder_inside(listItem);
   } else if(listItem.folderType == ItemType.PC){
     create_player_folder_inside(listItem);
-  } else {
+  } else if(listItem.folderType == ItemType.Encounter){
+    create_encounter_folder_inside(listItem);
+  }else {
     console.warn("create_folder_inside called with an incorrect item type", listItem);
   }
 }
@@ -1783,7 +2470,7 @@ function display_folder_configure_modal(listItem) {
 
   let folderNameInput = $(`<input type="text" title="Folder Name" name="folderName" value="${listItem.name}" />`);
   set_list_item_identifier(folderNameInput, listItem);
-  if (itemType === ItemType.MyToken || itemType === ItemType.Scene || (itemType === ItemType.PC && listItem.id !== RootFolder.Players.id)){
+  if (itemType === ItemType.MyToken || itemType === ItemType.Scene || (itemType === ItemType.PC && listItem.id !== RootFolder.Players.id) || (itemType === ItemType.Encounter && listItem.id !== RootFolder.Encounters.id)){
     sidebarModal.body.append(build_text_input_wrapper("Folder Name", folderNameInput, undefined, renameFolder, false));
   }
 
@@ -1828,13 +2515,13 @@ function display_folder_configure_modal(listItem) {
 
   let saveButton = $(`<button class="sidebar-panel-footer-button" style="width:100%;padding:8px;margin-top:8px;margin-left:0px;">Save Folder</button>`);
   saveButton.on("click", function (clickEvent) {
-    if (itemType === ItemType.MyToken || itemType === ItemType.Scene){
+    if (itemType === ItemType.MyToken || itemType === ItemType.Scene || (itemType === ItemType.PC && listItem.id !== RootFolder.Players.id) || (itemType === ItemType.Encounter && listItem.id !== RootFolder.Encounters.id)){
       let nameInput = $(clickEvent.currentTarget).closest(".sidebar-panel-body").find("input[name='folderName']");
       console.log(`saveButton nameInput`, nameInput);
       let renameResult = renameFolder(nameInput.val(), nameInput, clickEvent);
     }
     close_sidebar_modal();
-    if(itemType === ItemType.MyToken || (listItem.isTypeFolder() && itemType !== ItemType.Scene)){
+    if(itemType === ItemType.MyToken || (listItem.isTypeFolder() && itemType !== ItemType.Scene) || itemType === ItemType.PC){
       let customization = find_or_create_token_customization(ItemType.Folder, listItem.id, listItem.parentId, RootFolder.MyTokens.id);
       customization.color = listItem.color;
       persist_token_customization(customization);
@@ -1853,15 +2540,18 @@ function display_folder_configure_modal(listItem) {
   });
   sidebarModal.body.append(saveButton);
   if(!RootFolder.allValues().some(d => d.id == listItem.id) && itemType !== ItemType.BuiltinToken){
-    let deleteFolderAndMoveChildrenButton = $(`<button class="token-image-modal-remove-all-button" title="Delete this folder">Delete folder and<br />move items up one level</button>`);
-    set_list_item_identifier(deleteFolderAndMoveChildrenButton, listItem);
-    sidebarModal.footer.append(deleteFolderAndMoveChildrenButton);
-    deleteFolderAndMoveChildrenButton.on("click", function(event) {
-      let foundItem = find_sidebar_list_item($(event.currentTarget));
-      delete_folder_and_move_children_up_one_level(foundItem);
-      close_sidebar_modal();
-      expand_all_folders_up_to_item(foundItem);
-    });
+    if(itemType !== ItemType.Encounter){
+      let deleteFolderAndMoveChildrenButton = $(`<button class="token-image-modal-remove-all-button" title="Delete this folder">Delete folder and<br />move items up one level</button>`);
+      set_list_item_identifier(deleteFolderAndMoveChildrenButton, listItem);
+      sidebarModal.footer.append(deleteFolderAndMoveChildrenButton);
+      deleteFolderAndMoveChildrenButton.on("click", function(event) {
+        let foundItem = find_sidebar_list_item($(event.currentTarget));
+        delete_folder_and_move_children_up_one_level(foundItem);
+        close_sidebar_modal();
+        expand_all_folders_up_to_item(foundItem);
+      });
+    }
+    
     if(itemType !== ItemType.PC){
       let deleteFolderAndChildrenButton = $(`<button class="token-image-modal-remove-all-button" title="Delete this folder and everything in it">Delete folder and<br />everything in it</button>`);
       set_list_item_identifier(deleteFolderAndChildrenButton, listItem);
@@ -1889,11 +2579,11 @@ function rename_folder(item, newName, alertUser = true) {
     return undefined;
   }
 
-  if (item.folderPath.startsWith(RootFolder.MyTokens.path) || item.folderPath.startsWith(RootFolder.Players.path)) {
+  if (item.folderPath.startsWith(RootFolder.MyTokens.path) || item.folderPath.startsWith(RootFolder.Players.path) || item.folderPath.startsWith(RootFolder.Encounters.path)) {
     let customization = find_token_customization(item.type, item.id);
     customization.setTokenOption("name", newName);
     persist_token_customization(customization);
-    did_change_mytokens_items();
+    
     return customization.fullPath();
   } else if (item.isTypeSceneFolder()) {
     return rename_scene_folder(item, newName, alertUser);
@@ -1918,6 +2608,7 @@ function delete_item(listItem) {
       switch (listItem.folderType) {
         case ItemType.PC:  
           delete_folder_and_move_children_up_one_level(listItem);
+          break;
         default:
           delete_folder_and_delete_children(listItem)
           break;
@@ -1985,7 +2676,7 @@ function delete_folder_and_delete_children(listItem) {
     return;
   }
 
-  if (listItem.folderType === ItemType.MyToken) {
+  if (listItem.folderType === ItemType.MyToken || listItem.folderType === ItemType.Encounter) {
     delete_mytokens_folder_and_everything_in_it(listItem);
   } else if (listItem.folderType === ItemType.Scene) {
     delete_folder_and_all_scenes_within_it(listItem);
@@ -2133,12 +2824,15 @@ function  disable_draggable_change_folder() {
         add_expand_collapse_buttons_to_header(tokensPanel, true);
 
         try {
-          tokensPanel.body.find(".sidebar-list-item-row").draggable("destroy");
+          tokensPanel.body.find(".ui-draggable").draggable("destroy");
         } catch (e) {} // don't care if it fails, just try
         try {
-          tokensPanel.body.find(".sidebar-list-item-row").droppable("destroy");
+          tokensPanel.body.find(".ui-droppable").droppable("destroy");
         } catch (e) {} // don't care if it fails, just try
-
+        try {
+          tokensPanel.body.droppable("destroy");
+        } catch (e) {} // don't care if it fails, just try
+        tokensPanel.body.find('.list-item-identifier.selected').toggleClass('selected', false)
         redraw_token_list($('[name="token-search"]').val());
     }
 
@@ -2155,13 +2849,19 @@ function  disable_draggable_change_folder() {
         scenesPanel.body.removeClass("folder");
 
         try {
-          scenesPanel.body.find(".sidebar-list-item-row").draggable("destroy");
+          scenesPanel.body.find(".ui-draggable").draggable("destroy");
         } catch (e) {} // don't care if it fails, just try
         try {
-          scenesPanel.body.find(".sidebar-list-item-row").droppable("destroy");
+          scenesPanel.body.find(".ui-droppable").droppable("destroy");
         } catch (e) {} // don't care if it fails, just try
+        try {
+          scenesPanel.body.droppable("destroy");
+        } catch (e) {} // don't care if it fails, just try
+
+        scenesPanel.body.find('.list-item-identifier.selected').toggleClass('selected', false)
     }
   }
+  return true;
   
 }
 
@@ -2202,40 +2902,72 @@ function add_expand_collapse_buttons_to_header(sidebarPanel, addHideButton=false
  * allows you to drag items from one folder to another
  * @param listItemType {string} ItemType.MyTokens || ItemType.Scene
  */
-function enable_draggable_change_folder(listItemType) {
+async function enable_draggable_change_folder(listItemType) {
 
-  disable_draggable_change_folder();
+  await disable_draggable_change_folder();
   window.reorderState = listItemType; // if you move the current scene, it will reload. When that happens, we need to know to re-enter this state.
-
   const droppableOptions = {
     greedy: true,
     tolerance: "pointer",
     accept: ".draggable-sidebar-item-reorder:not(.drag-cancelled)",
     drop: function (dropEvent, ui) {
+      dropEvent.stopPropagation();
       let draggedRow = $(ui.helper);
+      draggedRow.toggleClass('selected', true);
       let draggedItem = find_sidebar_list_item(draggedRow);
+      let selectedItems = $(`.list-item-identifier.selected`)
+
       let droppedFolder = $(dropEvent.target);
       if (droppedFolder.hasClass("sidebar-panel-body") || droppedFolder.attr("id") === RootFolder.Scenes.id) {
         // they dropped it on the header so find the root folder
         if (window.reorderState === ItemType.Scene) {
-          move_item_into_folder_item(draggedItem, RootFolder.Scenes.id);
+          for(let i=0; i<selectedItems.length; i++){
+            draggedRow = $(selectedItems[i]);
+            draggedItem = find_sidebar_list_item(draggedRow);
+            move_item_into_folder_item(draggedItem, RootFolder.Scenes.id);
+          }
+          did_update_scenes();
         } else if (window.reorderState === ItemType.MyToken) {
-          let customization = find_token_customization(draggedItem.type, draggedItem.id);
-          customization.parentId = RootFolder.MyTokens.id;
-          persist_token_customization(customization);
+          for(let i=0; i<selectedItems.length; i++){
+            draggedRow = $(selectedItems[i]);
+            draggedItem = find_sidebar_list_item(draggedRow);
+            let customization = find_token_customization(draggedItem.type, draggedItem.id);
+            customization.parentId = RootFolder.MyTokens.id;
+            persist_token_customization(customization);
+          }
           rebuild_token_items_list();
-        } else if (window.reorderState === ItemType.PC) {
-          let customization = find_or_create_token_customization(draggedItem.type, draggedItem.id);
-          customization.parentId = RootFolder.Players.id;
-          persist_token_customization(customization);
+
+        } else if (window.reorderState === ItemType.PC) {   
+          for(let i=0; i<selectedItems.length; i++){
+            draggedRow = $(selectedItems[i]);
+            draggedItem = find_sidebar_list_item(draggedRow);
+            let customization = find_or_create_token_customization(draggedItem.type, draggedItem.id);
+            customization.parentId = RootFolder.Players.id;
+            persist_token_customization(customization);
+          }
           rebuild_token_items_list();
+          enable_draggable_change_folder(ItemType.PC);
         } else {
           console.warn("Unable to reorder item by dropping it on the body", window.reorderState, draggedItem);
         }
       } else {
         let folderItem = find_sidebar_list_item(droppedFolder);
         console.log("enable_draggable_change_folder dropped", draggedItem, folderItem);
-        move_item_into_folder_item(draggedItem, folderItem);
+        
+        for(let i=0; i<selectedItems.length; i++){
+          draggedRow = $(selectedItems[i]);
+          draggedItem = find_sidebar_list_item(draggedRow);
+          move_item_into_folder_item(draggedItem, folderItem);
+        }
+
+        if(window.reorderState === ItemType.Scene){
+          did_update_scenes();
+        }else if(window.reorderState === ItemType.PC ||window.reorderState === ItemType.MyToken){
+          rebuild_token_items_list();
+        }  
+
+        
+        
         expand_all_folders_up_to_item(folderItem);
       }
     }
@@ -2244,7 +2976,7 @@ function enable_draggable_change_folder(listItemType) {
   switch (window.reorderState) {
     case ItemType.MyToken:
 
-      redraw_token_list("", false)
+      await redraw_token_list("", false)
       tokensPanel.body.find(".token-row-gear").hide();
       tokensPanel.body.find(".token-row-button").hide();
       // tokensPanel.body.find(".folder").removeClass("collapsed");
@@ -2270,6 +3002,7 @@ function enable_draggable_change_folder(listItemType) {
         appendTo: tokensPanel.body,
         revert: true,
         scroll: true,
+        distance: 10,
         start: function(e, ui){
           offsetStart= tokensPanel.body.scrollTop();
         },
@@ -2321,6 +3054,7 @@ function enable_draggable_change_folder(listItemType) {
         revert: true,
         scroll: false, // jQuery UI has a bug where scrolling changes the offset of the helper. If we can figure out how to work around that bug, then we can change this to true
         // axis: "y",  // this helps if we set scroll: true
+        distance: 10,
         helper: function (event) {
           let draggedRow = $(event.target).closest(".list-item-identifier");
           let draggedItem = find_sidebar_list_item(draggedRow);
@@ -2345,7 +3079,7 @@ function enable_draggable_change_folder(listItemType) {
       break;
     case ItemType.PC:
 
-      redraw_token_list("", false)
+      await redraw_token_list("", false)
       tokensPanel.body.find(".token-row-gear").hide();
       tokensPanel.body.find(".token-row-button").hide();
       // tokensPanel.body.find(".folder").removeClass("collapsed");
@@ -2367,7 +3101,7 @@ function enable_draggable_change_folder(listItemType) {
       // TODO: disable the draggable that was added here enable_draggable_token_creation
       // tokensPanel.body.find(".sidebar-list-item-row").draggable("destroy");
       let playerOffsetStart = {};
-      tokensPanel.body.find(".sidebar-list-item-row").draggable({
+      tokensPanel.body.find(".sidebar-list-item-row:not([id*='playersFolder']").draggable({
         containment: tokensPanel.body,
         appendTo: tokensPanel.body,
         revert: true,
@@ -2375,6 +3109,7 @@ function enable_draggable_change_folder(listItemType) {
         start: function(e, ui){
           playerOffsetStart= tokensPanel.body.scrollTop();
         },
+        distance: 10,
         drag: function(e, ui){
           ui.position.top = ui.position.top - tokensPanel.body.scrollTop() + playerOffsetStart
         },
@@ -2413,19 +3148,14 @@ function enable_draggable_change_folder(listItemType) {
 function move_item_into_folder_item(listItem, folderItem) {
   if (listItem.isTypeMyToken() || (listItem.isTypeFolder() && listItem.fullPath().startsWith(RootFolder.MyTokens.path))) {
     let customization = find_token_customization(listItem.type, listItem.id);
-    customization.parentId = folderItem.id;
-    persist_token_customization(customization);
-    rebuild_token_items_list();
-    enable_draggable_change_folder(ItemType.MyToken);
+    customization.parentId = folderItem.id;    persist_token_customization(customization);
+
   } else if (listItem.isTypeScene() || listItem.isTypeSceneFolder()) {
     move_scene_to_folder(listItem, folderItem.id);
-    did_update_scenes();
   } else if(listItem.isTypePC() || (listItem.isTypeFolder() && listItem.fullPath().startsWith(RootFolder.Players.path))){
     let customization = find_or_create_token_customization(listItem.type, listItem.id, listItem.parentId, RootFolder.Players.id);
     customization.parentId = folderItem.id;
     persist_token_customization(customization);
-    rebuild_token_items_list();
-    enable_draggable_change_folder(ItemType.PC);
   } else {
     console.warn("move_item_into_folder_item was called with invalid item type", listItem);
   }

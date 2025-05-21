@@ -477,9 +477,13 @@ function add_journal_roll_buttons(target, tokenId=undefined, specificImage=undef
       rollType = $(this).closest('td').index() == 2 ? 'Check' : 'Save'
     }
     else if($(this).closest('table').find('tr:first').text().toLowerCase().includes('str')){
-      let statIndex = $(this).closest('table').find('tr button').index($(this));
+      let statIndex = $(this).closest('table').find('tr button').index($(this)); 
       let stats = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']
       rollAction = stats[statIndex];
+      rollType = 'Check'
+    }
+    else if($(this).closest('.ability-block__stat')?.find('.ability-block__heading').length>0){
+      rollAction = $(this).closest('.ability-block__stat')?.find('.ability-block__heading').text();
       rollType = 'Check'
     }
 
@@ -487,13 +491,13 @@ function add_journal_roll_buttons(target, tokenId=undefined, specificImage=undef
       rollAction = 'Roll';
     } 
     else if(rollAction.replace(' ', '').toLowerCase() == 'savingthrows'){ 
-      rollAction = $(this)[0].previousSibling?.nodeValue.replace(/[\W]+/gi, '');
-      rollAction = (rollAction == '') ? $(this).prev().text().replace(/[\W]+/gi, '') : rollAction;
+      rollAction = $(this)[0].previousSibling?.nodeValue?.replace(/[\W]+/gi, '');
+      rollAction = (rollAction == '') ? $(this).prev()?.text()?.replace(/[\W]+/gi, '') : rollAction;
       rollType = 'Save';  
     }
     else if(rollAction.replace(' ', '').toLowerCase() == 'skills'){
-      rollAction = $(this)[0].previousSibling?.nodeValue.replace(/[\W]+/gi, '');
-      rollAction = (rollAction == '') ? $(this).prev().text().replace(/[\W]+/gi, '') : rollAction;
+      rollAction = $(this)[0].previousSibling?.nodeValue?.replace(/[\W]+/gi, '');
+      rollAction = (rollAction == '') ? $(this).prev()?.text()?.replace(/[\W]+/gi, '') : rollAction;
       rollType = 'Check'; 
     }
     else if(rollAction.replace(' ', '').toLowerCase() == 'proficiencybonus'){
@@ -569,7 +573,7 @@ function general_statblock_formating(input){
 
   //bold top of statblock info
   input = input.replace(/^(Senses|Gear|Skills|Damage Resistances|Resistances|Immunities|Damage Immunities|Damage Vulnerabilities|Condition Immunities|Languages|Proficiency Bonus|Saving Throws)/gi, `<strong>$1</strong>`)
-  input = input.replace(/^(Speed|Hit Points|HP|AC|Armor Class|Challenge|CR)(\s[\d\()])/gi, `<strong>$1</strong>$2`)
+  input = input.replace(/^(Speed|Hit Points|HP|AC|Armor Class|Challenge|CR)([\s<][\d\()<])/gi, `<strong>$1</strong>$2`)
   // Remove space between letter ranges
   // e.g. a- b
   input = input.replace(/([a-z])- ([a-z])/gi, '$1$2');

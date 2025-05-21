@@ -105,7 +105,7 @@ const debounceHandleInjected = mydebounce(() => {
 					li.find(`[class*='MessageContainer-Flex']`).append(damageButtonContainer);
 				}					
 				
-				let output = $(`${current.data.injected_data.whisper == '' ? '' : `<div class='above-vtt-roll-whisper'>To: ${(current.data.injected_data.whisper == window.PLAYER_NAME && current.data.player_name == window.PLAYER_NAME) ? `Self` : current.data.injected_data.whisper}</div>`}<div class='above-vtt-container-roll-output'>${li.find('.abovevtt-roll-container').attr('title')}</div>`);
+				let output = $(`${current.data.injected_data.whisper == '' ? '' : `<div class='above-vtt-roll-whisper'>To: ${((current.data.injected_data.whisper == window.PLAYER_NAME || current.data.injected_data.whisper == window.myUser) && current.data.player_name == window.PLAYER_NAME) ? `Self` : current.data.injected_data.whisper}</div>`}<div class='above-vtt-container-roll-output'>${li.find('.abovevtt-roll-container').attr('title')}</div>`);
 				li.find('.abovevtt-roll-container [class*="Result"]').append(output);
 
 				let img = li.find(".magnify");
@@ -814,8 +814,9 @@ class MessageBroker {
 						let noteId = msg.data.notes[i].id;
 						window.JOURNAL.notes[noteId] = msg.data.notes[i];
 						delete window.JOURNAL.notes[noteId].id;
-						if(msg.data.notes[i].id in window.TOKEN_OBJECTS){
-							window.TOKEN_OBJECTS[msg.data.id].place();	
+						if(window.TOKEN_OBJECTS[noteId] != undefined){
+							const placedToken = $(`#tokens div[data-id='${noteId}']`);
+							window.TOKEN_OBJECTS[noteId].build_conditions(placedToken);	
 						}	
 					}			
 					window.JOURNAL.build_journal();			
@@ -1564,7 +1565,7 @@ class MessageBroker {
 		if(data.dmonly && !(window.DM) && !local) // /dmroll only for DM of or the user who initiated it
 			return $("<div/>");
 				
-		if(data.whisper && (data.whisper!=window.PLAYER_NAME) && (!local))
+		if(data.whisper && (data.whisper!=window.PLAYER_NAME && !(Array.isArray(data.whisper) && data.whisper.includes(`${window.myUser}`))) && (!local))
 			return $("<div/>");
 		//notify_gamelog();
 
@@ -1759,14 +1760,14 @@ class MessageBroker {
 				const pc = find_pc_by_player_id(data.id, false);
 		    let token = window.TOKEN_OBJECTS[data.id]     
 		    if (token && pc) {
-		      let currentImage = token.options.imgsrc;
-		      token.hp = pc.hitPointInfo.current;
-		      token.options = {
-		        ...token.options,
-		        ...pc,
-		        imgsrc: (token.options.alternativeImages?.length == 0) ? pc.image : currentImage,
-		        id: pc.sheet // pc.id is DDB characterId, but we use the sheet as an id for tokens
-		      };
+			      let currentImage = token.options.imgsrc;
+			      token.hp = pc.hitPointInfo.current;
+			      token.options = {
+			        ...token.options,
+			        ...pc,
+			        imgsrc: (token.options.alternativeImages?.length == 0) ? pc.image : currentImage,
+			        id: pc.sheet // pc.id is DDB characterId, but we use the sheet as an id for tokens
+			      };
 				}
 			}
 			t.place();
@@ -1952,6 +1953,8 @@ class MessageBroker {
 						// Store current scene width and height
 						let mapHeight = await $("#scene_map").height();
 						let mapWidth = await $("#scene_map").width();
+
+	
 						window.CURRENT_SCENE_DATA.conversion = 1;
 
 						if(data.scale_check && !data.UVTTFile && !data.is_video && (mapHeight > 2500 || mapWidth > 2500)){
@@ -2034,7 +2037,7 @@ class MessageBroker {
 							$('.import-loading-indicator .percentageLoaded').css('width', `20%`);		
 						}
 						reset_canvas();
-		        set_default_vttwrapper_size();
+		        		set_default_vttwrapper_size();
 						
 						console.log("LOADING TOKENS!");
 						let tokensLength = Object.keys(data.tokens).length;
