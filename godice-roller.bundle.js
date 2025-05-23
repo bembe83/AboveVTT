@@ -20,7 +20,7 @@ var settings = {
 		"parent": {
 			"id": "loading_overlay"
 		}
-	}
+	}	
 };
 
 /**
@@ -2070,7 +2070,7 @@ class RollResult {
 	isAutoSendEnabled() {
 		return false;
 	}
-	
+		
 	async rollDice(formula, critType = 0) {	
 		
 		var total = [];
@@ -2082,7 +2082,7 @@ class RollResult {
 		var constants = [];
 		var diePrompt = [] ;
 		var rollReturn = new RollResult();
-		
+
 		var d20 = formula.includes("d20");
 		var formulaHasDie = formula.match(dieRegex);
 		var advdis = 0;
@@ -2095,7 +2095,7 @@ class RollResult {
 			
 			if(rollBonus["bonus"].startsWith("+") || rollBonus["bonus"].startsWith("-") )
 				formula = formula + rollBonus["bonus"];
-			else
+			else if(rollBonus["bonus"].length > 0)
 				formula= formula + "+" + rollBonus["bonus"];
 			
 			advdis = Number(rollBonus["advdis"]);
@@ -2103,7 +2103,7 @@ class RollResult {
 			elvish = rollBonus["elven"];
 			d20dice = (elvish&&advdis==1)?3:2;
 		}
-				
+		
 		var matches = formula.matchAll(formulaRegex);
 		
 		for (const match of matches) {
@@ -2144,7 +2144,8 @@ class RollResult {
 				results.push(term);
 				for (let i = 0; i < Number(match.groups.numberOfDice); i++) {
 					let dieroll = rollDice(match.groups.faces);
-					diePrompt.push({name: term, dieFaces:Number(match.groups.faces), diePlaceholder:dieroll, index: i});
+					let index = results.length-1;
+					diePrompt.push({name: term, dieFaces:Number(match.groups.faces), diePlaceholder:dieroll, index: index});
 				}
 			}
 		}	
@@ -2159,27 +2160,27 @@ class RollResult {
 		if(formulaHasDie){
 			var newRolls = await new DiceRollPrompt().showDicePrompt(formula, diePrompt);
 		}
-		results.forEach(function(result, i){
-			if(dieRegex.test(result)) {
+		results.forEach(function(term, index){
+			if(dieRegex.test(term)) {
 				const newroll = [];
 				for (const [key, value] of Object.entries(newRolls)) {
-					if (value.name.includes(result) && key != null) {
+					if (value.name === term+"-"+index && key != null) {
 						newroll.push(isNaN(value.valueAsNumber)?Number(value.placeholder):value.valueAsNumber);
 					}
 				}
-				let dieroll = roll(result, newroll);
+				let dieroll = roll(term, newroll);
 				total.push(dieroll.total);
 				minTotal.push(dieroll.min);
 				maxTotal.push(dieroll.max);
 				avgTotal.push(dieroll.avg);	
 				totalexpl.push(dieroll.toString());
-				this[i] = {rolls: dieroll.rolls, type: "roll-results", value: dieroll.total};
+				this[index] = {rolls: dieroll.rolls, type: "roll-results", value: dieroll.total};
 			} else {
-				total.push(result);
-				minTotal.push(result);
-				maxTotal.push(result);
-				avgTotal.push(result);
-				totalexpl.push(result);
+				total.push(term);
+				minTotal.push(term);
+				maxTotal.push(term);
+				avgTotal.push(term);
+				totalexpl.push(term);
 			}
 		}, results);
 		
