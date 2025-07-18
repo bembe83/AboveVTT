@@ -204,6 +204,7 @@ const debounceSendNote = mydebounce(function(id, note){
 const delayedClear = mydebounce(() => clearFrame());
 
 function setupMBIntervals(){
+	window.reconnectDelay = 250;
 	if(window.pingInterval!=undefined)
 		clearInterval(window.pingInterval);
 	if(window.reconInterval!=undefined)
@@ -218,8 +219,7 @@ function setupMBIntervals(){
 
 	window.reconInterval = setInterval(function() {
    		forceDdbWsReconnect();
-		window.MB.reconnectDisconnectedAboveWs();
-	}, 4000)
+	}, 15000)
 	
 }
 
@@ -276,13 +276,7 @@ class MessageBroker {
 			this.abovews = new WebSocket(url);
 			
 		}
-		this.abovews.onopen=function(){
 
-		}
-		
-
-
-		
 		
 		this.abovews.onerror = function(errorEvent) {
 			self.loadingAboveWS = false;
@@ -291,6 +285,7 @@ class MessageBroker {
 			} catch (err) { // this is probably overkill, but just in case
 				console.error("MB.onerror failed to log event", err);
 			}
+			self.abovews.close();
 		};
 
 		this.abovews.onmessage=this.onmessage;
@@ -309,6 +304,32 @@ class MessageBroker {
 			if (recovered && (!window.DM)) {
 				console.log('asking the DM for recovery!');
 				self.sendMessage("custom/myVTT/syncmeup");
+	 		}
+			setupMBIntervals();
+		};
+
+		this.abovews.onclose = function() {
+			if(is_gamelog_popout())
+				return;
+			if(self.reconnectTimeout != undefined){
+				clearTimeout(self.reconnectTimeout);
+			}	
+			console.log('Attempting reconnect to Above Websocket');
+			if(window.reconnectAttemptAbovews == undefined){
+				window.reconnectAttemptAbovews = 0;
+			}
+			window.reconnectAttemptAbovews++;
+			if(window.onCloseNumberPerPopup == undefined){
+				window.onCloseNumberPerPopup = 0;
+			}
+			window.onCloseNumberPerPopup++;
+			if(window.onCloseNumberPerPopup > 5 && !get_avtt_setting_value('autoReconnect')){
+				self.showDisconnectWarning();
+			}	
+			else{
+				self.reconnectTimeout = setTimeout(function() {
+					self.loadAboveWS();	
+				}, Math.min(10000,2**window.onCloseNumberPerPopup*window.reconnectDelay));
 			}
 		};
 	}
@@ -635,6 +656,13 @@ class MessageBroker {
 				delete window.startupSceneId; // we only want to prevent a double load of the initial scene, so we want to delete this no matter what.
 			}
 
+			if(msg.eventType == "custom/myVTT/update_dm_player_scenes"){
+				if(window.DM){
+					window.splitPlayerScenes = msg.data.splitPlayerScenes;
+					did_update_scenes();
+				}
+				
+			}
 			if (msg.eventType == "custom/myVTT/scene") {
 				self.handleScene(msg);
 			}
@@ -1520,10 +1548,6 @@ class MessageBroker {
 		});
 
 		self.loadAboveWS();
-
-		setupMBIntervals();
-
-
 	}
 
   	handleCT(data){
@@ -1796,7 +1820,8 @@ class MessageBroker {
 			let isVideoEqual = window.CURRENT_SCENE_DATA.player_map_is_video == msg.data.player_map_is_video && window.CURRENT_SCENE_DATA.dm_map_is_video == msg.data.dm_map_is_video
 
 			let isSameScaleAndMaps = isCurrentScene && scaleFactorEqual && hppsEqual && vppsEqual && isVideoEqual && ((window.DM && dmMapEqual && dmMapToggleEqual) || (!window.DM && playerMapEqual))
-																				
+			
+			const isSameTokenLight = window.CURRENT_SCENE_DATA.disableSceneVision == msg.data.disableSceneVision;																		
 			
 
 			if(isSameScaleAndMaps && !forceRefresh){
@@ -1839,7 +1864,12 @@ class MessageBroker {
 						height: hexHeight
 					}
 				}
-
+				if(!isSameTokenLight){
+					for(let i in window.TOKEN_OBJECTS){
+						const token = $(`#tokens div[data-id='${i}']`);
+						setTokenLight(token, window.TOKEN_OBJECTS[i].options);
+					}
+				}
 				await reset_canvas(false);
 				if(!window.DM || window.SelectedTokenVision)
 					check_token_visibility();
@@ -1849,7 +1879,7 @@ class MessageBroker {
 				window.wallUndo = [];
 				$('#exploredCanvas').remove();
 				window.sceneRequestTime = Date.now();
-		    let lastSceneRequestTime = window.sceneRequestTime;   
+		    	let lastSceneRequestTime = window.sceneRequestTime;   
 				window.TOKEN_OBJECTS = {};
 				window.videoTokenOld = {};
 				let data = msg.data;
@@ -2059,9 +2089,12 @@ class MessageBroker {
 									$('.import-loading-indicator .percentageLoaded').css('width', `${20 + count/tokensLength*75}%`)
 									
 								}
+								return true;
 							}
 			
 						await tokenLoop(data, count, tokensLength);
+
+
 						if(msg.data.id != window.CURRENT_SCENE_DATA.id || lastSceneRequestTime != window.sceneRequestTime){
 							return;
 						}
@@ -2073,11 +2106,25 @@ class MessageBroker {
 							}
 						}
 						let audioTokens = $('.audio-token');
-		        if(audioTokens.length > 0){
-		            for(let i = 0; i < audioTokens.length; i++){
-		                setTokenAudio($(audioTokens[i]), window.TOKEN_OBJECTS[$(audioTokens[i]).attr('data-id')]);
-		            }
-		        }
+				        if(audioTokens.length > 0){
+				            for(let i = 0; i < audioTokens.length; i++){
+				                setTokenAudio($(audioTokens[i]), window.TOKEN_OBJECTS[$(audioTokens[i]).attr('data-id')]);
+				            }
+				        }
+						if(window.TELEPORTER_PASTE_BUFFER != undefined){
+							try{
+								const teleporterTokenId = window.TELEPORTER_PASTE_BUFFER.targetToken
+								const targetPortal = window.TOKEN_OBJECTS[teleporterTokenId];
+								const top = parseInt(targetPortal.options.top)+25;
+								const left = parseInt(targetPortal.options.left)+25;
+								const isTeleporter = true;
+								paste_selected_tokens(left, top, isTeleporter);
+							}
+							catch{
+								window.TELEPORTER_PASTE_BUFFER = undefined;
+							}
+							
+						}
 						ct_load({
 							loading: true,
 							current: $("#combat_area [data-current]").attr('data-target')
@@ -2265,7 +2312,7 @@ class MessageBroker {
 				alertText = `Drawings include - drawings, walls, elevation, light drawings and text.\n\n${window.DRAWINGS.filter(d=> d[1]=='wall').length > 200 ? `Try reducing the number of walls used around curves where possible - using X's on pillars etc. Longer straight walls will also perform better.\n\n` : ''}Number of drawings by type:\nDrawings: ${window.DRAWINGS.filter(d=> d[1]!='wall' && d[1]!='light' && d[0]!='text'&& d[1]!='elev' ).length}\nWalls: ${window.DRAWINGS.filter(d=> d[1]=='wall').length}\nElevation Drawings: ${window.DRAWINGS.filter(d=> d[1]=='elev').length}\nLight Drawings: ${window.DRAWINGS.filter(d=> d[1]=='light').length}\nText: ${window.DRAWINGS.filter(d=> d[0]=='text').length}\n\nCheck console warnings for more message data.`
 			}
 			else if(message.eventType?.toLowerCase()?.includes('note')){
-				alertText = `\n\n${Object.keys(message.data.notes).length == 1 ? `Sent 1 note with title: ${message.data.notes.find(d=>d.title).title} \n\nThis note may be over 128000 characters including html - check this using the source button in notes (looks like <>).\n\nCheck console warnings for more message data.` : `Sent ${Object.keys(message.data.notes).length} notes.`}\n\nCheck console warnings for more message data.`			
+				alertText = `\n\n${Object.keys(message.data.notes).length == 1 ? `Sent 1 note with title: ${message.data.notes.find(d=>d.title)?.title} \n\nThis note may be over 128000 characters including html - check this using the source button in notes (looks like <>).\n\nCheck console warnings for more message data.` : `Sent ${Object.keys(message.data.notes).length} notes.`}\n\nCheck console warnings for more message data.`			
 			}
 			else if(message.eventType?.toLowerCase()?.includes('token')){
 				alertText = `You may have too many tokens on the map to send.\n\nNumber of Tokens: ${Object.keys(window.TOKEN_OBJECTS).length}\n\nCheck console warnings for more message data.`
@@ -2365,6 +2412,7 @@ class MessageBroker {
 	  	window.close();
 	  });
 	  $("#reconnect-button").on("click", function(){
+	  	window.onCloseNumberPerPopup = 0;
 	  	window.MB.loadAboveWS(function(){ 
 	  		AboveApi.getScene(window.CURRENT_SCENE_DATA.id).then((response) => {
 	  			window.MB.handleScene(response, true);
@@ -2393,7 +2441,6 @@ class MessageBroker {
 			if(window.reconnectAttemptAbovews == undefined){
 				window.reconnectAttemptAbovews = 0;
 			}	
-			window.reconnectAttemptAbovews++;
 			if(get_avtt_setting_value('autoReconnect')){
 				this.loadAboveWS();	
 			}

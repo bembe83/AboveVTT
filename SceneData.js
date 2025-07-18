@@ -113863,12 +113863,13 @@ function get_ddb_extras() {
 		...get_scene_data_gotsf(),
 		...get_scene_data_gos(),
 		...get_scene_data_hbtd(),
-		...get_scene_data_ottg()
+		...get_scene_data_ottg(),
+		...get_scene_data_wel()
 	}
 }
 
 
-var CONDITIONS = {};
+
 
 function get_avtt_scene_import_data() {
 	return [

@@ -1450,7 +1450,7 @@ class Token {
 		else if(window.DM){ // in all the other cases.. the DM should always see HP/AC
 			showthem=true;
 		}
-		else if(this.options.player_owned || this.isCurrentPlayer()){ // if it's player_owned.. always showthem
+		else if((this.options.player_owned && !this.isPlayer()) || this.isCurrentPlayer()){ // if it's player_owned.. always showthem
 			showthem=true;
 		}
 		else if(this.isPlayer() && (!this.options.hidestat)){
@@ -2226,12 +2226,12 @@ class Token {
 				if (this.selected) {
 					old.addClass("tokenselected");
 					toggle_player_selectable(this, old)
-					$(`#combat_area tr[data-target='${this.options.id}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');
+					$(`:is(#combat_area, #combat_area_carousel) tr[data-target='${this.options.id}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');
 				}
 				else {
 					old.css("border", "");
 					old.removeClass("tokenselected");
-					$(`#combat_area tr[data-target='${this.options.id}']`).toggleClass('selected-token', false);
+					$(`:is(#combat_area, #combat_area_carousel) tr[data-target='${this.options.id}']`).toggleClass('selected-token', false);
 				}
 				let oldImage =  old.find(".token-image,[data-img]")
 				// token uses an image for it's image
@@ -2283,10 +2283,10 @@ class Token {
 							if (thisSelected == true) {
 								parentToken.addClass('tokenselected');
 								toggle_player_selectable(window.TOKEN_OBJECTS[tokID], parentToken)
-								$(`#combat_area tr[data-target='${tokID}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');
+								$(`:is(#combat_area, #combat_area_carousel) tr[data-target='${tokID}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');
 							} else {
 								parentToken.removeClass('tokenselected');
-								$(`#combat_area tr[data-target='${tokID}']`).toggleClass('selected-token', false);
+								$(`:is(#combat_area, #combat_area_carousel) tr[data-target='${tokID}']`).toggleClass('selected-token', false);
 							}				
 
 							window.TOKEN_OBJECTS[tokID].selected = thisSelected;
@@ -2955,7 +2955,7 @@ class Token {
 								let id = $(tok).attr("data-id");
 								window.TOKEN_OBJECTS[id].selected = false;
 								$("#tokens [data-id='" + id + "']").toggleClass("tokenselected", false)
-								$(`#combat_area tr[data-target='${id}']`).toggleClass('selected-token', false);
+								$(`:is(#combat_area, #combat_area_carousel) tr[data-target='${id}']`).toggleClass('selected-token', false);
 							}
 						}
 						let playerTokenId = $(`.token[data-id*='${window.PLAYER_ID}']`).attr("data-id");
@@ -2963,7 +2963,7 @@ class Token {
 						self.selected = true;
 						window.CURRENTLY_SELECTED_TOKENS.push(self.options.id);
 						$("#tokens [data-id='" + self.options.id + "']").toggleClass(["tokenselected", 'pause_click'], true);
-						$(`#combat_area tr[data-target='${self.options.id}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');
+						$(`:is(#combat_area, #combat_area_carousel) tr[data-target='${self.options.id}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');
 						if(tok.is(":animated")){
 							self.stopAnimation();
 						}
@@ -2987,13 +2987,13 @@ class Token {
 						
 
 						window.playerTokenAuraIsLight = (window.CURRENT_SCENE_DATA.disableSceneVision == '1') ? false : (playerTokenId == undefined) ? true : window.TOKEN_OBJECTS[playerTokenId].options.auraislight; // used in drag to know if we should check for wall/LoS collision.
-						window.dragSelectedTokens = $(`#tokens .token.tokenselected, #tokens .token[data-group-id='${self.options.groupId}'][style*=' display: none;']`); //set variable for selected tokens that we'll be looking at in drag, deleted in stop.
+						window.dragSelectedTokens = $(`#tokens .token.tokenselected:not(.ui-draggable-disabled), #tokens .token[data-group-id='${self.options.groupId}']`); //set variable for selected tokens that we'll be looking at in drag, deleted in stop.
 						
 						if (self.selected && window.dragSelectedTokens.length>1 && !shiftHeld) {
 							for (let tok of window.dragSelectedTokens){
 								let id = $(tok).attr("data-id");
 								window.TOKEN_OBJECTS[id].selected = true;
-								$(`#combat_area tr[data-target='${id}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');
+								$(`:is(#combat_area, #combat_area_carousel) tr[data-target='${id}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');
 						
 								$(tok).addClass("pause_click");
 								if($(tok).is(":animated")){
@@ -3423,10 +3423,10 @@ class Token {
 					if (thisSelected == true) {
 						parentToken.addClass('tokenselected');
 						toggle_player_selectable(window.TOKEN_OBJECTS[tokID], parentToken)
-						$(`#combat_area tr[data-target='${tokID}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');
+						$(`:is(#combat_area, #combat_area_carousel) tr[data-target='${tokID}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');
 					} else {
 						parentToken.removeClass('tokenselected');
-						$(`#combat_area tr[data-target='${tokID}']`).toggleClass('selected-token', false);
+						$(`:is(#combat_area, #combat_area_carousel) tr[data-target='${tokID}']`).toggleClass('selected-token', false);
 					}				
 
 					window.TOKEN_OBJECTS[tokID].selected = thisSelected;
@@ -3733,7 +3733,7 @@ function place_token_at_view_point(tokenObject, pageX, pageY) {
 	place_token_at_map_point(tokenObject, mapPosition.x, mapPosition.y);
 }
 
-function place_token_at_map_point(tokenObject, x, y) {
+function place_token_at_map_point(tokenObject, x, y, forcePlaceAndSize = false) {
 
 	console.log(`attempting to place token at ${x}, ${y}; options: ${JSON.stringify(tokenObject)}`);
 
@@ -3741,7 +3741,7 @@ function place_token_at_map_point(tokenObject, x, y) {
 		tokenObject.id = uuid();
 	}
 	// if this is a player token, check if the token is already on the map
-	if(tokenObject.id in window.TOKEN_OBJECTS && window.TOKEN_OBJECTS[tokenObject.id].isPlayer()){
+	if(!forcePlaceAndSize && tokenObject.id in window.TOKEN_OBJECTS && window.TOKEN_OBJECTS[tokenObject.id].isPlayer()){
 		window.TOKEN_OBJECTS[tokenObject.id].highlight();
 		return;
 	}
@@ -3771,7 +3771,7 @@ function place_token_at_map_point(tokenObject, x, y) {
 		options.imgsrc = parse_img(options.imgsrc);
 	}
 
-	if (options.size == undefined) {
+	if (options.size == undefined || forcePlaceAndSize) {
 		if (options.tokenSize != undefined && parseFloat(options.tokenSize) != NaN) {
 			// tokenSize was specified, convert it to size. tokenSize is the number of squares this token fills
 			options.size = Math.round(window.CURRENT_SCENE_DATA.hpps) * parseFloat(options.tokenSize);
@@ -3817,7 +3817,14 @@ function place_token_at_map_point(tokenObject, x, y) {
 	setReasonableDefault("hidden", false);
 
 	// place the token
-	window.ScenesHandler.create_update_token(options);
+	if(forcePlaceAndSize && options.id in window.TOKEN_OBJECTS){
+		window.TOKEN_OBJECTS[options.id].options = options;
+		window.TOKEN_OBJECTS[options.id].place_sync_persist();
+	}
+	else{
+		create_update_token(options);
+	}
+	
 
 	if (is_player_id(options.id)) {
 		update_pc_token_rows();
@@ -3966,7 +3973,7 @@ function deselect_all_tokens(ignoreVisionUpdate = false) {
 		}
 	}
 	$(`.token`).toggleClass('tokenselected', false);
-	$(`#combat_area tr`).toggleClass('selected-token', false);
+	$(`:is(#combat_area, #combat_area_carousel) tr`).toggleClass('selected-token', false);
 	remove_selected_token_bounding_box();
 	window.CURRENTLY_SELECTED_TOKENS = [];
 
@@ -4215,7 +4222,10 @@ function setTokenAuras (token, options) {
 }
 
 function setTokenLight (token, options) {
-	if (!options.light1 || window.CURRENT_SCENE_DATA.disableSceneVision == true || options.id.includes('exampleToken')) return;
+	if ((!options.light1&&!options.light2) || window.CURRENT_SCENE_DATA.disableSceneVision == true || options.id.includes('exampleToken')){
+		token.parent().parent().find(`.aura-element-container-clip[id='${options.id}']`).remove();
+		return;
+	} 
 	const innerlightSize = options.light1.feet != undefined? (options.light1.feet / parseInt(window.CURRENT_SCENE_DATA.fpsq)) * window.CURRENT_SCENE_DATA.hpps/window.CURRENT_SCENE_DATA.scale_factor  : 0;
 	const outerlightSize = options.light2.feet != undefined ? (options.light2.feet / parseInt(window.CURRENT_SCENE_DATA.fpsq)) * window.CURRENT_SCENE_DATA.hpps/window.CURRENT_SCENE_DATA.scale_factor  : 0;
 	const visionSize = options.vision.feet != undefined ? (options.vision.feet / parseInt(window.CURRENT_SCENE_DATA.fpsq)) * window.CURRENT_SCENE_DATA.hpps/window.CURRENT_SCENE_DATA.scale_factor  : 0;
@@ -4635,7 +4645,7 @@ async function do_draw_selected_token_bounding_box() {
 		}));	
 		window.CURRENTLY_SELECTED_TOKENS.push(id);	
 		$("#tokens").find(selector).toggleClass('tokenselected', true);	
-		$(`#combat_area tr[data-target='${id}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');
+		$(`:is(#combat_area, #combat_area_carousel) tr[data-target='${id}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');
 					
 		if(window.TOKEN_OBJECTS[id].options.groupId && !groupIDs.includes(window.TOKEN_OBJECTS[id].options.groupId)){
 			groupIDs.push(window.TOKEN_OBJECTS[id].options.groupId)
@@ -4649,7 +4659,7 @@ async function do_draw_selected_token_bounding_box() {
 			if(window.CURRENTLY_SELECTED_TOKENS.includes($(this).attr('data-id')))
 				return;
 			$(this).toggleClass('tokenselected', true);	
-			$(`#combat_area tr[data-target='${$(this).attr('data-id')}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');		
+			$(`:is(#combat_area, #combat_area_carousel) tr[data-target='${$(this).attr('data-id')}']`).toggleClass('selected-token', getCombatTrackersettings().ct_selected_token == '1');		
 			window.TOKEN_OBJECTS[$(this).attr('data-id')].selected = true;	
 			window.CURRENTLY_SELECTED_TOKENS.push($(this).attr('data-id'));
 		})
@@ -4984,99 +4994,119 @@ function remove_selected_token_bounding_box() {
 
 }
 
-function copy_selected_tokens() {
-	if (!window.DM) return;
-	window.TOKEN_PASTE_BUFFER = [];
-	let redrawBoundingBox = false;
-	let bounds = {
-		top: Infinity,
-		left: Infinity,
-		bottom: -Infinity,
-		right: -Infinity,
-		hpps: window.CURRENT_SCENE_DATA.hpps,
-		vpps: window.CURRENT_SCENE_DATA.vpps
-	};
-	for (let id in window.TOKEN_OBJECTS) {
-		let token = window.TOKEN_OBJECTS[id];
-
-		if (token.selected) { 
-			bounds = {
-				...bounds,
-				top: parseInt(token.options.top) < bounds.top ? parseInt(token.options.top) : bounds.top,
-				left: parseInt(token.options.left) < bounds.left ? parseInt(token.options.left) : bounds.left,
-				bottom: parseInt(token.options.top) > bounds.bottom ? parseInt(token.options.top) : bounds.bottom,
-				right: parseInt(token.options.left) > bounds.right ? parseInt(token.options.left) : bounds.right
-			}
-			window.TOKEN_PASTE_BUFFER.push({id: id, left: token.options.left, top: token.options.top});
+function copy_selected_tokens(teleporterTokenId=undefined) {
+	if(teleporterTokenId){
+		window.TELEPORTER_PASTE_BUFFER = {
+			'targetToken': teleporterTokenId,
+			'tokens': window.CURRENTLY_SELECTED_TOKENS.slice(0)
 		}
 	}
+	else{
+		if (!window.DM) return;
+		window.TOKEN_PASTE_BUFFER = [];
+		let bounds = {
+			top: Infinity,
+			left: Infinity,
+			bottom: -Infinity,
+			right: -Infinity,
+			hpps: window.CURRENT_SCENE_DATA.hpps,
+			vpps: window.CURRENT_SCENE_DATA.vpps
+		};
+		for (let id in window.TOKEN_OBJECTS) {
+			let token = window.TOKEN_OBJECTS[id];
 
-
-	window.TOKEN_PASTE_BOUNDS = bounds;
-	if (redrawBoundingBox) {
-		draw_selected_token_bounding_box();
+			if (token.selected) { 
+				bounds = {
+					...bounds,
+					top: parseInt(token.options.top) < bounds.top ? parseInt(token.options.top) : bounds.top,
+					left: parseInt(token.options.left) < bounds.left ? parseInt(token.options.left) : bounds.left,
+					bottom: parseInt(token.options.top) > bounds.bottom ? parseInt(token.options.top) : bounds.bottom,
+					right: parseInt(token.options.left) > bounds.right ? parseInt(token.options.left) : bounds.right
+				}
+				window.TOKEN_PASTE_BUFFER.push({id: id, left: token.options.left, top: token.options.top});
+			}
+		}
+		window.TOKEN_PASTE_BOUNDS = bounds;
 	}
+	
 }
 
-function paste_selected_tokens(x, y) {
-	if (!window.DM) return;
+function paste_selected_tokens(x, y, teleporter=undefined) {
+	if (!teleporter && !window.DM) return;
 	if (window.TOKEN_PASTE_BUFFER == undefined) {
 		window.TOKEN_PASTE_BUFFER = [];
 	}
 	deselect_all_tokens();
-	for (let i = 0; i < window.TOKEN_PASTE_BUFFER.length; i++) {
-		let id = window.TOKEN_PASTE_BUFFER[i]?.id;
-		let token = window.all_token_objects[id];
-		if(token == undefined || (token.isPlayer() && window.TOKEN_OBJECTS[id])) continue;
-		let options = $.extend(true, {}, token.options);
-		let newId = token.isPlayer() ? id : uuid();
-		options.id = newId;
-		if(options.audioChannel != undefined){
-			options.audioChannel.token = newId;
-			options.audioChannel.audioId = uuid();
+	if(teleporter){
+		for (let i in window.TELEPORTER_PASTE_BUFFER.tokens) {
+			const id = window.TELEPORTER_PASTE_BUFFER.tokens[i];
+			let token = window.TOKEN_OBJECTS[id] != undefined ? window.TOKEN_OBJECTS[id] : window.all_token_objects[id];
+			if(token == undefined) continue;
+			let options = $.extend(true, {}, token.options);
+			
+			options.selected = true;
+
+			place_token_at_map_point(options, x, y, forceSize=true);				
 		}
-		// TODO: figure out the location under the cursor and paste there instead of doing center of view
-		options.init = token.isPlayer() ? options.init : undefined;
-		options.ct_show = token.isPlayer() ? options.ct_show : undefined;
-		options.combatGroup = token.isPlayer() ? options.combatGroup : undefined;
-		options.selected = true;
-		let center = center_of_view(); 
-		let mapView = convert_point_from_view_to_map(x, y, false);
+		window.TELEPORTER_PASTE_BUFFER = undefined;
+	}
+	else{
+		for (let i = 0; i < window.TOKEN_PASTE_BUFFER.length; i++) {
+			let id = window.TOKEN_PASTE_BUFFER[i]?.id;
+			let token = window.all_token_objects[id];
+			if(token == undefined || (token.isPlayer() && window.TOKEN_OBJECTS[id])) continue;
+			let options = $.extend(true, {}, token.options);
+			let newId = token.isPlayer() ? id : uuid();
+			options.id = newId;
+			if(options.audioChannel != undefined){
+				options.audioChannel.token = newId;
+				options.audioChannel.audioId = uuid();
+			}
+			// TODO: figure out the location under the cursor and paste there instead of doing center of view
+			options.init = token.isPlayer() ? options.init : undefined;
+			options.ct_show = token.isPlayer() ? options.ct_show : undefined;
+			options.combatGroup = token.isPlayer() ? options.combatGroup : undefined;
+			options.selected = true;
+			let center = center_of_view(); 
+			let mapView = convert_point_from_view_to_map(x, y, false);
 
-		let bounds = window.TOKEN_PASTE_BOUNDS;
-		let left = (parseInt(window.TOKEN_PASTE_BUFFER[i]?.left) - (bounds.right + bounds.left)/2)/bounds.hpps;
-		let top = (parseInt(window.TOKEN_PASTE_BUFFER[i]?.top) - (bounds.bottom + bounds.top)/2)/bounds.vpps;
+			let bounds = window.TOKEN_PASTE_BOUNDS;
+			let left = (parseInt(window.TOKEN_PASTE_BUFFER[i]?.left) - (bounds.right + bounds.left)/2)/bounds.hpps;
+			let top = (parseInt(window.TOKEN_PASTE_BUFFER[i]?.top) - (bounds.bottom + bounds.top)/2)/bounds.vpps;
 
 
-		options.top = `${mapView.y + top*window.CURRENT_SCENE_DATA.vpps}px`;
-		options.left = `${mapView.x + left*window.CURRENT_SCENE_DATA.hpps}px`;
-		window.ScenesHandler.create_update_token(options);
-		// deselect the old and select the new so the user can easily move the new tokens around after pasting them
-		if(typeof window.TOKEN_OBJECTS[id] !== "undefined"){
-			window.TOKEN_OBJECTS[id].selected = false;
-			window.TOKEN_OBJECTS[id].place_sync_persist();
-		}
+			options.top = `${mapView.y + top*window.CURRENT_SCENE_DATA.vpps}px`;
+			options.left = `${mapView.x + left*window.CURRENT_SCENE_DATA.hpps}px`;
+			window.ScenesHandler.create_update_token(options);
+			// deselect the old and select the new so the user can easily move the new tokens around after pasting them
+			if(typeof window.TOKEN_OBJECTS[id] !== "undefined"){
+				window.TOKEN_OBJECTS[id].selected = false;
+				window.TOKEN_OBJECTS[id].place_sync_persist();
+			}
 
-		if (id in window.JOURNAL.notes) {
-			window.JOURNAL.notes[newId] = structuredClone(window.JOURNAL.notes[id]);
-			let copiedNote = window.JOURNAL.notes[newId];
-			copiedNote.title = window.all_token_objects[id].options.name;
-			window.JOURNAL.persist();
-			window.MB.sendMessage('custom/myVTT/note',{
-				id: newId,
-				note:copiedNote
-			});
-		}
+			if (id in window.JOURNAL.notes) {
+				window.JOURNAL.notes[newId] = structuredClone(window.JOURNAL.notes[id]);
+				let copiedNote = window.JOURNAL.notes[newId];
+				copiedNote.title = window.all_token_objects[id].options.name;
+				window.JOURNAL.persist();
+				window.MB.sendMessage('custom/myVTT/note',{
+					id: newId,
+					note:copiedNote
+				});
+			}
 
-		window.TOKEN_OBJECTS[newId].selected = true;
-		window.TOKEN_OBJECTS[newId].place_sync_persist();
-		if(token.isPlayer() && options.ct_show != undefined){
-			let findSVG = $('<svg class="findSVG" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 11c1.33 0 4 .67 4 2v.16c-.97 1.12-2.4 1.84-4 1.84s-3.03-.72-4-1.84V13c0-1.33 2.67-2 4-2zm0-1c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm6 .2C18 6.57 15.35 4 12 4s-6 2.57-6 6.2c0 2.34 1.95 5.44 6 9.14 4.05-3.7 6-6.8 6-9.14zM12 2c4.2 0 8 3.22 8 8.2 0 3.32-2.67 7.25-8 11.8-5.33-4.55-8-8.48-8-11.8C4 5.22 7.8 2 12 2z"/></svg>')
-			let playerCTRow = $(`#combat_area tr[data-target='${token.options.id}']`);
-			let findButton = playerCTRow.find('.findTokenCombatButton')
-			findButton.empty().append(findSVG);
+			window.TOKEN_OBJECTS[newId].selected = true;
+			window.TOKEN_OBJECTS[newId].place_sync_persist();
+			if(token.isPlayer() && options.ct_show != undefined){
+				let findSVG = $('<svg class="findSVG" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 11c1.33 0 4 .67 4 2v.16c-.97 1.12-2.4 1.84-4 1.84s-3.03-.72-4-1.84V13c0-1.33 2.67-2 4-2zm0-1c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm6 .2C18 6.57 15.35 4 12 4s-6 2.57-6 6.2c0 2.34 1.95 5.44 6 9.14 4.05-3.7 6-6.8 6-9.14zM12 2c4.2 0 8 3.22 8 8.2 0 3.32-2.67 7.25-8 11.8-5.33-4.55-8-8.48-8-11.8C4 5.22 7.8 2 12 2z"/></svg>')
+				let playerCTRow = $(`#combat_area tr[data-target='${token.options.id}']`);
+				let findButton = playerCTRow.find('.findTokenCombatButton')
+				findButton.empty().append(findSVG);
+			}
 		}
 	}
+
+	
 
 	draw_selected_token_bounding_box();
 }
