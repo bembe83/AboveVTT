@@ -1385,7 +1385,7 @@ input {
     #sources-import-content-container .card-listing .listing-card,
     #mega_importer .card-listing .listing-card {
         width: 50%;
-
+        min-width: 250px;
     }
     #sources-import-content-container .listing-card__title,
     #mega_importer .listing-card__title{
@@ -2232,6 +2232,7 @@ padding-top:10px;
     background: #01ffff;
     border: 1px solid black;
     border-radius: 50%;
+    display:flex;
 }
 
 .token .custom-condition.condition-img {
@@ -8851,6 +8852,11 @@ div.note[id^="ui-id"] .mce-btn button {
     font-size:12px;
     min-width:65px;
 }
+.sidebar-flyout .token-image-modal-footer-select-wrapper input.styled-number-input {
+    position:absolute;
+    right:0px;
+    width:100px;
+}
 .peerCursorPosition {
     height: 16px;
     width: 16px;
@@ -10992,9 +10998,7 @@ button#editAnimations {
 #qrm_apply_conditions-button{
     width: 26% !important;
 }
-.ui-front {
-    z-index: 50010 !important;
-}
+
 .ui-selectmenu-text{
     top: 1px;
     position: relative;

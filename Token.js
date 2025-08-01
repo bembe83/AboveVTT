@@ -40,7 +40,7 @@ const availableToAoe = [
 
 
 
-const throttleLight = throttle((darknessMoved = false) => {requestAnimationFrame(()=>{redraw_light(darknessMoved)})}, 1000/30);
+const throttleLight = throttle((darknessMoved = false) => {requestAnimationFrame(()=>{redraw_light(darknessMoved)})}, 1000/16);
 const throttleTokenCheck = throttle(() => {requestAnimationFrame(()=>{do_check_token_visibility()})}, 1000/4);
 const debounceStoreExplored = mydebounce((exploredCanvas) => {		
 	let dataURI = exploredCanvas.toDataURL('image/jpg')
@@ -676,7 +676,12 @@ class Token {
 		this.prepareWalkableArea()
 		
 		let tinyToken = (Math.round(this.options.gridSquares*2)/2 < 1) || this.isAoe();
-		let tokenPosition = snap_point_to_grid(left, top, true, tinyToken)
+
+
+		
+		let tokenPosition = snap_point_to_grid(left, top, true, tinyToken, this.options.size, true)
+		
+		
 
 		// Stop movement if new position is outside of the scene
 		if (
@@ -3124,7 +3129,7 @@ class Token {
 							tokenY +=  !(tinyToken) ? (parseFloat(window.CURRENT_SCENE_DATA.vpps) / 2) : (parseFloat(window.CURRENT_SCENE_DATA.vpps) / 4) ;
 						}
 						
-						let tokenPosition = snap_point_to_grid(tokenX, tokenY, undefined, tinyToken);
+						let tokenPosition = snap_point_to_grid(tokenX, tokenY, undefined, tinyToken, self.options.size);
 
 						if(self.walkableArea.bottom != null && self.walkableArea.right != null){ // need to figure out what's causing these to be null but this is a workaround for the error for now
 							// Constrain token within scene
@@ -3667,8 +3672,33 @@ function should_snap_to_grid() {
 		|| ((window.CURRENT_SCENE_DATA.snap != "1") && window.toggleSnap);
 }
 
-function snap_point_to_grid(mapX, mapY, forceSnap = false, tinyToken = false) {
+function snap_point_to_grid(mapX, mapY, forceSnap = false, tinyToken = false, tokenWidth = 0, arrowKeys=false) {
 	if (forceSnap || should_snap_to_grid()) {
+		const gridSquaresWide = Math.floor(tokenWidth/window.CURRENT_SCENE_DATA.hpps)
+		const hpps = window.CURRENT_SCENE_DATA.gridType == 2 ? window.CURRENT_SCENE_DATA.vpps : window.CURRENT_SCENE_DATA.hpps;
+
+		const hexSize = hpps/1.5 / window.CURRENT_SCENE_DATA.scale_factor || window.CURRENT_SCENE_DATA.hpps/1.5 / window.CURRENT_SCENE_DATA.scale_factor;
+
+		if(!arrowKeys && (window.CURRENT_SCENE_DATA.gridType == 3 || window.CURRENT_SCENE_DATA.gridType == 2)){
+			
+			
+		
+			const closeHexes = window.gridCentersArray.filter(d => Math.abs(d[0]*window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.scaleAdjustment.x-mapX) < hexSize*window.CURRENT_SCENE_DATA.scale_factor && Math.abs(d[1]*window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.scaleAdjustment.y-mapY)< hexSize*window.CURRENT_SCENE_DATA.scale_factor);
+			if(window.CURRENT_SCENE_DATA.gridType == 3){
+				return {
+					x: closeHexes[0][0]*window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.scaleAdjustment.x - tokenWidth/2 + ((1-(gridSquaresWide%2))*hexSize),
+					y: closeHexes[0][1]*window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.scaleAdjustment.y - tokenWidth/2 
+				}
+
+				
+			}else if(window.CURRENT_SCENE_DATA.gridType == 2){
+				return {
+					x: closeHexes[0][0]*window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.scaleAdjustment.x - tokenWidth/2,
+					y: closeHexes[0][1]*window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.scaleAdjustment.y - tokenWidth/2 + ((1-(gridSquaresWide%2))*hexSize) 
+				}
+			}
+
+		}
 		// adjust to the nearest square coordinate
 		let startX = parseFloat(window.CURRENT_SCENE_DATA.offsetx);
 		let startY = parseFloat(window.CURRENT_SCENE_DATA.offsety); 
@@ -3676,6 +3706,14 @@ function snap_point_to_grid(mapX, mapY, forceSnap = false, tinyToken = false) {
 
 		const gridWidth = (window.CURRENT_SCENE_DATA.gridType && window.CURRENT_SCENE_DATA.gridType != 1) ? parseFloat(window.hexGridSize.width) * parseFloat(window.CURRENT_SCENE_DATA.scaleAdjustment.x) : (!tinyToken) ? parseFloat(window.CURRENT_SCENE_DATA.hpps) : parseFloat(window.CURRENT_SCENE_DATA.hpps)/2;
 		const gridHeight = (window.CURRENT_SCENE_DATA.gridType && window.CURRENT_SCENE_DATA.gridType != 1) ? parseFloat(window.hexGridSize.height) * parseFloat(window.CURRENT_SCENE_DATA.scaleAdjustment.y) : (!tinyToken) ? parseFloat(window.CURRENT_SCENE_DATA.vpps) : parseFloat(window.CURRENT_SCENE_DATA.vpps/2);
+		
+		if(window.CURRENT_SCENE_DATA.gridType == 3){
+			startX = startX*window.CURRENT_SCENE_DATA.scaleAdjustment.x+gridWidth - tokenWidth/2 - ((1-(gridSquaresWide%2))*hexSize);
+			startY = startY*window.CURRENT_SCENE_DATA.scaleAdjustment.y+gridHeight/2 - tokenWidth/2;
+		}else if(window.CURRENT_SCENE_DATA.gridType == 2){
+			startX = startX*window.CURRENT_SCENE_DATA.scaleAdjustment.x+gridWidth/2 - tokenWidth/2;
+			startY = startY*window.CURRENT_SCENE_DATA.scaleAdjustment.y+gridHeight - tokenWidth/2 - ((1-(gridSquaresWide%2))*hexSize);
+		}
 		
 		let currentGridX = Math.floor((mapX - startX) / gridWidth);
 		let currentGridY = Math.floor((mapY - startY) / gridHeight);
@@ -3685,13 +3723,7 @@ function snap_point_to_grid(mapX, mapY, forceSnap = false, tinyToken = false) {
 		else if(window.CURRENT_SCENE_DATA.gridType == 2 && currentGridY % 2 == 1){//replace with current scene when setting exists
 			currentGridX += 0.5;
 		} 
-
-		if(window.CURRENT_SCENE_DATA.gridType == 3){
-			startX = startX + window.hexGridSize.width/2 * window.CURRENT_SCENE_DATA.scaleAdjustment.x;
-		}else if(window.CURRENT_SCENE_DATA.gridType == 2){
-			startY = startY + window.hexGridSize.height/2 * window.CURRENT_SCENE_DATA.scaleAdjustment.y;
-		}
-		return {
+			return {
 			x: Math.ceil((currentGridX * gridWidth) + startX),
 			y: Math.ceil((currentGridY * gridHeight) + startY)
 		}
@@ -4379,7 +4411,7 @@ function setTokenLight (token, options) {
 		}
 	}
 
-	if(options.type == 'door' && $(`.door-button[data-id='${options.id}']`).hasClass('closed') && $(`.door-button[data-id='${options.id}'] .door`).length > 0){
+	if(options.type == 'door' && $(`.door-button[data-id='${options.id}']`).hasClass('closed') && $(`.door-button[data-id='${options.id}'] :is(.door, .curtain)`).length > 0){
 		$(".aura-element-container-clip[id='" + options.id +"']").css("display", "none")
 	}
 	else if(options.type == 'door'){
@@ -4994,6 +5026,135 @@ function remove_selected_token_bounding_box() {
 
 }
 
+function copy_selected_walls(teleporterTokenId=undefined) {
+	
+	if (!window.DM) return;
+	window.TOKEN_PASTE_BUFFER = [];
+	let bounds = {
+		top: Infinity,
+		left: Infinity,
+		bottom: -Infinity,
+		right: -Infinity,
+		hpps: window.CURRENT_SCENE_DATA.hpps,
+		vpps: window.CURRENT_SCENE_DATA.vpps
+	};
+	for (let i in window.selectedWalls) {
+		let wall = window.selectedWalls[i].wall;
+		const pt1 ={ 
+			x: wall[3],
+			y:wall[4],
+		}
+		const pt2 ={ 
+			x: wall[5],
+			y:wall[6],
+		}
+		
+		bounds = {
+			...bounds,
+			top: pt1.y < bounds.top ? pt1.y : bounds.top,
+			left: pt1.x < bounds.left ? pt1.x : bounds.left,
+			bottom: pt1.y  > bounds.bottom ? pt1.y : bounds.bottom,
+			right: pt1.x > bounds.right ? pt1.x : bounds.right
+		}
+		bounds = {
+			...bounds,
+			top: pt2.y < bounds.top ? pt2.y : bounds.top,
+			left: pt2.x < bounds.left ? pt2.x : bounds.left,
+			bottom: pt2.y  > bounds.bottom ? pt2.y : bounds.bottom,
+			right: pt2.x > bounds.right ? pt2.x : bounds.right
+		}
+
+		const tokenId = window.selectedWalls[i].tokenId;
+		let token;
+		if(window.TOKEN_OBJECTS[tokenId] != undefined){
+			token = $.extend(true, {}, window.TOKEN_OBJECTS[tokenId]);
+		}
+		window.TOKEN_PASTE_BUFFER.push({wall:wall, token:token});
+		
+	}
+	window.TOKEN_PASTE_BOUNDS = bounds;
+	
+	
+}
+function paste_selected_walls(x, y) {
+	if (!window.DM) return;
+	if (window.TOKEN_PASTE_BUFFER == undefined) {
+		window.TOKEN_PASTE_BUFFER = [];
+	}
+	deselect_all_tokens();
+	const originalSelected = JSON.parse(JSON.stringify(window.selectedWalls));
+	window.selectedWalls = [];
+	const undoArray =[];
+	for (let i = 0; i < window.TOKEN_PASTE_BUFFER.length; i++) {
+		const wall = [...window.TOKEN_PASTE_BUFFER[i].wall]
+		
+		const pt1 ={
+			x: wall[3],
+			y: wall[4]
+
+		};
+		const pt2 = {
+			x: wall[5],
+			y: wall[6]
+		}
+
+
+		
+		let mapView = convert_point_from_view_to_map(x, y, true);
+
+		let bounds = window.TOKEN_PASTE_BOUNDS;
+		let newX1 = (pt1.x - (bounds.right + bounds.left)/2)/bounds.hpps;
+		let newY1 = (pt1.y - (bounds.bottom + bounds.top)/2)/bounds.vpps;
+
+		let newX2 = (pt2.x - (bounds.right + bounds.left)/2)/bounds.hpps;
+		let newY2 = (pt2.y - (bounds.bottom + bounds.top)/2)/bounds.vpps;
+
+		const scale = wall[8];
+		const adjustedScale = wall[8]/window.CURRENT_SCENE_DATA.scale_factor/window.CURRENT_SCENE_DATA.conversion;					
+				
+		
+
+		wall[3] = Math.round(mapView.x*adjustedScale + newX1*window.CURRENT_SCENE_DATA.hpps)
+		wall[4] = Math.round(mapView.y*adjustedScale + newY1*window.CURRENT_SCENE_DATA.vpps)
+		wall[5] = Math.round(mapView.x*adjustedScale + newX2*window.CURRENT_SCENE_DATA.hpps)
+		wall[6] = Math.round(mapView.y*adjustedScale + newY2*window.CURRENT_SCENE_DATA.vpps)
+
+		window.DRAWINGS.push([...wall]);
+		undoArray.push([...wall]);
+
+
+		pt1.x = wall[3]/scale*window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion;
+		pt1.y = wall[4]/scale*window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion;
+		pt2.x = wall[5]/scale*window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion;
+		pt2.y = wall[6]/scale*window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion;
+		const [x1,y1,x2,y2] = [wall[3]/scale, wall[4]/scale, wall[5]/scale, wall[6]/scale];
+		const doorTokenId = `${x1}${y1}${x2}${y2}${window.CURRENT_SCENE_DATA.id}`.replaceAll('.','');
+		const drawIndex = window.DRAWINGS.findIndex(d => JSON.stringify(d)==JSON.stringify(wall));
+		const token = window.TOKEN_PASTE_BUFFER[i].token;
+
+		if(token != undefined){
+			const newOptions = $.extend(true, [], token.options);
+			const midX = Math.floor((x1+x2)*adjustedScale/2);
+			const midY = Math.floor((y1+y2)*adjustedScale/2);
+			let options = {
+				...newOptions,
+				left: `${parseFloat(midX) - 25}px`,
+				top: `${parseFloat(midY) - 25}px`,
+				id: doorTokenId
+			};
+			window.ScenesHandler.create_update_token(options, noScale=true)
+		}
+		window.selectedWalls.push({pt1: pt1, pt2: pt2, wall: wall, tokenId: doorTokenId, drawIndex: drawIndex})
+	}
+
+	window.wallUndo.push({undo: [...undoArray], selectedWalls: originalSelected});
+	
+	redraw_light_walls();
+	redraw_drawn_light();
+	redraw_light();
+	sync_drawings();
+
+}
 function copy_selected_tokens(teleporterTokenId=undefined) {
 	if(teleporterTokenId){
 		window.TELEPORTER_PASTE_BUFFER = {
@@ -5020,8 +5181,8 @@ function copy_selected_tokens(teleporterTokenId=undefined) {
 					...bounds,
 					top: parseInt(token.options.top) < bounds.top ? parseInt(token.options.top) : bounds.top,
 					left: parseInt(token.options.left) < bounds.left ? parseInt(token.options.left) : bounds.left,
-					bottom: parseInt(token.options.top) > bounds.bottom ? parseInt(token.options.top) : bounds.bottom,
-					right: parseInt(token.options.left) > bounds.right ? parseInt(token.options.left) : bounds.right
+					bottom: parseInt(token.options.top)+parseInt(token.options.size) > bounds.bottom ? parseInt(token.options.top)+parseInt(token.options.size) : bounds.bottom,
+					right: parseInt(token.options.left)+parseInt(token.options.size) > bounds.right ? parseInt(token.options.left)+parseInt(token.options.size) : bounds.right
 				}
 				window.TOKEN_PASTE_BUFFER.push({id: id, left: token.options.left, top: token.options.top});
 			}
@@ -5067,12 +5228,12 @@ function paste_selected_tokens(x, y, teleporter=undefined) {
 			options.ct_show = token.isPlayer() ? options.ct_show : undefined;
 			options.combatGroup = token.isPlayer() ? options.combatGroup : undefined;
 			options.selected = true;
-			let center = center_of_view(); 
-			let mapView = convert_point_from_view_to_map(x, y, false);
+			
+			let mapView = convert_point_from_view_to_map(x, y, true);
 
 			let bounds = window.TOKEN_PASTE_BOUNDS;
-			let left = (parseInt(window.TOKEN_PASTE_BUFFER[i]?.left) - (bounds.right + bounds.left)/2)/bounds.hpps;
-			let top = (parseInt(window.TOKEN_PASTE_BUFFER[i]?.top) - (bounds.bottom + bounds.top)/2)/bounds.vpps;
+			let left = (parseFloat(window.TOKEN_PASTE_BUFFER[i]?.left) - (bounds.right+bounds.left)/2)/bounds.hpps;
+			let top = (parseFloat(window.TOKEN_PASTE_BUFFER[i]?.top) - (bounds.bottom+bounds.top)/2)/bounds.vpps;
 
 
 			options.top = `${mapView.y + top*window.CURRENT_SCENE_DATA.vpps}px`;
@@ -5110,7 +5271,30 @@ function paste_selected_tokens(x, y, teleporter=undefined) {
 
 	draw_selected_token_bounding_box();
 }
-
+function delete_selected_walls() {
+	if(window.DM && window.selectedWalls?.length>0){
+		const originalSelected = JSON.parse(JSON.stringify(window.selectedWalls));
+		const redoArray = [];
+		for(let i in window.selectedWalls){
+			const wall = window.selectedWalls[i].wall;
+			redoArray.push([...wall]);
+			const drawIndex = window.DRAWINGS.findIndex(d => JSON.stringify(d)==JSON.stringify(wall));
+			if (drawIndex > -1) { 
+			  window.DRAWINGS.splice(drawIndex, 1); 
+			}
+			const tokenId = window.selectedWalls.tokenId;
+			if(window.TOKEN_OBJECTS[tokenId] != undefined){
+				window.TOKEN_OBJECTS[tokenId].delete();
+			}
+		}
+		window.wallUndo.push({redo: [...redoArray], selectedWalls: originalSelected});
+		window.selectedWalls =[];
+		redraw_light_walls();
+		redraw_drawn_light();
+		redraw_light();
+		sync_drawings();
+	}
+}
 function delete_selected_tokens() {
 	// move all the tokens into a separate list so the DM can "undo" the deletion
 	let tokensToDelete = [];
