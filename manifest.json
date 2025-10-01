@@ -100,7 +100,7 @@
 			"peerVideo.js",
 			"peerDice.js",
 			"onedrive/*",
-			"godice-roller.bundle.js"
+			"godice-roller.bundle.js",
 			"WeatherOverlay.js",
 			"iframe.html",
 			"loadFrame.js"
