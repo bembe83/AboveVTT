@@ -1,4 +1,5 @@
 const isVttGamePage = window.location.search.includes("abovevtt=true");
+const isDM = window.location.pathname.match(/\/campaigns\/[0-9]+$/gi) && window.location.search.includes("dm=true");
 const isPlayerPage = window.location.pathname.match("/characters");
 const isPlainCharacterPage = !isVttGamePage && isPlayerPage //character, builder, or listing
 const isCampaignPage = window.location.pathname.match(/\/campaigns\/[0-9]+$/gi); //match campaign page exactly in case other pages ever get added like campaigns/join that we want to exclude
@@ -15,6 +16,8 @@ if (isPlainCharacterPage) {
 	l.setAttribute("style", "display:none;");
 	l.setAttribute("id", "extensionpath");
 	l.setAttribute("data-path", getExtURL("/"));
+	
+
 	(document.body || document.documentElement).appendChild(l);
 	loadStyle = [
 		"DiceContextMenu/DiceContextMenu.css",
@@ -53,6 +56,7 @@ if (isPlainCharacterPage) {
 		} else if (isPlayerPage) {
 			loadingBg.setAttribute("class", "player");
 		}
+
 	}
 
 	let l = document.createElement('div');
@@ -138,14 +142,15 @@ if (isPlainCharacterPage) {
 		{ src: "audio/index.js", type: "module" },
 		{ src: "onedrive/onedrivemsal.js" },
 		{ src: "onedrive/onedrivepicker.js" },
+		{ src: "WeatherOverlay.js" },
 	]
 	//Do not load characterPage.js for DM or on campaign page
-	if(isPlayerPage){ 
+	if(isPlayerPage && !isDM){ 
 		window.scripts.push(
 			{ src: "CharactersPage.js" }
 		)
 	}
-	else if(isPopoutGameLog){
+	else if(isPopoutGameLog && !isDM){
 		window.scripts = [
 			{ src: "jquery.magnific-popup.min.js" },
 			{ src: "purify.min.js" },
@@ -160,9 +165,10 @@ if (isPlainCharacterPage) {
 			{ src: "CampaignPage.js" }
 		]
 	}
-	else if(isCampaignPage){
+	else if(isCampaignPage && !isDM){
 
 		window.scripts = [
+			{ src: "environment.js" },
 			{ src: "CoreFunctions.js" }, 		
 			{ src: "DDBApi.js" }, 
 			{ src: "Settings.js" },
@@ -173,25 +179,6 @@ if (isPlainCharacterPage) {
 	else{//dm
   		window.scripts.push(
 	  		{ src: "SceneData.js" },
-			{ src: "scenedata/bgdia-scene-data.js" },
-			{ src: "scenedata/tod-scene-data.js" },
-			{ src: "scenedata/toa-scene-data.js" },
-			{ src: "scenedata/doip-scene-data.js" },
-			{ src: "scenedata/lmop-scene-data.js" },
-			{ src: "scenedata/pbtso-scene-data.js" },
-			{ src: "scenedata/loe-scene-data.js" },
-			{ src: "scenedata/veor-scene-data.js" },
-			{ src: "scenedata/hcs-scene-data.js" },
-			{ src: "scenedata/dosi-scene-data.js" },
-			{ src: "scenedata/sdw-scene-data.js" },
-			{ src: "scenedata/hgtmh1-scene-data.js" },
-			{ src: "scenedata/dilct-scene-data.js" },
-			{ src: "scenedata/uhlh-scene-data.js" },
-			{ src: "scenedata/gotsf-scene-data.js" },
-			{ src: "scenedata/gos-scene-data.js" },
-			{ src: "scenedata/hbtd-scene-data.js" },
-			{ src: "scenedata/ottg-scene-data.js" },
-			{ src: "scenedata/wel-scene-data.js" }
 		)
 	}
 	if(isVttGamePage) {

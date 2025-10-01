@@ -2,7 +2,7 @@
 	"manifest_version": 3,
 	"name": "AboveVTT",
 	"description": "Integrated VTT for D&DBeyond",
-	"version": "1.41",
+	"version": "1.45",
 	"content_scripts": [
 		{
 			"matches": [
@@ -101,9 +101,11 @@
 			"peerDice.js",
 			"onedrive/*",
 			"godice-roller.bundle.js"
+			"WeatherOverlay.js",
+			"iframe.html",
+			"loadFrame.js"
 			],
 			"matches": [ "*://*.dndbeyond.com/*" ]	
 		}
 	]
 }
-

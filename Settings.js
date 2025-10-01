@@ -11,7 +11,8 @@ function token_setting_options() {
 				{ value: "virtualMiniSquare", label: "Virtual Mini w/ Square Base", description: `The token looks like a physical mini with a round base. The image will show up as it is naturally with The largest side being equal to the token size, we set "Ignore Aspect Ratio" to false and "Square" to true. We also add a virtual token base to this Style with Borders and Health Aura on the base of the token. Great for tokens with a top-down art style!` },
 				{ value: "noConstraint", label: "No Constraint", description: `The token will show up as it is naturally largest side being equal to token size, we set "Ignore Aspect Ratio" to false and "Square to true. Borders and Health Aura are drawn as a drop shadow to fit the shape of the token.` },
 				{ value: "definitelyNotAToken", label: "Definitely Not a Token", description: `This token will have the shape of no contraints and be made to appear as a object tile` },
-				{ value: "labelToken", label: "Map Pin Token", description: `This token will have the settings of Definitely Not a Token and have it's name always displayed` }
+				{ value: "labelToken", label: "Map Pin Token", description: `This token will have the settings of Definitely Not a Token and have it's name always displayed` },
+				{ value: "inPersonMini", label: "TV Table Mini - Hidden from Players", description: `This token will not be displayed to players on the scene but they will still see it in the combat tracker.` }
 				
 			],
 			defaultValue: "circle",
@@ -39,8 +40,10 @@ function token_setting_options() {
 			type: 'dropdown',
 			options: [
 				{ value: "aura", label: "Aura", description: "Tokens will have a colored aura" },
-				{ value: "aura-bloodied-50", label: "Bloodied 50", description: "Tokens will have a red aura when bloodied" },				
+				{ value: "aura-bloodied-50", label: "Aura Bloodied 50", description: "Tokens will have a red aura when bloodied" },			
+				{ value: "condition-bloodied-50", label: "Condition Bloodied 50", description: "Tokens will have the bloodied condition automatically applied." },	
 				{ value: "bar", label: "HP Meter", description: "How this meter is displayed depends on token type. Color blind alternative to auras." },
+				
 				{ value: "none", label: "None", description: "Tokens will not have a health visual" }
 			],
 			defaultValue: "aura",
@@ -322,6 +325,17 @@ function avtt_settings() {
 			class: 'ui'
 		},	
 		{
+			name: "disableCombatText",
+			label: "Disable DM Damage Button Text",
+			type: "toggle",
+			options: [
+				{ value: true, label: "Enable", description: `If enabled removes the scrolling text on tokens displayed to DM when using gamelog damage buttons.` },
+				{ value: false, label: "Disable", description: `If enabled removes the scrolling text on tokens displayed to DM when using gamelog damage buttons.` }
+			],
+			defaultValue: false,
+			class: 'ui'
+		},
+		{
 			name: 'streamDiceRolls',
 			label: 'Stream Dice Rolls',
 			type: 'toggle',
@@ -334,7 +348,7 @@ function avtt_settings() {
 		},
 		{
 			name: 'iframeStatBlocks',
-			label: 'Fetch Monster Stat Blocks',
+			label: 'Fallback Monster Statblocks',
 			type: 'toggle',
 			options: [
 				{ value: true, label: "Load from DDB", description: `Monster details pages are being fetched and shown as Stat Blocks. Disabling this will build monster stat blocks locally instead. Disabling this will improve performance and reduce network data usage. Enabling this is not recommended unless you are experiencing issues with the default stat blocks.` },
@@ -416,16 +430,83 @@ function avtt_settings() {
 				defaultValue: false,
 				class: 'stream'
 			},
-			{
-				name: "disableCombatText",
-				label: "Disable DM Damage Button Text",
-				type: "toggle",
-				options: [
-					{ value: true, label: "Enable", description: `If enabled removes the scrolling text on tokens displayed to DM when using gamelog damage buttons.` },
-					{ value: false, label: "Disable", description: `If enabled removes the scrolling text on tokens displayed to DM when using gamelog damage buttons.` }
-				],
-				defaultValue: false,
-				class: 'ui'
+			{	
+				name: "tokenDefaults",
+				label: "Token Settings Defaults",
+				buttonText: "Edit",
+				type: "customButton",
+				customFunction: function (clickEvent, body) {
+					build_and_display_sidebar_flyout(clickEvent.clientY, function (flyout) {
+						let optionsContainer = build_sidebar_token_options_flyout(token_setting_options(), window.TOKEN_SETTINGS, function (name, value) {
+							if (value === true || value === false || typeof value === 'string' || typeof value === 'object') {
+								window.TOKEN_SETTINGS[name] = value;
+							} else {
+								delete window.TOKEN_SETTINGS[name];
+							}
+						}, function() {
+							let visionInput = $("input[name='visionColor']").spectrum("get");
+			   				let light1Input = $("input[name='light1Color']").spectrum("get");
+			    			let light2Input = $("input[name='light2Color']").spectrum("get");
+			        		
+			        		window.TOKEN_SETTINGS.vision.color= `rgba(${visionInput._r}, ${visionInput._g}, ${visionInput._b}, ${visionInput._a})`;
+			   				window.TOKEN_SETTINGS.light1.color = `rgba(${light1Input._r}, ${light1Input._g}, ${light1Input._b}, ${light1Input._a})`;
+			    			window.TOKEN_SETTINGS.light2.color = `rgba(${light2Input._r}, ${light2Input._g}, ${light2Input._b}, ${light2Input._a})`;
+
+							persist_token_settings(window.TOKEN_SETTINGS);
+							redraw_settings_panel_token_examples();
+						}, true);
+						optionsContainer.prepend(`<div class="sidebar-panel-header-explanation">Every time you place a token on the scene, these settings will be used. You can override these settings on a per-token basis by clicking the gear on a specific token row in the tokens tab.</div>`);
+						
+						const clearAllOverridesWarning = `This will remove ALL overridden token options from every player, monster, custom token, and folder in the Tokens Panel. This shouldn't remove any custom images from those tokens. This will not update any tokens that have been placed on a scene. This cannot be undone.`;
+						let clearAllTokenOverrides = $(`<button class='token-image-modal-remove-all-button sidebar-hover-text' data-hover="${clearAllOverridesWarning}" style="width:100%;padding:8px;margin:10px 0px;">Clear All Token Option Overrides</button>`);
+						clearAllTokenOverrides.on("click", function() {
+							if (confirm(clearAllOverridesWarning)) {
+								window.TOKEN_CUSTOMIZATIONS.forEach(tc => tc.clearTokenOptions());
+								persist_all_token_customizations(window.TOKEN_CUSTOMIZATIONS);
+								redraw_settings_panel_token_examples();
+							}
+						});
+						optionsContainer.append(clearAllTokenOverrides);
+
+						flyout.append(optionsContainer);
+						position_flyout_left_of(body, flyout);
+					});
+				},
+				class: 'defaults'
+			},
+			{	
+				name: "sceneDefaults",
+				label: "Scene Settings Defaults",
+				buttonText: "Edit",
+				type: "customButton",
+				customFunction: function (clickEvent, body) {
+					const self=this;
+					build_and_display_sidebar_flyout(clickEvent.clientY, function (flyout) {
+						let optionsContainer = build_sidebar_token_options_flyout(scene_setting_options(), window.SCENE_DEFAULT_SETTINGS, function (name, value) {
+							if (value != 'undefined' && (value === true || value === false || typeof value === 'string' || typeof value === 'object' || typeof value === 'number')) {
+								window.SCENE_DEFAULT_SETTINGS[name] = value;
+							} else { 
+								delete window.SCENE_DEFAULT_SETTINGS[name];
+							}
+						}, function() {
+							persist_default_scene_settings(window.SCENE_DEFAULT_SETTINGS);
+						}, false, true, true);
+						optionsContainer.prepend(`<div class="sidebar-panel-header-explanation">Every time you create a scene these settings will be used</div>`);
+						const clearAllSceneDefaultWarning = `Are you sure you want to reset your scene defaults?`;
+						let clearAllSceneDefault = $(`<button class='token-image-modal-remove-all-button sidebar-hover-text' data-hover="${clearAllSceneDefaultWarning}" style="width:100%;padding:8px;margin:10px 0px;">Reset Scene Defaults</button>`);
+						clearAllSceneDefault.on("click", function() {
+							if (confirm(clearAllSceneDefaultWarning)) {
+								window.SCENE_DEFAULT_SETTINGS = {};
+								persist_default_scene_settings(window.SCENE_DEFAULT_SETTINGS);
+								self.customFunction(clickEvent, body);
+							}
+						});
+						optionsContainer.append(clearAllSceneDefault);
+						flyout.append(optionsContainer);
+						position_flyout_left_of(body, flyout);
+					});
+				},
+				class: 'defaults'
 			}
 		);
 	} else {
@@ -470,6 +551,17 @@ function avtt_settings() {
 		],
 		defaultValue: false,
 		class: 'performance'
+	})
+	settings.push({
+		name: "colorBlindText",
+		label: "Red/Green Colorblind Text",
+		type: "toggle",
+		options: [
+			{ value: true, label: "Enable", description: `If enabled adjusts green text to yellow` },
+			{ value: false, label: "Disable", description: `If enabled adjusts green text to yellow` }
+		],
+		defaultValue: false,
+		class: 'ui'
 	})
 	settings.push(
 	{
@@ -532,6 +624,20 @@ function avtt_settings() {
 		defaultValue: false,
 		class: 'ui'
 	})
+	settings.push(
+	{
+		name: "monsterCritType",
+		label: "Monster Action Crit Type",
+		type: "dropdown",
+		options: [
+                { value: "0", label: "Double damage dice", description: "Doubles damage dice for crits." },
+                { value: "1", label: "Perfect Crits", description: "Rolls the original dice and adds a max roll" },
+                { value: "3", label: "Double total damage", description: "Rolls the original dice adds modifier then doubles it" },
+                { value: "2", label: "Manual", description: "Rolls are not modified based on crit" },
+		],
+		defaultValue: 0,
+		class: 'ui'
+	})
 	settings.push({
 		name: 'quickToggleDefaults',
 		label: 'Quick Toggle Defaults on Load',
@@ -567,7 +673,7 @@ function avtt_settings() {
 			], },
 		],
 		defaultValue: {},
-		class: 'ui'
+		class: 'defaults'
 	})
 
 	settings.push({
@@ -587,55 +693,55 @@ function avtt_settings() {
 			},
 			{
 		        name: 'customDieRoll1',
-			        label: 'Custom Roll 1 Key',
+		        label: 'Custom Roll 1 Key',
 				type: 'text',
 		        defaultValue: '1d4'
 			},
 			{
 		        name: 'customDieRoll2',
-			        label: 'Custom Roll 2 Key',
+		        label: 'Custom Roll 2 Key',
 				type: 'text',
 		        defaultValue: '1d6'
 			},
 			{
 		        name: 'customDieRoll3',
-			        label: 'Custom Roll 3 Key',
+		        label: 'Custom Roll 3 Key',
 				type: 'text',
 		        defaultValue: '1d8'
 			},
 			{
 		        name: 'customDieRoll4',
-			        label: 'Custom Roll 4 Key',
+		        label: 'Custom Roll 4 Key',
 				type: 'text',
 		        defaultValue: '1d100'
 			},
 			{
 		        name: 'customDieRoll5',
-			        label: 'Custom Roll 5 Key',
+		        label: 'Custom Roll 5 Key',
 				type: 'text',
 		        defaultValue: '1d10'
 			},
 			{
 		        name: 'customDieRoll6',
-			        label: 'Custom Roll 6 Key',
+		        label: 'Custom Roll 6 Key',
 				type: 'text',
 		        defaultValue: '1d12'
 			},
 			{
 		        name: 'customDieRoll7',
-			        label: 'Custom Roll 7 Key',
+		        label: 'Custom Roll 7 Key',
 				type: 'text',
 		        defaultValue: '1d20'
 			},
 			{
 		        name: 'customDieRoll8',
-			        label: 'Custom Roll 8 Key',
+		        label: 'Custom Roll 8 Key',
 				type: 'text',
 		        defaultValue: '2d20kl1'
 			},
 			{
 		        name: 'customDieRoll9',
-			        label: 'Custom Roll 9 Key',
+		        label: 'Custom Roll 9 Key',
 				type: 'text',
 		        defaultValue: '2d20kh1'
 			},
@@ -672,6 +778,86 @@ function avtt_settings() {
 		});
 	}
 
+	return settings;
+}
+
+function scene_setting_options(){
+	return [	
+		{
+			name: 'dm_map_usable',
+			label: 'DM Map',
+			type: 'toggle',
+			options: [
+				{ value: true, label: "DM Map Enabled", description: "Will enable a DM map field to have a DM only version of the map." },
+				{ value: false, label: "DM Map Disabled", description: "DM and Players will see the same map" }
+			],
+			defaultValue: false,
+			convertToDropdownInSettings: true,
+			notOverridenLabeleLabel: 'DM Map Enabled if link already exists in scene data'
+		},
+		{
+			name: 'grid',
+			label: 'Display Grid',
+			type: 'toggle',
+			options: [
+				{ value: true, label: "Display Grid", description: "Grid is visible" },
+				{ value: false, label: "Hide Grid", description: "Grid is not drawn" }
+			],
+			defaultValue: false
+		},
+		{
+			name: 'snap',
+			label: 'Snap to Grid',
+			type: 'toggle',
+			options: [
+				{ value: true, label: "Snap to Grid", description: "Tokens will be snapped to the grid" },
+				{ value: false, label: "Disable Snap to Grid", description: "Tokens will not snap to grid" }
+			],
+			defaultValue: false
+		},
+		{
+			name: 'disableSceneVision',
+			label: 'Disable token vision/light',
+			type: 'toggle',
+			options: [
+				{ value: true, label: "Disable token vision/light", description: "Tokens vision checks won't be run, walls will be ignored" },
+				{ value: false, label: "Enabled token vision/light", description: "Tokens will run vision checks" }
+			],
+			defaultValue: false
+		},
+		{
+			name: 'darkness_filter',
+			label: 'Line of Sight/Darkness Opacity',
+			type: 'rangeInput',
+			options: [
+				{ min: 0, max: 100, step: 1, description: "Darkness and line of sight opacity. At 100% areas out of vision will be opaque black." },
+			],
+			defaultValue: 0
+		},
+		{
+			name: 'visionTrail',
+			label: 'Player Explored Vision Trail',
+			type: 'toggle',
+			options: [
+				{ value: true, label: "Enable Player Explored Vision Trail", description: "Explored areas out of line of sight will remain visible. Tokens will still be hidden when out of line of sight unless line of sight checks are disabled on that token." },
+				{ value: false, label: "Disable Player Explored Vision Trail", description: "Explored areas out of line of sight won't be visible." }
+			],
+			defaultValue: false
+		},
+		{
+			name: 'daylight',
+			label: 'Daylight Color',
+			type: 'colorSelect',
+			defaultValue: '#fff'
+		},
+	];
+}
+
+function get_custom_scene_settings(){
+	const settings = {}; 
+	for(let i in window.SCENE_DEFAULT_SETTINGS){
+		settings[i] = window.SCENE_DEFAULT_SETTINGS[i] === true || window.SCENE_DEFAULT_SETTINGS[i] === 'true' ? "1" : window.SCENE_DEFAULT_SETTINGS[i] == false || window.SCENE_DEFAULT_SETTINGS[i] === 'false' ? "0" : window.SCENE_DEFAULT_SETTINGS[i]
+	}
 	return settings;
 }
 
@@ -781,6 +967,9 @@ function set_avtt_setting_value(name, newValue) {
 		 case "iconUi":
 		 	$('body').toggleClass('mobileAVTTUI', newValue)
 		 	break;
+		case "colorBlindText":
+			$('body').toggleClass('color-blind-avtt', newValue)
+			break;
 		case "alwaysHideScrollbar":
 			hide_or_unhide_scrollbar();
 			break;
@@ -791,7 +980,7 @@ function is_valid_token_option_value(tokenOptionName, value) {
 	return token_setting_options().find(o => o.name === tokenOptionName)?.options?.map(value).includes(value);
 }
 
-function convert_option_to_override_dropdown(tokenOption) {
+function convert_option_to_override_dropdown(tokenOption, notOverridenLabel = 'Not Overridden') {
 	// Note: Spread syntax effectively goes one level deep while copying an array/object. Therefore, it may be unsuitable for copying multidimensional arrays or objects
 	// we are explicitly not using the spread operator at this level because we need to deep copy the object
 	let converted = {
@@ -802,7 +991,7 @@ function convert_option_to_override_dropdown(tokenOption) {
 		defaultValue: undefined,
 		hiddenSetting: tokenOption.hiddenSetting
 	};
-	converted.options.push({ value: undefined, label: "Not Overridden", description: "Changing this setting will override the default settings" });
+	converted.options.push({ value: undefined, label: notOverridenLabel, description: "Changing this setting will override the default settings" });
 	return converted;
 }
 
@@ -842,7 +1031,21 @@ function download(data, filename, type) {
         }, 0);
     }
 }
-
+function persist_default_scene_settings(settings, callback) {
+    if (typeof callback !== 'function') {
+        callback = function(){};
+    }	    
+    console.log("persist_default_scene_settings", settings, JSON.stringify(settings));
+    try{
+        localStorage.setItem(`SceneDefaults-${window.gameId}`, JSON.stringify(settings));
+        
+    }    
+    catch(e){
+        console.warn('localStorage saving Scene Defaults Failed', e)
+    }
+    window.SCENE_DEFAULT_SETTINGS = settings;
+    callback();
+}
 
 function init_settings() {
 
@@ -878,61 +1081,17 @@ function init_settings() {
 		`);
 
 		$("#input_file").change(import_readfile);
-
-		body.append(`
-			<br />
-			<h3 class="token-image-modal-footer-title">Default Token Options</h3>
-			<div class="sidebar-panel-header-explanation">Every time you place a token on the scene, these settings will be used. You can override these settings on a per-token basis by clicking the gear on a specific token row in the tokens tab.</div>
-		`);
-
-		let tokenOptionsButton = $(`<button class="sidebar-panel-footer-button">Change The Default Token Options</button>`);
-		tokenOptionsButton.on("click", function (clickEvent) {
-			build_and_display_sidebar_flyout(clickEvent.clientY, function (flyout) {
-				let optionsContainer = build_sidebar_token_options_flyout(token_setting_options(), window.TOKEN_SETTINGS, function (name, value) {
-					if (value === true || value === false || typeof value === 'string' || typeof value === 'object') {
-						window.TOKEN_SETTINGS[name] = value;
-					} else {
-						delete window.TOKEN_SETTINGS[name];
-					}
-				}, function() {
-					let visionInput = $("input[name='visionColor']").spectrum("get");
-	   				let light1Input = $("input[name='light1Color']").spectrum("get");
-	    			let light2Input = $("input[name='light2Color']").spectrum("get");
-	        		
-	        		window.TOKEN_SETTINGS.vision.color= `rgba(${visionInput._r}, ${visionInput._g}, ${visionInput._b}, ${visionInput._a})`;
-	   				window.TOKEN_SETTINGS.light1.color = `rgba(${light1Input._r}, ${light1Input._g}, ${light1Input._b}, ${light1Input._a})`;
-	    			window.TOKEN_SETTINGS.light2.color = `rgba(${light2Input._r}, ${light2Input._g}, ${light2Input._b}, ${light2Input._a})`;
-
-					persist_token_settings(window.TOKEN_SETTINGS);
-					redraw_settings_panel_token_examples();
-				}, true);
-				optionsContainer.prepend(`<div class="sidebar-panel-header-explanation">Every time you place a token on the scene, these settings will be used. You can override these settings on a per-token basis by clicking the gear on a specific token row in the tokens tab.</div>`);
-				flyout.append(optionsContainer);
-				position_flyout_left_of(body, flyout);
-			});
-		});
-		body.append(tokenOptionsButton);
-
-		const clearAllOverridesWarning = `This will remove ALL overridden token options from every player, monster, custom token, and folder in the Tokens Panel. This shouldn't remove any custom images from those tokens. This will not update any tokens that have been placed on a scene. This cannot be undone.`;
-		let clearAllTokenOverrides = $(`<button class='token-image-modal-remove-all-button sidebar-hover-text' data-hover="${clearAllOverridesWarning}" style="width:100%;padding:8px;margin:10px 0px;">Clear All Token Option Overrides</button>`);
-		clearAllTokenOverrides.on("click", function() {
-			if (confirm(clearAllOverridesWarning)) {
-				window.TOKEN_CUSTOMIZATIONS.forEach(tc => tc.clearTokenOptions());
-				persist_all_token_customizations(window.TOKEN_CUSTOMIZATIONS);
-			}
-		});
-		body.append(clearAllTokenOverrides);
-
-
 		body.append(`<br />`);
+
 
 	}
 
 	let experimental_features = avtt_settings();
 	body.append(`
 		<br />
-		<h3 class="token-image-modal-footer-title no-bottom-margin-setting" >Above VTT Settings</h3>
-		<div class="sidebar-panel-header-explanation"><b>Enabling these can have an impact on performance.</b></div>
+		<h3 class="token-image-modal-footer-title no-bottom-margin-setting" >AboveVTT Settings</h3>
+		<div class="sidebar-panel-header-explanation"><b>Some settings can have an impact on performance.</b></div>
+		<div class='avtt-settings-section avtt-settings-defaults'><h4 class="token-image-modal-footer-title">Default Settings</h4></div>
 		<div class='avtt-settings-section avtt-settings-ui'><h4 class="token-image-modal-footer-title">UI</h4></div>
 		<div class='avtt-settings-section avtt-settings-stream'><h4 class="token-image-modal-footer-title">Streaming/P2P</h4></div>
 		<div class='avtt-settings-section avtt-settings-performance'><h4 class="token-image-modal-footer-title">Performance</h4><div class="sidebar-panel-header-explanation"><b>These settings can improve performance</b></div></div>
@@ -996,6 +1155,9 @@ function init_settings() {
 					set_avtt_setting_value(name, newValue);
 				})
 				break;
+			case "customButton":
+				inputWrapper = build_custom_button_input(setting);
+				break;
 		}
 		if (inputWrapper) {
 			body.find(`.avtt-settings-${setting.class}`).append(inputWrapper);
@@ -1056,11 +1218,11 @@ function redraw_settings_panel_token_examples(settings) {
 	for (let i = 0; i < items.length; i++) {
 		let item = $(items[i]);
 		mergedSettings.imgsrc = item.find(".token-image").attr("src");
-		item.replaceWith(build_example_token(mergedSettings));
+		item.replaceWith(build_example_token(mergedSettings, 90));
 	}
 }
 
-function build_example_token(options) {
+function build_example_token(options, size=90) {
 	let mergedOptions = {...default_options(), ...window.TOKEN_SETTINGS, ...options};
 	let hpnum;
 	switch (mergedOptions['defaultmaxhptype']) {
@@ -1081,7 +1243,7 @@ function build_example_token(options) {
 		temp: 0
 	}
 	mergedOptions.id = `exampleToken-${uuid()}`;
-	mergedOptions.size = 90;
+	mergedOptions.size = size;
 	// mergedOptions.gridHeight = 1;
 	// mergedOptions.gridWidth = 1;
 	mergedOptions.armorClass = 10;
@@ -1117,7 +1279,7 @@ function build_example_token(options) {
 // used for settings tab, and tokens tab configuration modals. For placed tokens, see `build_options_flyout_menu`
 // updateValue: function(name, newValue) {} // only update the data here
 // didChange: function() {} // do ui things here
-function build_sidebar_token_options_flyout(availableOptions, setValues, updateValue, didChange, showExtraOptions=false, genericFlyout=false) {
+function build_sidebar_token_options_flyout(availableOptions, setValues, updateValue, didChange, showExtraOptions=false, genericFlyout=false, convertToDropdowns=false) {
 	if (typeof updateValue !== 'function') {
 		updateValue = function(name, newValue){
 			console.warn("build_sidebar_token_options_flyout was not given an updateValue function so we can't set ", name, "to", value);
@@ -1140,11 +1302,14 @@ function build_sidebar_token_options_flyout(availableOptions, setValues, updateV
 	// };
 	let inputWrapper;
 	availableOptions.forEach(option => {
+		if(convertToDropdowns == true  && option.convertToDropdownInSettings == true){
+			option = convert_option_to_override_dropdown(option, option.notOverridenLabeleLabel);
+		}
 		if(option.hiddenSetting == true)
 			return;
 		if(option.dmOnly == true && !window.DM)
 			return;
-		const currentValue = setValues[option.name] != undefined ? setValues[option.name] : option.defaultValue;
+		const currentValue = setValues?.[option.name] != undefined ? setValues[option.name] : option.defaultValue;
 
 		switch (option.type) {
 			case "dropdown":
@@ -1164,7 +1329,18 @@ function build_sidebar_token_options_flyout(availableOptions, setValues, updateV
 					updateValue(name, newValue);
 					didChange();
 				})
-
+				break; 
+			case "rangeInput":
+				inputWrapper = build_rangeInput_input(option, currentValue, function(name, newValue){
+					updateValue(name, newValue);
+					didChange();
+				})
+				break;
+			case "colorSelect":
+				inputWrapper = build_color_select_input(option, currentValue, function(name, newValue){
+					updateValue(name, newValue);
+					didChange();
+				})
 				break;
 			case "default":
 				console.warn("build_sidebar_token_options_flyout failed to handle token setting option with type", option.type);
@@ -1174,7 +1350,7 @@ function build_sidebar_token_options_flyout(availableOptions, setValues, updateV
 		}
 	});
 	if(!genericFlyout){
-		container.append(build_age_inputs([setValues['age']], [setValues['maxAge']],
+		container.append(build_age_inputs([setValues?.['age']], [setValues?.['maxAge']],
 		function(age){
 			updateValue("age", age)
 			didChange();
@@ -1477,6 +1653,9 @@ function export_current_scene(){
 			DataFile.notes[tokenID] = window.JOURNAL.notes[tokenID];
 		}
 	}
+	if (window.JOURNAL.notes[currentSceneData.id]){
+		DataFile.notes[currentSceneData.id] = window.JOURNAL.notes[currentSceneData.id];
+	}
 	let currentdate = new Date(); 
 	let datetime = `${currentdate.getFullYear()}-${(currentdate.getMonth()+1)}-${currentdate.getDate()}`
 	download(b64EncodeUnicode(JSON.stringify(DataFile,null,"\t")),`${window.CURRENT_SCENE_DATA.title}-${datetime}.abovevtt`,"text/plain");
@@ -1513,12 +1692,19 @@ async function export_scene_context(sceneId){
 		}
 		tokensObject[tokenId] = scene.data.tokens[token];		
 	}
+	if (window.JOURNAL.notes[currentSceneData.id]) {
+		DataFile.notes[currentSceneData.id] = window.JOURNAL.notes[currentSceneData.id];
+	}
 	DataFile.scenes[0].tokens = tokensObject;
 
 	let currentdate = new Date(); 
 	let datetime = `${currentdate.getFullYear()}-${(currentdate.getMonth()+1)}-${currentdate.getDate()}`
 	download(b64EncodeUnicode(JSON.stringify(DataFile,null,"\t")),`${scene.data.title}-${datetime}.abovevtt`,"text/plain");
 	$(".import-loading-indicator").remove();
+}
+
+async function open_scene_note(sceneId){
+	window.JOURNAL.display_note(sceneId, false);
 }
 
 
@@ -1532,7 +1718,7 @@ async function export_scenes_folder_context(folderId){
 	const getIds = function(folderId){
 		let scenesInFolder = window.ScenesHandler.scenes.filter(d => d.parentId == folderId);
 
-		for(let scene in scenesInFolder){
+		for(let scene=0; scene<scenesInFolder.length; scene++){
 			ids.push(scenesInFolder[scene].id)
 			if(scenesInFolder[scene].itemType != 'scene'){
 				getIds(scenesInFolder[scene].id)
@@ -1549,7 +1735,7 @@ async function export_scenes_folder_context(folderId){
 		journalchapters: [],
 		soundpads: {}
 	};
-	for(let id in ids){
+	for(let id=0; id<ids.length; id++){
 		let scene = await AboveApi.getScene(ids[id]);
 		let currentSceneData = {
 			...scene.data
@@ -1565,6 +1751,9 @@ async function export_scenes_folder_context(folderId){
 				DataFile.notes[tokenId] = window.JOURNAL.notes[tokenId];
 			}
 			tokensObject[tokenId] = scene.data.tokens[token];		
+		} 
+		if (window.JOURNAL.notes[ids[id]]) {
+			DataFile.notes[ids[id]] = window.JOURNAL.notes[ids[id]];
 		}
 		currentSceneData.tokens = tokensObject;
 		DataFile.scenes.push(currentSceneData)
@@ -1590,7 +1779,7 @@ async function export_main_scenes_folder_backup(){
 	const getIds = function(folderId){
 		let scenesInFolder = window.ScenesHandler.scenes.filter(d => d.parentId == folderId);
 
-		for(let scene in scenesInFolder){
+		for(let scene=0; scene<scenesInFolder.length; scene++){
 			ids.push(scenesInFolder[scene].id)
 			if(scenesInFolder[scene].itemType != 'scene'){
 				getIds(scenesInFolder[scene].id)
@@ -1601,7 +1790,7 @@ async function export_main_scenes_folder_backup(){
 	getIds(folderId);
 	let scenes = []
 		
-	for(let id in ids){
+	for(let id=0; id<ids.length; id++){
 		let scene = await AboveApi.getScene(ids[id]);
 		let currentSceneData = {
 			...scene.data

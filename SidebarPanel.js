@@ -4,8 +4,10 @@ function init_sidebar_tabs() {
 
   let sidebarContent = is_characters_page() ? $(".ct-sidebar__inner [class*='styles_content']>div:first-of-type") : $(".sidebar__pane-content");
 
-  // gamelog doesn't use it yet, maybe never
-
+  // Journal needs to load before scenes for scene  notes
+  if (window.JOURNAL === undefined) {
+    init_journal(find_game_id());
+  }
   if (window.DM) {
     $("#tokens-panel").remove();
     tokensPanel = new SidebarPanel("tokens-panel", false);
@@ -488,7 +490,20 @@ function build_flyout_input(settingOption, currentValue, changeHandler){
     wrapper.append(flyoutButton)
     return wrapper;
 }
-
+function build_custom_button_input(settingOption) {
+  if (typeof clickHandler !== 'function') {
+    changeHandler = function(){};
+  }
+  let wrapper = $(`
+     <div class="token-image-modal-footer-select-wrapper" data-option-name="${settingOption.name}">
+       <div class="token-image-modal-footer-title">${settingOption.label}</div>
+     </div>
+  `);
+  let flyoutButton = $(`<button class='sidebar-panel-footer-button avtt-small-settings-edit'>${settingOption.buttonText}</button>`);
+  flyoutButton.on("click", function(e){settingOption.customFunction(e, $('#settings-panel .sidebar-panel-body'))});
+  wrapper.append(flyoutButton)
+  return wrapper;
+}
 function build_text_input(settingOption, currentValue, changeHandler) {
   if (typeof changeHandler !== 'function') {
     changeHandler = function(){};
@@ -504,6 +519,80 @@ function build_text_input(settingOption, currentValue, changeHandler) {
   });
   wrapper.append(input);
   return wrapper;
+}
+function build_rangeInput_input(settingOption, currentValue, changeHandler){
+  if (typeof changeHandler !== 'function') {
+    changeHandler = function(){};
+  }
+    const min = settingOption.options[0].min;
+    const max = settingOption.options[0].max;
+    const step = settingOption.options[0].step;
+
+
+    let wrapper = $(`
+       <div class="token-image-modal-footer-select-wrapper" data-option-name="${settingOption.name}">
+         <div class="token-image-modal-footer-title">${settingOption.label}</div>
+       </div>
+    `);
+    const range = $(`<input name="${settingOption.name}" class="input-range" type="range" value="${currentValue}" min="${min}" max="${max}" step="${step}"/>`);
+    const input = $(`<input name='${settingOption.name}' class='styled-number-input' type='number' min="${min}" max="${max}" step="${step}" value='${currentValue}'/>`)
+    
+    range.on('input change', function(){
+   
+      const rangeValue = parseInt(range.val());
+      input.val(rangeValue);
+      changeHandler(settingOption.name, rangeValue);
+    });
+
+
+    range.on('mouseup', function(){
+        const rangeValue = parseInt(range.val());
+        changeHandler(settingOption.name, rangeValue);
+    });
+
+    input.on('input change', function(){
+      $("#darkness_layer").toggleClass("smooth-transition", true);
+      const inputValue = parseInt(input.val());
+      range.val(inputValue);
+      changeHandler(settingOption.name, inputValue);
+    });
+    wrapper.append(input, range);
+    return wrapper;
+}
+function build_color_select_input(settingOption, currentValue, changeHandler){
+  if (typeof changeHandler !== 'function') {
+    changeHandler = function(){};
+  }
+    
+
+    let wrapper = $(`
+       <div class="token-image-modal-footer-select-wrapper" data-option-name="${settingOption.name}">
+         <div class="token-image-modal-footer-title">${settingOption.label}</div>
+       </div>
+    `);
+    let input = $(`<input class="spectrum" name="${settingOption.name}" value="${currentValue ? currentValue : 'rgba(255, 255, 255, 1)'}" >`);
+    wrapper.append(input);
+    const colorPickers = wrapper.find(`input[name='${settingOption.name}']`)
+    colorPickers.spectrum({
+        type: "color",
+        showInput: true,
+        showInitial: true,
+        containerClassName: 'prevent-sidebar-modal-close',
+        clickoutFiresChange: true,
+        appendTo: "parent"
+    });
+
+
+    colorPickers.spectrum("set", currentValue);
+    const colorPickerChange = function(e, tinycolor) {
+      changeHandler(settingOption.name, `rgba(${tinycolor._r}, ${tinycolor._g}, ${tinycolor._b}, ${tinycolor._a})`);
+    };
+    colorPickers.on('dragstop.spectrum', colorPickerChange);   // update the token as the player messes around with colors
+    colorPickers.on('change.spectrum', colorPickerChange); // commit the changes when the user clicks the submit button
+    colorPickers.on('hide.spectrum', colorPickerChange);   // the hide event includes the original color so let's change it back when we get it
+
+    
+    return wrapper;
 }
 
 //#endregion UI Construction
@@ -690,6 +779,7 @@ class SidebarListItem {
     let item = new SidebarListItem(sceneData.id, name, sceneData.player_map, ItemType.Scene, folderPath, parentId);
     console.debug(`SidebarListItem.Scene ${item.fullPath()}`);
     item.isVideo = sceneData.player_map_is_video == "1"; // explicity using `==` instead of `===` in case it's ever `1` or `"1"`
+    item.noteData = sceneData.noteData || undefined;
     return item;
   }
 
@@ -2141,7 +2231,7 @@ function edit_encounter(clickEvent) {
 
 
 
-      for(let i in customization.encounterData.tokenItems){
+      for (let i in customization.encounterData.tokenItems){
         const item = customization.encounterData.tokenItems[i];
         const itemCustomization = find_token_customization(customization.encounterData.tokenItems[i].type, customization.encounterData.tokenItems[i].id);
         const hasCustomStatBlock = itemCustomization?.tokenOptions?.statBlock != undefined;

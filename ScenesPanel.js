@@ -440,7 +440,7 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function
 	scene.fog_of_war = "1"; // ALWAYS ON since 0.0.18
 	console.log('edit_scene_dialog');
 	$("#scene_selector").attr('disabled', 'disabled');
-	dialog = $(`<div id='edit_dialog' data-scene-id='${scene.id}'></div>`);
+	const dialog = $(`<div id='edit_dialog' data-scene-id='${scene.id}'></div>`);
 	dialog.css('background', "url('/content/1-0-1487-0/skins/waterdeep/images/mon-summary/paper-texture.png')");
 
 
@@ -931,7 +931,7 @@ function edit_scene_vision_settings(scene_id){
 	scene.fog_of_war = "1"; // ALWAYS ON since 0.0.18
 	console.log('edit_scene_dialog');
 	$("#scene_selector").attr('disabled', 'disabled');
-	dialog = $(`<div id='edit_dialog' data-scene-id='${scene.id}'></div>`);
+	const dialog = $(`<div id='edit_dialog' data-scene-id='${scene.id}'></div>`);
 	dialog.css('background', "url('/content/1-0-1487-0/skins/waterdeep/images/mon-summary/paper-texture.png')");
 
 
@@ -1217,7 +1217,7 @@ function edit_scene_dialog(scene_id) {
 	scene.fog_of_war = "1"; // ALWAYS ON since 0.0.18
 	console.log('edit_scene_dialog');
 	$("#scene_selector").attr('disabled', 'disabled');
-	dialog = $(`<div id='edit_dialog' data-scene-id='${scene.id}'></div>`);
+	const dialog = $(`<div id='edit_dialog' data-scene-id='${scene.id}'></div>`);
 	dialog.css('background', "url('/content/1-0-1487-0/skins/waterdeep/images/mon-summary/paper-texture.png')");
 
 	template_section = $("<div id='template_section'/>");
@@ -1453,6 +1453,25 @@ function edit_scene_dialog(scene_id) {
 	const playlistRow = form_row('playlistRow', 'Load Playlist', playlistSelect)
 	playlistRow.attr('title', `This playlist will load when the DM moves players to this scene. The playlist will not change if 'None' is selected.`)
 	form.append(playlistRow);
+
+	const weatherSelect = $(`<select id='weatherSceneSelect'><option value='0'>None</option></select>`)
+	for(const [weatherType, weatherName] of Object.entries(getWeatherTypes())){
+		weatherSelect.append($(`<option value='${weatherType}'>${weatherName}</option>`));
+	
+	}
+
+	
+
+	const weatherValue = scene.weather || 0;
+	weatherSelect.val(weatherValue);
+	weatherSelect.find(`option`).removeAttr('selected');
+	weatherSelect.find(`option[value='${weatherValue}']`).attr('selected', 'selected');
+	
+
+	const weatherRow = form_row('weatherRow', 'Select Weather Overlay', weatherSelect)
+	weatherRow.attr('title', `Applies a weather overlay to the scene. The weather overlay will persist until changed by the DM.`)
+	form.append(weatherRow);
+	
 	let initialPosition = form_row('initialPosition',
 			'Initial Position',
 			$(`<div>X:<input name='initial_x' step="any" type='number' value='${scene.initial_x || ''}'/> Y:<input type='number' step="any" name='initial_y' value='${scene.initial_y || ''}'/> Zoom:<input name='initial_zoom' step="any" type='number' value='${scene.initial_zoom || ''}'/><button id='initialPosition'>Set initial x,y and zoom to current view</button></div>`)
@@ -1512,7 +1531,7 @@ function edit_scene_dialog(scene_id) {
 			scene[key] = formData[key];
 		}
 		scene['playlist'] = playlistSelect.val();
-
+		scene['weather'] = weatherSelect.val();
 
 		const isNew = false;
 		window.ScenesHandler.persist_scene(scene_id, isNew);
@@ -1560,6 +1579,9 @@ function edit_scene_dialog(scene_id) {
 			}
 			if(sceneData.UVTTFile==1){
 				container.append(build_combat_tracker_loading_indicator('One moment while we load the UVTT File'));
+			}
+			else{
+				container.append(build_combat_tracker_loading_indicator('Loading Wizard'));
 			}
 			window.ScenesHandler.scenes[scene_id] = sceneData;
 
@@ -1801,20 +1823,20 @@ function init_ddb_importer(target, selectedSource, selectedChapter) {
 
 }
 
-function fill_importer(scene_set, start, searchState = '') {
+async function fill_importer(scene_set, start, searchState = '') {
 	area = $("#importer_area");
+	const chapterImports = await build_source_book_chapter_import_section(scene_set);
 	area.empty();
 	area.css("opacity", "0");
 	area.animate({ opacity: "1" }, 300);
-
-	area.append(build_source_book_chapter_import_section(scene_set));
+	area.append(chapterImports);
 
 	return;
 }
 
 function mega_importer(DDB = false, ddbSource, ddbChapter) {
-	container = $("<div id='mega_importer'/>");
-	toggles = $("<div id='importer_toggles'/>");
+	const container = $("<div id='mega_importer'/>");
+	const toggles = $("<div id='importer_toggles'/>");
 	container.append(toggles);
 	area = $("<div id='importer_area'/>");
 	container.append(area);
@@ -1854,7 +1876,7 @@ function mega_importer(DDB = false, ddbSource, ddbChapter) {
 
 
 function default_scene_data() {
-	return {
+	let defaultData = {
 		id: uuid(),
 		title: "New Scene",
 		dm_map: "",
@@ -1881,7 +1903,16 @@ function default_scene_data() {
 		gridType: 1,
 		scale_check: 1
 	};
+	const sceneCustomDefaults = window.SCENE_DEFAULT_SETTINGS;
+	if(sceneCustomDefaults != false){
+		defaultData = {
+			...defaultData,
+			...sceneCustomDefaults
+		}
+	}
+	return defaultData;
 }
+
 
 function init_scenes_panel() {
 	console.log("init_scenes_panel");
@@ -2143,7 +2174,7 @@ async function redraw_scene_list(searchTerm) {
 						if(i != 'players' && window.splitPlayerScenes[i] == item.id){
 							let listItem = list_item_from_player_id(i);
 							let tokenOptions = find_token_options_for_list_item(listItem);
-							playerImage = tokenOptions.alternativeImages != undefined ? tokenOptions.alternativeImages[0] : listItem.image;
+							playerImage = tokenOptions.alternativeImages?.length>0 ? tokenOptions.alternativeImages[0] : listItem.image;
 							let tokenImg = $(`<img src='${playerImage}'></img>`)
 							tokenImg.css({
 								width: '15px',
@@ -2154,6 +2185,161 @@ async function redraw_scene_list(searchTerm) {
 						}
 					}
 					
+				}
+				if (window.JOURNAL.notes?.[item.id] != undefined){
+					const conditionName = "note"
+					const conditionContainer = $(`<div id='${conditionName}' class='condition-container' />`);
+					const symbolImage = $("<img class='condition-img note-condition' src='" + window.EXTENSION_PATH + "assets/conditons/note.svg'/>");
+
+
+					conditionContainer.dblclick(function () {
+						window.JOURNAL.display_note(item.id);
+					})
+
+					
+
+
+
+					const noteId = item.id;
+					let hoverNoteTimer;
+					const sceneId = item.id;
+					conditionContainer.on({
+						'mouseover': function (e) {
+							hoverNoteTimer = setTimeout(function () {
+								build_and_display_sidebar_flyout(e.clientY, function (flyout) {
+									let noteHover = `<div>
+										<div class="tooltip-header">
+											<div class="tooltip-header-icon">
+											
+												</div>
+											<div class="tooltip-header-text">
+												${item.name}
+											</div>
+											<div class="tooltip-header-identifier tooltip-header-identifier-condition">
+											Note
+											</div>
+										</div>
+										<div class="tooltip-body note-text" style="max-height:calc(100vH - 100px)">
+											<div class="tooltip-body-description">
+												<div class="tooltip-body-description-text note-text">
+													${window.JOURNAL.notes[item.id].text}
+												</div>
+											</div>
+										</div>
+									</div>`
+									flyout.addClass("prevent-sidebar-modal-close"); // clicking inside the tooltip should not close the sidebar modal that opened it
+									flyout.addClass('note-flyout');
+									flyout.css('max-height', 'calc(100vH - 50px)')
+									const tooltipHtml = $(noteHover);
+									window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);
+									add_journal_roll_buttons(tooltipHtml);
+									window.JOURNAL.add_journal_tooltip_targets(tooltipHtml);
+									add_stat_block_hover(tooltipHtml, sceneId);
+									add_aoe_statblock_click(tooltipHtml, sceneId);
+
+									$(tooltipHtml).find('.add-input').each(function () {
+										let numberFound = $(this).attr('data-number');
+										const spellName = $(this).attr('data-spell');
+										const remainingText = $(this).hasClass('each') ? '' : `${spellName} slots remaining`
+										const track_ability = function (key, updatedValue) {
+											if (window.JOURNAL.notes[noteId].abilityTracker === undefined) {
+												window.JOURNAL.notes[noteId].abilityTracker = {};
+											}
+											const asNumber = parseInt(updatedValue);
+											window.JOURNAL.notes[noteId].abilityTracker[key] = asNumber;
+											window.JOURNAL.persist();
+											debounceSendNote(noteId, window.JOURNAL.notes[noteId])
+										}
+										if (window.JOURNAL.notes[noteId].abilityTracker?.[spellName] >= 0) {
+											numberFound = window.JOURNAL.notes[noteId].abilityTracker[spellName]
+										}
+										else {
+											track_ability(spellName, numberFound)
+										}
+
+										let input = createCountTracker(window.JOURNAL.notes[noteId], spellName, numberFound, remainingText, "", track_ability);
+										$(this).find('p').remove();
+										$(this).after(input)
+									})
+									flyout.append(tooltipHtml);
+									let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
+									sendToGamelogButton.css({ "float": "right" });
+									sendToGamelogButton.on("click", function (ce) {
+										ce.stopPropagation();
+										ce.preventDefault();
+
+										send_html_to_gamelog(noteHover);
+									});
+
+									flyout.css({
+										right: '350px',
+										width: '400px'
+									})
+
+									const buttonFooter = $("<div></div>");
+									buttonFooter.css({
+										height: "40px",
+										width: "100%",
+										position: "relative",
+										background: "#fff"
+									});
+									window.JOURNAL.block_send_to_buttons(flyout);
+									flyout.append(buttonFooter);
+									buttonFooter.append(sendToGamelogButton);
+									flyout.find("a").attr("target", "_blank");
+									flyout.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function (event) {
+										event.preventDefault();
+										render_source_chapter_in_iframe(event.target.href);
+									});
+
+
+									flyout.hover(function (hoverEvent) {
+										if (hoverEvent.type === "mouseenter") {
+											clearTimeout(removeToolTipTimer);
+											removeToolTipTimer = undefined;
+										} else {
+											remove_tooltip(500);
+										}
+									});
+
+									flyout.css("background-color", "#fff");
+								});
+							}, 500);
+
+						},
+						'mouseout': function (e) {
+							clearTimeout(hoverNoteTimer)
+							remove_tooltip(500);
+						}
+
+					});
+
+
+
+
+					conditionContainer.css({
+						"position": "absolute",
+						"top": "0px",
+						"left": "0px",
+						"height": "14px",
+						"width": "12px",
+						"border-radius": "2px 2px 50% 2px",
+						"overflow": "hidden",
+						"border-width": "0px 1px 1px 0px",
+						"border-color": "#000",
+						"border-style": "solid"
+					})
+
+					symbolImage.css({
+						'height': "22px",
+						'width': "22px",
+						'border-radius': "0px",
+						'left': "-4px",
+						'top': "-7px",
+						'position': "absolute"
+					})
+					conditionContainer.append(symbolImage);
+					row.append(conditionContainer);
 				}
 				// let folder = find_html_row_from_path(item.folderPath, scenesPanel.body).find(` > .folder-item-list`);
 				if (folder.length > 0) {
@@ -2296,6 +2482,49 @@ function register_scene_row_context_menu() {
 						export_scene_context(itemToEdit.id)
 					}
 				};
+				if (window.JOURNAL.notes[rowItem.id]) {
+					menuItems["openSceneNote"] = {
+						name: "Open Scene Note",
+						callback: function (itemKey, opt, originalEvent) {
+							let self = window.JOURNAL;
+							let item = find_sidebar_list_item(opt.$trigger);
+							self.display_note(item.id, false);
+						}
+					}
+				}
+				menuItems["editSceneNote"] = {
+					name: window.JOURNAL.notes[rowItem.id] ? "Edit Scene Note" : "Create Scene Note",
+					callback: function (itemKey, opt, originalEvent) {
+
+						let self = window.JOURNAL;
+						let item = find_sidebar_list_item(opt.$trigger);
+
+						if (!self.notes[item.id]) {
+							self.notes[item.id] = {
+								title: item.name,
+								text: "",
+								player: false,
+								plain: "",
+								isSceneNote: true,
+							};
+							did_update_scenes();
+						}
+						self.edit_note(item.id, false);
+						
+					}
+				}
+				if (window.JOURNAL.notes[rowItem.id]) {
+					menuItems["deleteSceneNote"] = {
+						name: "Delete Scene Note",
+						callback: function (itemKey, opt, originalEvent) {
+							let self = window.JOURNAL;
+							let item = find_sidebar_list_item(opt.$trigger);
+							delete self.notes[item.id];
+							self.persist();
+							did_update_scenes();
+						}
+					}
+				}
 			}
 			if(rowItem.isTypeFolder()){
 				menuItems["export"] = {
@@ -2798,21 +3027,28 @@ function build_free_map_importer() {
 	container.find(".ddb-collapsible-filter__input").focus();
 }
 
-function build_source_book_chapter_import_section(sceneSet) {
+async function build_source_book_chapter_import_section(sceneSet) {
 	const container = build_import_container();
 	const sectionHtml = build_import_collapsible_section("test", "");
 	container.find(".no-results").before(sectionHtml);
 	sectionHtml.find(".ddb-collapsible__header").hide();
 	sectionHtml.css("border", "none");
-	let DDB_EXTRAS = get_ddb_extras();
+	
+
+	
+
+	let module = await import('./scenedata/ddb-extras.js');
+
+
+	let DDB_EXTRAS = module.get_ddb_extras;
 	let sceneData = [];
 
 	sceneSet.forEach(scene => {
 		if (scene.uuid in DDB_EXTRAS) {
-			scene = {...default_scene_data(), ...scene, ...DDB_EXTRAS[scene.uuid]}
+			scene = {...default_scene_data(), ...scene, ...DDB_EXTRAS[scene.uuid], ... get_custom_scene_settings()}
 		}
 		else if(scene.uuid.replace('dnd/', '') in DDB_EXTRAS){
-			scene = {...scene, ...DDB_EXTRAS[scene.uuid.replace('dnd/', '')]}
+			scene = {...scene, ...DDB_EXTRAS[scene.uuid.replace('dnd/', '')], ...get_custom_scene_settings()}
 		}
 
 		
@@ -2823,7 +3059,7 @@ function build_source_book_chapter_import_section(sceneSet) {
 
  		const uuidString = scene.uuid.replace('dnd/', '');
  		const regEx = new RegExp(`v[0-9]+\/${uuidString}`, "gi");
-		const otherVersions = Object.keys(get_ddb_extras()).filter(d=>d.match(regEx));
+		const otherVersions = Object.keys(DDB_EXTRAS).filter(d=>d.match(regEx));
 		if(otherVersions.length > 0){
 			for(let i = 0; i<otherVersions.length; i++){
 				scene = {...default_scene_data(), ...scene, ...DDB_EXTRAS[scene.uuid], ...DDB_EXTRAS[otherVersions[i]]}
@@ -2833,6 +3069,8 @@ function build_source_book_chapter_import_section(sceneSet) {
 			}
 		}
 	});
+	DDB_EXTRAS = null;
+	module = null;
 
 	const import_chapter = $(`<div class='listing-card__callout-button import-button'>Import Chapter</button>`)
 	const folderPath = decode_full_path($(`#sources-import-main-container`).attr("data-folder-path")).replace(RootFolder.Scenes.path, "");
@@ -2840,13 +3078,14 @@ function build_source_book_chapter_import_section(sceneSet) {
 
 	import_chapter.off('click.importChap').on('click.importChap', function(){
 		build_import_loading_indicator(`Importing Chapter`);
-		for(let i in sceneData){
+		for(let i=0; i<sceneData.length; i++){
 			sceneData[i] = {
 				...default_scene_data(),
 				...sceneData[i],
 				id: uuid(),
 				folderPath: folderPath,
-				parentId: parentId
+				parentId: parentId,
+				...get_custom_scene_settings()
 			}
 			if(Array.isArray(sceneData[i].tokens)){
 				let tokensObject = {}
@@ -2863,7 +3102,7 @@ function build_source_book_chapter_import_section(sceneSet) {
 		AboveApi.migrateScenes(window.gameId, sceneData)
 			.then(() => {
 				let journalUpdated = false;
-				for(let i in sceneData){
+				for(let i=0; i<sceneData.length; i++){
 					if(sceneData[i].notes != undefined){
 						journalUpdated = true;
 						for(let id in sceneData[i].notes){
@@ -3128,7 +3367,8 @@ function build_tutorial_import_list_item(scene, logo, allowMagnific = true) {
 			...scene,
 			id: uuid(),
 			folderPath: folderPath,
-			parentId: parentId
+			parentId: parentId,
+			...get_custom_scene_settings()
 		};
 		if(Array.isArray(importData.tokens)){
 			let tokensObject = {}
@@ -3139,16 +3379,15 @@ function build_tutorial_import_list_item(scene, logo, allowMagnific = true) {
 			}	
 			importData.tokens = tokensObject;
 		}
-
+		if(importData.notes != undefined){
+			for(let id in importData.notes){
+				window.JOURNAL.notes[id] = {...importData.notes[id]};
+			}
+			window.JOURNAL.persist();
+			delete importData.notes;
+		}
 		AboveApi.migrateScenes(window.gameId, [importData])
 			.then(() => {
-				if(importData.notes != undefined){
-					for(let id in importData.notes){
-						window.JOURNAL.notes[id] = {...importData.notes[id]};
-					}
-					window.JOURNAL.persist();
-					delete importData.notes;
-				}
 				window.ScenesHandler.scenes.push(importData);
 				did_update_scenes();
 				$(`.scene-item[data-scene-id='${importData.id}'] .dm_scenes_button`).click();

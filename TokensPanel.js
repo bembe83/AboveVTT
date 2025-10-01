@@ -436,7 +436,7 @@ function inject_monster_tokens(searchTerm, skip, addedList=[]) {
             }
             let m = monsterSearchResponse.data[i];
             let item = SidebarListItem.Monster(m)
-            if(window.ownedMonstersOnly && !item.monsterData.isReleased && item.monsterData.homebrewStatus != 1){
+            if(window.ownedMonstersOnly && !item.monsterData.isReleased && item.monsterData.homebrewStatus == 0){
                 continue;   
             }
             window.monsterListItems.push(item);
@@ -558,7 +558,7 @@ function init_tokens_panel() {
     tokensPanel.updateHeader("Tokens");
     add_expand_collapse_buttons_to_header(tokensPanel, true);
 
-    let searchInput = $(`<input name="token-search" type="search" style="width:96%;margin:2%" placeholder="search tokens">`);
+    let searchInput = $(`<input name="token-search" type="search" style="width:93%;margin:2%" placeholder="search tokens">`);
     searchInput.off("input").on("input", mydebounce(() => {
         let textValue = tokensPanel.header.find("input[name='token-search']").val();
         filter_token_list(textValue);
@@ -1076,8 +1076,8 @@ function create_and_place_token(listItem, hidden = undefined, specificImage= und
     // set up whatever you need to. We'll override a few things after
     let foundOptions = find_token_options_for_list_item(listItem);
     options = {...options, ...foundOptions}; // we may need to put this in specific places within the switch statement below
-
-    options.imgsrc = random_image_for_item(listItem, specificImage);
+    const chosenImage = random_image_for_item(listItem, specificImage);
+    options.imgsrc = chosenImage;
 
 
     if(options.alternativeImagesCustomizations != undefined && options.alternativeImagesCustomizations[options.imgsrc] != undefined){
@@ -1160,8 +1160,10 @@ function create_and_place_token(listItem, hidden = undefined, specificImage= und
                 return;
             }
             options.id = listItem.sheet;
-            if(window.all_token_objects[options.id] != undefined){
+            if(window.all_token_objects[options.id] != undefined){           
                 options = {...options, ...window.all_token_objects[options.id].options}
+                if(specificImage)
+                    options.imgsrc = chosenImage;
             }
             tokenSizeSetting = options.tokenSize;
             tokenSize = parseInt(tokenSizeSetting);
@@ -1975,9 +1977,9 @@ function register_token_row_context_menu() {
                     }
                 }
             }
-            if(rowItem.isTypeMyToken()){
+            if(rowItem.isTypeMyToken() || rowItem.isTypeBuiltinToken() || rowItem.isTypeDDBToken()){
                 menuItems["duplicateMyToken"] = {
-                    name: 'Duplicate',
+                    name: rowItem.isTypeMyToken()  ? 'Duplicate' : 'Copy to My Tokens',
                     callback: function(itemKey, opt, originalEvent) {
                         let itemToPlace = find_sidebar_list_item(opt.$trigger);
                         duplicate_my_token(itemToPlace);
@@ -2388,6 +2390,18 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
         const didAdd = await customization.addAlternativeImage(newImageUrl);
         if (!didAdd) {
             return; // no need to do anything if the image wasn't added. This can happen if they accidentally hit enter a few times which would try to add the same url multiple times
+        }
+        if(listItem.type == ItemType.PC ){
+            const id = customization.tokenOptions.id;
+            let token = window.all_token_objects[id]
+            if (token)
+                window.all_token_objects[id].options.alternativeImages = customization.tokenOptions.alternativeImages;
+           
+            token = window.TOKEN_OBJECTS[id]
+            if (token){
+                token.options.alternativeImages = customization.tokenOptions.alternativeImages;
+                token.sync($.extend(true, {}, window.TOKEN_OBJECTS[id].options))
+            }
         }
         if(['.mp4', '.webm', '.m4v'].some(d => type.includes(d))){
             customization.tokenOptions.videoToken = true;
@@ -2834,7 +2848,7 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
         defaultValue: false
     };
     let auraRevealVisionEnabled = (customization.tokenOptions.share_vision != undefined) ? customization.tokenOptions.share_vision : false;
-    for(let i in window.playerUsers){
+    for(let i=0; i<window.playerUsers.length; i++){
         if(!revealvisionOption.options.some(d => d.value == window.playerUsers[i].userId)){
             let option = {value: window.playerUsers[i].userId, label: window.playerUsers[i].userName, desciption: `Token vision is shared with ${window.playerUsers[i].userName}`};
             revealvisionOption.options.push(option);
@@ -3055,7 +3069,9 @@ function build_token_border_color_input(initialColor, colorChangeCallback) {
 function build_override_token_options_button(sidebarPanel, listItem, placedToken, options, updateValue, didChange) {
     let tokenOptionsButton = $(`<button class="sidebar-panel-footer-button" style="margin: 10px 0px 10px 0px;">Override Token Options</button>`);
     tokenOptionsButton.on("click", function (clickEvent) {
+
         build_and_display_sidebar_flyout(clickEvent.clientY, function (flyout) {
+            const options = find_token_customization(listItem.type, listItem.id)?.tokenOptions;
             const overrideOptions = listItem.isTypeAoe() ? 
                 token_setting_options().filter(option=> availableToAoe.includes(option.name))
                  .map(option => convert_option_to_override_dropdown(option)) 
@@ -3187,7 +3203,7 @@ function redraw_token_images_in_modal(sidebarPanel, listItem, placedToken, drawI
 
     function* addExampleToken(index) {
         
-        while(index < index+10 && index<alternativeImages.length){
+        while(index < index+8 && index<alternativeImages.length){
             setTimeout(function(){
                 if(index < alternativeImages.length){
                     let tokenDiv = build_token_div_for_sidebar_modal(alternativeImages[index], listItem, placedToken);
@@ -3202,20 +3218,21 @@ function redraw_token_images_in_modal(sidebarPanel, listItem, placedToken, drawI
        
     }
     let buildToken = addExampleToken(0);
-    modalBody.off('scroll.exampleToken').on('scroll.exampleToken', function(){
-        if (modalBody.scrollTop() + 500 >= 
-            modalBody[0].scrollHeight) { 
-            for(let i = 0; i<10; i++){
+    const debounceExampleToken = mydebounce(() => {
+        if (modalBody.scrollTop() + 300 >=
+            modalBody[0].scrollHeight) {
+            for (let i = 0; i < 8; i++) {
                 buildToken.next()
             }
-        } 
-    });
+        }
+    }, 50)
+    modalBody.off('scroll.exampleToken').on('scroll.exampleToken', debounceExampleToken);
     for (let i = 0; i < alternativeImages.length; i++) {
         if (drawInline) {
             let tokenDiv = build_token_div_for_sidebar_modal(alternativeImages[i], listItem, placedToken);
             modalBody.append(tokenDiv);
         } else {
-            if(i<10){
+            if(i<13){
                 buildToken.next();
             }
         }
@@ -3677,7 +3694,7 @@ function display_monster_filter_modal() {
         filter_observer.observe(mutation_target,mutation_config);
         console.groupEnd()
     });
-    iframe.attr("src", `https://www.dndbeyond.com/encounters/${window.EncounterHandler.avttId}/edit`);
+    iframe.attr("src", `https://www.dndbeyond.com/encounter-builder`);
 
 }
 
@@ -3927,12 +3944,18 @@ function find_token_options_for_list_item(listItem) {
 }
 function duplicate_my_token(listItem){
     if (!listItem) return {};
-    let foundOptions = find_token_options_for_list_item(listItem);
+    let foundOptions = $.extend(true, {}, find_token_options_for_list_item(listItem));
+    if(foundOptions.image){
+        foundOptions.imgsrc = foundOptions.image;
+        delete foundOptions.image;
+    }
+    delete foundOptions.id;
+    const folder = listItem.isTypeMyToken() ? find_sidebar_list_item_from_path(listItem.folderPath) : find_sidebar_list_item_from_path(RootFolder.MyTokens.path)
     if(window.JOURNAL.notes[listItem.id] != undefined){
-        create_token_inside(find_sidebar_list_item_from_path(listItem.folderPath), undefined, undefined, undefined, foundOptions, window.JOURNAL.notes[listItem.id].text);
+        create_token_inside(folder, undefined, undefined, undefined, foundOptions, window.JOURNAL.notes[listItem.id].text);
     }
     else{
-        create_token_inside(find_sidebar_list_item_from_path(listItem.folderPath), undefined, undefined, undefined, foundOptions);
+        create_token_inside(folder, undefined, undefined, undefined, foundOptions);
     }
 }
 function create_token_copy_inside(listItem, open5e = false){

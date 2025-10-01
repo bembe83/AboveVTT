@@ -29,14 +29,15 @@ const debounceHandleInjected = mydebounce(() => {
 				if(newlihtml=="") {
 					li.css("display","none"); // THIS IS TO HIDE DMONLY STUFF
 				} 
-					
 				
 			 	li.html(newlihtml);
-			 	window.JOURNAL.translateHtmlAndBlocks(li);	
-				add_journal_roll_buttons(li);
-				window.JOURNAL.add_journal_tooltip_targets(li);
-				add_stat_block_hover(li)
-				add_aoe_statblock_click(li);
+				if(window.JOURNAL){
+					window.JOURNAL.translateHtmlAndBlocks(li);
+					add_journal_roll_buttons(li);
+					window.JOURNAL.add_journal_tooltip_targets(li);
+					add_stat_block_hover(li)
+					add_aoe_statblock_click(li);
+				}
 				let rollType = current.data.injected_data?.rollType?.toLowerCase();
 				let rollAction = current.data.injected_data?.rollTitle?.toLowerCase();
 				if(rollType != undefined && rollAction != 'initiative' && rollType != "tohit" && rollType != "attack" && rollType != "to hit" && rollType != "save" && rollType != "skill" && rollType != "check" && window.DM){
@@ -65,16 +66,16 @@ const debounceHandleInjected = mydebounce(() => {
 						
 						if(is_gamelog_popout()){
 							tabCommunicationChannel.postMessage({
-		           msgType: 'gamelogDamageButtons',
-		           damage: damage
-		          });
-		          return;
+								msgType: 'gamelogDamageButtons',
+								damage: damage
+							});
+							return;
 						}
 						if($(`.tokenselected:not([data-id*='profile'])`).length == 0){
 							showTempMessage('No non-player tokens selected');
 						}
 						
-						for(let i in window.CURRENTLY_SELECTED_TOKENS){
+						for(let i=0; i<window.CURRENTLY_SELECTED_TOKENS.length; i++){
 
 							let id = window.CURRENTLY_SELECTED_TOKENS[i];
 							let token = window.TOKEN_OBJECTS[id];
@@ -104,9 +105,10 @@ const debounceHandleInjected = mydebounce(() => {
 					
 					li.find(`[class*='MessageContainer-Flex']`).append(damageButtonContainer);
 				}					
-				
-				let output = $(`${current.data.injected_data.whisper == '' ? '' : `<div class='above-vtt-roll-whisper'>To: ${((current.data.injected_data.whisper == window.PLAYER_NAME || current.data.injected_data.whisper == window.myUser) && current.data.player_name == window.PLAYER_NAME) ? `Self` : current.data.injected_data.whisper}</div>`}<div class='above-vtt-container-roll-output'>${li.find('.abovevtt-roll-container').attr('title')}</div>`);
+				const toSelf = ((current.data.injected_data.whisper == window.PLAYER_NAME || current.data.injected_data.whisper == window.myUser) && current.data.player_name == window.PLAYER_NAME)
+				let output = $(`${current.data.injected_data.whisper == '' ? '' : `<div class='above-vtt-roll-whisper'>To: ${toSelf ? `Self` : current.data.injected_data.whisper}</div>`}<div class='above-vtt-container-roll-output'>${li.find('.abovevtt-roll-container').attr('title')}</div>`);
 				li.find('.abovevtt-roll-container [class*="Result"]').append(output);
+				
 
 				let img = li.find(".magnify");
 				for(let i=0; i<img.length; i++){
@@ -177,14 +179,19 @@ const debounceHandleInjected = mydebounce(() => {
 				li.height(newheight);
 				
 
-				if (injection_data.dmonly && window.DM) { // ADD THE "Send To Player Buttons"
-					let btn = $("<button>Show to Players</button>")
-					li.append(btn);
-					btn.click(() => {
-						li.css("display", "none");
-						delete injection_data.dmonly;
-						self.inject_chat(injection_data); // RESEND THE MESSAGE REMOVING THE "injection only"
-					});
+				// CHECK FOR SELF ROLLS ADD SEND TO EVERYONE BUTTON
+				if ((injection_data.dmonly && window.DM) || toSelf) {
+					
+					if (li.find(".gamelog-to-everyone-button").length === 0) {
+						const sendToEveryone = $(`<button class="gamelog-to-everyone-button">Send To Everyone</button>`);
+						sendToEveryone.click(function (clickEvent) {
+							li.css("display", "none");
+							delete injection_data.dmonly;
+							injection_data.whisper = '';
+							self.inject_chat(injection_data); // RESEND THE MESSAGE REMOVING THE "injection only"
+						});
+						li.find("time").before(sendToEveryone);
+					 }
 				}
 			}
 		});
@@ -207,31 +214,13 @@ function setupMBIntervals(){
 	window.reconnectDelay = 250;
 	if(window.pingInterval!=undefined)
 		clearInterval(window.pingInterval);
-	if(window.reconInterval!=undefined)
-		clearInterval(window.reconInterval);
-
-	
 	window.pingInterval = setInterval(function() {
 		window.MB.sendPing();
 		window.MB.sendAbovePing();
 	}, 480000);
-
-
-	window.reconInterval = setInterval(function() {
-   		forceDdbWsReconnect();
-	}, 15000)
-	
 }
 
-function resizeCanvasChromeBug(){
-	let diceRollCanvas = $(".dice-rolling-panel__container");
-	if(parseInt(diceRollCanvas.attr("width")) % 2 != 0){
-		diceRollCanvas.attr("width", parseInt(diceRollCanvas.attr("width"))+1);
-	}
-	if(parseInt(diceRollCanvas.attr("height")) % 2 != 0){
-		diceRollCanvas.attr("height", parseInt(diceRollCanvas.attr("height"))+1);
-	}
-}
+
 
 function addFloatingCombatText(id, damageValue, heal = false){
 	if(get_avtt_setting_value('disableCombatText'))
@@ -245,7 +234,9 @@ function addFloatingCombatText(id, damageValue, heal = false){
 		combatText.remove();
 	}, 2000)
 }
-
+const debounceSyncMeUp = mydebounce(()=>{
+	window.MB.sendMessage("custom/myVTT/syncmeup");
+}, 2000)
 class MessageBroker {
 
 	loadAboveWS(callback=null){
@@ -256,7 +247,7 @@ class MessageBroker {
 		if (callback)
 			this.callbackAboveQueue.push(callback);
 		
-		if (this.loadingAboveWS) {
+		if (this.loadingAboveWS || this.abovews?.readyState == 1) {
 			return;
 		}
 		this.loadingAboveWS=true;
@@ -303,7 +294,7 @@ class MessageBroker {
 			};
 			if (recovered && (!window.DM)) {
 				console.log('asking the DM for recovery!');
-				self.sendMessage("custom/myVTT/syncmeup");
+				debounceSyncMeUp();
 	 		}
 			setupMBIntervals();
 		};
@@ -340,7 +331,7 @@ class MessageBroker {
 			this.callbackQueue.push(callback);
 
 		console.log("LOADING WS: There Are " + this.callbackQueue.length + " elements in the queue");
-		if (this.loadingWS) {
+		if (this.loadingWS || this.ws?.readyState == 1) {
 			console.log("ALREADY LOADING A WS");
 			return;
 		}
@@ -360,6 +351,7 @@ class MessageBroker {
 
 		this.ws.onerror = function() {
 			self.loadingWS = false;
+			self.ws.close();
 		};
 
 		this.ws.onopen = function() {
@@ -370,7 +362,23 @@ class MessageBroker {
 				cb();
 			};
 		};
-
+		this.ws.onclose = function() {
+			if(is_gamelog_popout())
+				return;
+			if(self.ddbReconnectTimeout != undefined){
+				clearTimeout(self.ddbReconnectTimeout);
+			}	
+			console.log('Attempting reconnect to DDB Websocket');
+			if(window.reconnectAttemptDDBWs == undefined){
+				window.reconnectAttemptDDBWs = 0;
+			}
+			window.reconnectAttemptDDBWs++;
+			self.ddbReconnectTimeout = setTimeout(function() {
+				get_cobalt_token(function(token) {
+					self.loadWS(token, null);
+				});
+			}, Math.min(10000,2**window.reconnectAttemptDDBWs*window.reconnectDelay));
+		};
 		
 	}
 
@@ -641,17 +649,21 @@ class MessageBroker {
 						msg.data.sceneid = msg.data.sceneid.players
 				}
 
-				if (window.startupSceneId === msg.data.sceneid) {
-					// we fetch this on startup because it's faster. Don't reload what we've already loaded
-					console.log("received custom/myVTT/fetchscene, but we've already loaded", msg.data.sceneid)
-				} 
-
-				else if (msg.data?.sceneid) {
-					AboveApi.getScene(msg.data.sceneid).then((response) => {
-						self.handleScene(response);
-					}).catch((error) => {
-						console.error("Failed to download scene", error);
-					});
+				if (msg.data?.sceneid) {
+					if(window.LOADING){
+						if(window.handleSceneQueue == undefined){
+							window.handleSceneQueue = [];
+						}
+						window.handleSceneQueue.push(msg);
+					}
+					else{
+						AboveApi.getScene(msg.data.sceneid).then((response) => {
+							self.handleScene(response);
+						}).catch((error) => {
+							console.error("Failed to download scene", error);
+						});
+					}
+					
 				}
 				delete window.startupSceneId; // we only want to prevent a double load of the initial scene, so we want to delete this no matter what.
 			}
@@ -711,6 +723,9 @@ class MessageBroker {
 				redraw_text();
 				redraw_drawn_light();
 				redraw_light();
+			}
+			if(msg.eventType=="custom/myVTT/forceRedrawLight"){
+				redraw_light(true);
 			}
 			if (msg.eventType == "custom/myVTT/chat") { // DEPRECATED!!!!!!!!!
 				if(!window.NOTIFIEDOLDVERSION){
@@ -800,6 +815,14 @@ class MessageBroker {
 			
 			if(msg.eventType=="custom/myVTT/note"){
 				if(!window.DM || (msg.data.from && msg.data.from != window.PLAYER_ID)){
+					if(msg.data.delete == true){
+						delete window.JOURNAL.notes[msg.data.id]
+						window.JOURNAL.build_journal();
+						if(msg.data.id in window.TOKEN_OBJECTS){
+							window.TOKEN_OBJECTS[msg.data.id].place();			
+						}
+						return;
+					}
 					window.JOURNAL.notes[msg.data.id]=msg.data.note;
 					
 					window.JOURNAL.build_journal();
@@ -1218,12 +1241,13 @@ class MessageBroker {
 			
 			if (msg.eventType == "dice/roll/fulfilled") {
 				notify_gamelog();
-				if (msg.avttExpression !== undefined && msg.avttExpressionResult !== undefined) {
-					let gamelogItem = $("ol[class*='-GameLogEntries'] li").first();
+				const gamelogItem = $(`ol[class*='-GameLogEntries'] li`).first(); 
+				if (msg.avttExpression !== undefined && msg.avttExpressionResult !== undefined) {	
 					gamelogItem.attr("data-avtt-expression", msg.avttExpression);
 					gamelogItem.attr("data-avtt-expression-result", msg.avttExpressionResult);
 					replace_gamelog_message_expressions(gamelogItem);
 				}
+
 
 				if(msg.data.rolls != undefined){
 					let critSuccess = {};
@@ -1239,11 +1263,11 @@ class MessageBroker {
 							for(let k=0; k<roll.diceNotation.set[j].dice.length; k++){
 								let reduceCrit = 0;
 								if(parseInt(roll.diceNotation.set[j].dice[k].dieType.replace('d', '')) == 20){
-                  reduceCrit = 20 - msg.data.critRange;
+                  					reduceCrit = 20 - msg.data.critRange;
 								}
-                else if(msg.data.rolls[0].rollType == 'attack' || msg.data.rolls[0].rollType == 'to hit' || msg.data.rolls[0].rollType == 'tohit' ){
-                	continue;
-                }
+								else if(msg.data.rolls[0].rollType == 'attack' || msg.data.rolls[0].rollType == 'to hit' || msg.data.rolls[0].rollType == 'tohit' ){
+									continue;
+								}
 								if(roll.diceNotation.set[j].dice[k].dieValue >= parseInt(roll.diceNotation.set[j].dice[k].dieType.replace('d', ''))-reduceCrit && roll.result.values.includes(roll.diceNotation.set[j].dice[k].dieValue)){
 									if(roll.rollKind == 'advantage'){
 										if(k>0 && roll.diceNotation.set[j].dice[k-1].dieValue <= roll.diceNotation.set[j].dice[k].dieValue){
@@ -1373,7 +1397,7 @@ class MessageBroker {
 										if($(`.tokenselected:not([data-id*='profile'])`).length == 0){
 											showTempMessage('No non-player tokens selected');
 										}
-										for(let i in window.CURRENTLY_SELECTED_TOKENS){
+										for(let i=0; i<window.CURRENTLY_SELECTED_TOKENS.length; i++){
 
 											let id = window.CURRENTLY_SELECTED_TOKENS[i];
 											let token = window.TOKEN_OBJECTS[id];
@@ -1406,13 +1430,27 @@ class MessageBroker {
 									
 									
 								}
+								// CHECK FOR SELF ROLLS ADD SEND TO EVERYONE BUTTON
+								if (msg.messageScope === "userId" && target.find(".gamelog-to-everyone-button").length === 0) {
+									const sendToEveryone = $(`<button class="gamelog-to-everyone-button">Send To Everyone</button>`);
+									sendToEveryone.click(function (clickEvent) {
+										let resendMessage = msg;
+										resendMessage.id = uuid();
+										resendMessage.data.rollId = uuid();
+										resendMessage.messageScope = "gameId";
+										resendMessage.messageTarget = find_game_id();
+										resendMessage.dateTime = Date.now();
+										window.diceRoller.ddbDispatch(resendMessage);
+									});
+									target.find("time").before(sendToEveryone);
+								}
 							}
 
 						}
 						
 					}, 100)
 				}
-
+				
 				
 				if (!window.DM)
 					return;
@@ -1482,25 +1520,9 @@ class MessageBroker {
 					}
 					
 				}
-				// CHECK FOR SELF ROLLS ADD SEND TO EVERYONE BUTTON
-				if (msg.messageScope === "userId") {
-					let gamelogItem = $("ol[class*='-GameLogEntries'] li").first();
-					if (gamelogItem.find(".gamelog-to-everyone-button").length === 0) {
-						const sendToEveryone = $(`<button class="gamelog-to-everyone-button">Send To Everyone</button>`);
-						sendToEveryone.click(function (clickEvent) {
-							let resendMessage = msg;
-							resendMessage.id = uuid();
-							resendMessage.data.rollId = uuid();
-							resendMessage.messageScope = "gameId";
-							resendMessage.messageTarget = find_game_id();
-							resendMessage.dateTime = Date.now();
-							window.diceRoller.ddbDispatch(resendMessage);
-						});
-						gamelogItem.find("time").before(sendToEveryone);
-					 }
-				}
+				
 			}
-
+			
 			if (msg.eventType === "custom/myVTT/peerReady") {
 				window.PeerManager.receivedPeerReady(msg);
 			}
@@ -1510,15 +1532,15 @@ class MessageBroker {
 			if (msg.eventType === "custom/myVTT/videoPeerConnect") {
 				if(msg.data.id != window.myVideoPeerID){
 					let call = window.videoPeer.call(msg.data.id, window.myLocalVideostream)
-          call.on('stream', (stream) => {
-              window.videoConnectedPeers.push(msg.data.id);
-              setRemoteStream(stream, call.peer);   
-              call.on('close', () => {
-                $(`.video-meet-area video#${call.peer}`).remove();
-            	})   
-          })
-          window.currentPeers = window.currentPeers.filter(d=> d.peer != call.peer)
-          window.currentPeers.push(call);
+					call.on('stream', (stream) => {
+						window.videoConnectedPeers.push(msg.data.id);
+						setRemoteStream(stream, call.peer);   
+						call.on('close', () => {
+							$(`.video-meet-area video#${call.peer}`).remove();
+							})   
+					})
+					window.currentPeers = window.currentPeers.filter(d=> d.peer != call.peer)
+					window.currentPeers.push(call);
 				}
 			}
 			if (msg.eventType === "custom/myVTT/videoPeerDisconnect") {
@@ -1528,28 +1550,418 @@ class MessageBroker {
 			if (msg.eventType === "custom/myVTT/diceVideoPeerConnect") {
 				if(msg.data.id != diceplayer_id){
 					let call = window.diceVideoPeer.call(msg.data.id, window.MYMEDIASTREAM)
-          call.on('stream', (stream) => {
-              window.diceVideoConnectedPeers.push(msg.data.id);
-              setDiceRemoteStream(stream, call.peer);   
-              call.on('close', () => {
-                $(`video.remote-dice-video#${call.peer}, #streamer-canvas-${call.peer}`).remove();
-            	})   
-          })
-          window.diceCurrentPeers = window.diceCurrentPeers.filter(d=> d.peer != call.peer)
-          window.diceCurrentPeers.push(call);
+					call.on('stream', (stream) => {
+						window.diceVideoConnectedPeers.push(msg.data.id);
+						setDiceRemoteStream(stream, call.peer);   
+						call.on('close', () => {
+							$(`video.remote-dice-video#${call.peer}, #streamer-canvas-${call.peer}`).remove();
+						})   
+					})
+					window.diceCurrentPeers = window.diceCurrentPeers.filter(d=> d.peer != call.peer)
+					window.diceCurrentPeers.push(call);
 				}
 			}
 
 
 		};
+		if(is_campaign_page()){
+			get_cobalt_token(function (token) {
+				self.loadWS(token);
+			});
 
-		get_cobalt_token(function(token) {
-			self.loadWS(token);
+			self.loadAboveWS();
+			return;
+		}
+
+		get_cobalt_token(function (token) {
+			self.loadWS(token, report_connection);
 		});
 
-		self.loadAboveWS();
+		self.loadAboveWS(notify_player_join);
+
 	}
 
+	async handleScene (msg, forceRefresh=false) {
+		console.debug("handlescene", msg);
+		try{
+			if(msg.data.scale_factor == undefined || msg.data.scale_factor == ''){
+				msg.data.scale_factor = 1;
+			}
+			let isCurrentScene = window.CURRENT_SCENE_DATA?.id != undefined && msg.data.id == window.CURRENT_SCENE_DATA.id
+			let dmMapEqual = msg.data.dm_map == window.CURRENT_SCENE_DATA.dm_map && msg.data.dm_map_usable == '1' || msg.data.player_map == window.CURRENT_SCENE_DATA.player_map && msg.data.dm_map_usable == '0'
+			let dmMapToggleEqual = msg.data.dm_map_usable == window.CURRENT_SCENE_DATA.dm_map_usable
+			let playerMapEqual = msg.data.player_map == window.CURRENT_SCENE_DATA.player_map
+			let scaleFactorEqual = (msg.data.scale_factor == window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion || 
+																		((msg.data.scale_factor == undefined || msg.data.scale_factor=='') && window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion == 1))
+			let hppsEqual = window.CURRENT_SCENE_DATA.hpps==parseFloat(msg.data.hpps*msg.data.scale_factor)
+			let vppsEqual = window.CURRENT_SCENE_DATA.vpps==parseFloat(msg.data.vpps*msg.data.scale_factor)
+			let isVideoEqual = window.CURRENT_SCENE_DATA.player_map_is_video == msg.data.player_map_is_video && window.CURRENT_SCENE_DATA.dm_map_is_video == msg.data.dm_map_is_video
+
+			let isSameScaleAndMaps = isCurrentScene && scaleFactorEqual && hppsEqual && vppsEqual && isVideoEqual && ((window.DM && dmMapEqual && dmMapToggleEqual) || (!window.DM && playerMapEqual))
+			
+			const isSameTokenLight = window.CURRENT_SCENE_DATA.disableSceneVision == msg.data.disableSceneVision;																		
+			
+
+			if(isSameScaleAndMaps && !forceRefresh){
+				let scaleFactor = window.CURRENT_SCENE_DATA.scale_factor;
+				let conversion = window.CURRENT_SCENE_DATA.conversion;
+
+				window.CURRENT_SCENE_DATA = {
+					...msg.data,
+					conversion: conversion,
+					scale_factor: scaleFactor
+				};
+				check_darkness_value();
+				window.CURRENT_SCENE_DATA.daylight = window.CURRENT_SCENE_DATA.daylight ? window.CURRENT_SCENE_DATA.daylight : `rgba(255, 255, 255, 1)`
+		 		$('#VTT').css('--daylight-color', window.CURRENT_SCENE_DATA.daylight);
+
+		 		if(!window.CURRENT_SCENE_DATA.scale_factor)
+					window.CURRENT_SCENE_DATA.scale_factor = 1;
+				window.CURRENT_SCENE_DATA.vpps=parseFloat(msg.data.vpps*msg.data.scale_factor);
+				window.CURRENT_SCENE_DATA.hpps=parseFloat(msg.data.hpps*msg.data.scale_factor);
+				window.CURRENT_SCENE_DATA.offsetx=parseFloat(msg.data.offsetx*msg.data.scale_factor);
+				window.CURRENT_SCENE_DATA.offsety=parseFloat(msg.data.offsety*msg.data.scale_factor);
+
+				// Store current scene width and height
+				let mapHeight = await $("#scene_map").height();
+				let mapWidth = await $("#scene_map").width();
+		
+
+				
+				// Scale map according to scaleFactor
+				$("#VTT").css("--scene-scale", scaleFactor)
+				window.CURRENT_SCENE_DATA.width = mapWidth;
+				window.CURRENT_SCENE_DATA.height = mapHeight;
+				
+
+				if(window.CURRENT_SCENE_DATA.gridType == 2 || window.CURRENT_SCENE_DATA.gridType == 3){
+					const a = 2 * Math.PI / 6;
+					const hexWidth = window.CURRENT_SCENE_DATA.hpps * Math.sin(a) * 2 * window.CURRENT_SCENE_DATA.scale_factor;
+					const hexHeight = window.CURRENT_SCENE_DATA.hpps * (1 + Math.cos(a)) * window.CURRENT_SCENE_DATA.scale_factor;
+					window.hexGridSize = {
+						width: hexWidth,
+						height: hexHeight
+					}
+				}
+				if(!isSameTokenLight){
+					for(let i in window.TOKEN_OBJECTS){
+						const token = $(`#tokens div[data-id='${i}']`);
+						setTokenLight(token, window.TOKEN_OBJECTS[i].options);
+					}
+				}
+				await reset_canvas(false);
+				if(!window.DM || window.SelectedTokenVision)
+					check_token_visibility();
+			}
+			else{
+				window.DRAWINGS = [];
+				window.wallUndo = [];
+				$('#exploredCanvas').remove();
+				window.sceneRequestTime = Date.now();
+		    	let lastSceneRequestTime = window.sceneRequestTime;   
+				window.TOKEN_OBJECTS = {};
+				window.ON_SCREEN_TOKENS = {};
+				window.videoTokenOld = {};
+				let data = msg.data;
+				let self=this;
+
+					if(data.dm_map_usable=="1"){ // IN THE CLOUD WE DON'T RECEIVE WIDTH AND HEIGT. ALWAYS LOAD THE DM_MAP FIRST, AS TO GET THE PROPER WIDTH
+						data.map=data.dm_map;
+						if(data.dm_map_is_video=="1" || data.dm_map?.includes('youtube.com') || data.dm_map?.includes("youtu.be"))
+							data.is_video=true;
+					}
+					else{
+						data.map=data.player_map;
+						if(data.player_map_is_video=="1")
+							data.is_video=true;
+					}
+
+				for(const i in msg.data.tokens){
+					if(i == msg.data.tokens[i].id)
+						continue;
+					msg.data.tokens[msg.data.tokens[i].id] = msg.data.tokens[i];
+					delete msg.data.tokens[i];
+				}
+				msg.data.tokens = Object.fromEntries(Object.entries(msg.data.tokens).filter(([_, v]) => v != null));
+				window.CURRENT_SCENE_DATA = msg.data;
+				check_darkness_value();
+				window.CURRENT_SCENE_DATA.daylight = window.CURRENT_SCENE_DATA.daylight ? window.CURRENT_SCENE_DATA.daylight : `rgba(255, 255, 255, 1)`
+		 		$('#VTT').css('--daylight-color', window.CURRENT_SCENE_DATA.daylight);
+				if(window.DM){
+					window.ScenesHandler.scene=window.CURRENT_SCENE_DATA;
+				}
+
+				if(!window.CURRENT_SCENE_DATA.scale_factor)
+					window.CURRENT_SCENE_DATA.scale_factor = 1;
+				window.CURRENT_SCENE_DATA.vpps=parseFloat(window.CURRENT_SCENE_DATA.vpps*window.CURRENT_SCENE_DATA.scale_factor);
+				window.CURRENT_SCENE_DATA.hpps=parseFloat(window.CURRENT_SCENE_DATA.hpps*window.CURRENT_SCENE_DATA.scale_factor);
+				window.CURRENT_SCENE_DATA.offsetx=parseFloat(window.CURRENT_SCENE_DATA.offsetx*window.CURRENT_SCENE_DATA.scale_factor);
+				window.CURRENT_SCENE_DATA.offsety=parseFloat(window.CURRENT_SCENE_DATA.offsety*window.CURRENT_SCENE_DATA.scale_factor);
+				$('#vision_menu #draw_line_width').val(window.CURRENT_SCENE_DATA.hpps);
+				$('#fog_menu #draw_line_width').val(window.CURRENT_SCENE_DATA.hpps);
+				console.log("SETTO BACKGROUND A " + msg.data);
+				$("#tokens").children().remove();
+				$(".aura-element[id^='aura_'").remove();
+				$(".aura-element-container-clip").remove();
+				$("[data-darkness]").remove();
+				$("[data-notatoken]").remove();
+
+				let old_src = $("#scene_map").attr('src');
+				$('.import-loading-indicator').remove();
+				if(data.UVTTFile == 1){
+					build_import_loading_indicator("Loading UVTT Map");
+					try{
+						if(window.DM && data.dm_map && data.dm_map_usable){
+							data.map = await get_map_from_uvtt_file(data.map)
+						}
+						else{
+							data.map = await get_map_from_uvtt_file(data.player_map);
+						}			
+					}
+					catch{
+						console.log('non-UVTT file found for map')
+						if(window.DM && data.dm_map && data.dm_map_usable){
+							data.map = data.dm_map;
+						}
+						else{
+							data.map = data.player_map;
+						}
+					}
+				}
+				else{
+					await build_import_loading_indicator(`Loading ${window.DM ? data.title : 'Scene'}`);		
+				}
+				$('.import-loading-indicator .percentageLoaded').css('width', `0%`);
+				if(msg.data.id == window.CURRENT_SCENE_DATA.id){ // incase another map was loaded before we get uvtt data back
+
+
+					if (data.fog_of_war == 1) {
+						window.FOG_OF_WAR = true;
+						window.REVEALED = data.reveals;
+					}
+					else {
+						window.FOG_OF_WAR = false;
+						window.REVEALED = [];
+					}
+					if (typeof data.drawings !== "undefined") {
+						window.DRAWINGS = data.drawings;
+
+					}
+					else {
+						window.DRAWINGS = [];
+					}
+					window.LOADING = true;
+					if(!window.DM && (data.player_map_is_video == '1' || data.player_map?.includes('youtube.com') || data.player_map?.includes("youtu.be") || data.is_video == '1')){
+						data.map = data.player_map;
+						data.is_video = data.player_map_is_video;
+					}
+
+					load_scenemap(data.map, data.is_video, data.width, data.height, data.UVTTFile, async function() {
+						
+						console.group("load_scenemap callback")
+						if(!window.CURRENT_SCENE_DATA.scale_factor)
+							window.CURRENT_SCENE_DATA.scale_factor = 1;
+						let scaleFactor = window.CURRENT_SCENE_DATA.scale_factor;
+						// Store current scene width and height
+						let mapHeight = await $("#scene_map").height();
+						let mapWidth = await $("#scene_map").width();
+
+	
+						window.CURRENT_SCENE_DATA.conversion = 1;
+
+						if(data.scale_check && !data.UVTTFile && !data.is_video && (mapHeight > 2500 || mapWidth > 2500)){
+							let conversion = 2;
+							if(mapWidth >= mapHeight){
+								conversion = 1980 / mapWidth;
+							}
+							else{
+								conversion = 1980 / mapHeight;
+							}
+							mapHeight = mapHeight*conversion;
+							mapWidth = mapWidth*conversion;
+							$("#scene_map").css({
+								'height': mapHeight,
+								'width': mapWidth
+							});
+							scaleFactor = scaleFactor / conversion		
+							window.CURRENT_SCENE_DATA.scale_factor = scaleFactor;
+							window.CURRENT_SCENE_DATA.conversion = conversion;
+						}
+						else if(!data.scale_check){ //older than 0.98
+							window.CURRENT_SCENE_DATA = {
+								...window.CURRENT_SCENE_DATA,
+								hpps: window.CURRENT_SCENE_DATA.hpps / window.CURRENT_SCENE_DATA.scale_factor,
+								vpps: window.CURRENT_SCENE_DATA.vpps / window.CURRENT_SCENE_DATA.scale_factor,
+								offsetx: window.CURRENT_SCENE_DATA.offsetx / window.CURRENT_SCENE_DATA.scale_factor,
+								offsety: window.CURRENT_SCENE_DATA.offsety / window.CURRENT_SCENE_DATA.scale_factor
+							}
+						}
+						$('.import-loading-indicator .percentageLoaded').css('width', `10%`);	
+						window.CURRENT_SCENE_DATA.width = mapWidth;
+						window.CURRENT_SCENE_DATA.height = mapHeight;
+						
+
+						if(window.CURRENT_SCENE_DATA.gridType == 2 || window.CURRENT_SCENE_DATA.gridType == 3){
+							const a = 2 * Math.PI / 6;
+							const hexWidth = window.CURRENT_SCENE_DATA.hpps * Math.sin(a) * 2 * window.CURRENT_SCENE_DATA.scale_factor;
+							const hexHeight = window.CURRENT_SCENE_DATA.hpps * (1 + Math.cos(a)) * window.CURRENT_SCENE_DATA.scale_factor;
+							window.hexGridSize = {
+								width: hexWidth,
+								height: hexHeight
+							}
+						}
+
+						// Scale map according to scaleFactor
+						$("#VTT").css("--scene-scale", scaleFactor)
+						$('#loadingStyles').remove(); // incase 2nd load
+						if(!window.DM){
+							$('body').append($(`<style id='loadingStyles'>
+								.token,
+								.door-button,
+								.aura-element-container-clip{
+									display: none !important;
+								}
+								.token[data-id*='${window.PLAYER_ID}']{
+									display: flex !important;
+								}
+								
+								.aura-element-container-clip[id*='${window.PLAYER_ID}']{
+									display:unset !important;
+								}
+							</style>`))
+						}
+
+
+						if(!window.DM && data.dm_map_usable=="1" && data.UVTTFile != 1 && !data.is_video){
+	
+							$("#scene_map").stop();
+							$("#scene_map").css("opacity","0");
+							console.log("switching back to player map");
+							$("#scene_map").off("load");
+							$("#scene_map").on("load", () => {
+								$("#scene_map").css('opacity', 1)
+								$("#darkness_layer").show();
+							});
+							
+						
+							$("#scene_map").attr('src', await getGoogleDriveAPILink(data.player_map));
+							$('.import-loading-indicator .percentageLoaded').css('width', `20%`);		
+						}
+						reset_canvas();
+		        		set_default_vttwrapper_size();
+						
+						console.log("LOADING TOKENS!");
+						
+
+						let tokensLength = Object.keys(data.tokens).length;
+						let count = 0;
+						const tokenLoop = async function(data, count, tokensLength){
+							for (let id in data.tokens) {
+								if(forceRefresh){
+									delete window.all_token_objects[id];
+								}
+								await self.handleToken({
+									data: data.tokens[id],
+									loading: true,
+									persist: false			
+								})
+								count += 1;
+								await async_sleep(0.01);
+								$('.import-loading-indicator .percentageLoaded').css('width', `${20 + count/tokensLength*75}%`)
+							}
+							return true;
+						}
+			
+						await tokenLoop(data, count, tokensLength);
+
+						if(window.TELEPORTER_PASTE_BUFFER != undefined){
+							try{
+								const teleporterTokenId = window.TELEPORTER_PASTE_BUFFER.targetToken
+								const targetPortal = window.TOKEN_OBJECTS[teleporterTokenId];
+								const top = parseInt(targetPortal.options.top)+25;
+								const left = parseInt(targetPortal.options.left)+25;
+								const isTeleporter = true;
+								await paste_selected_tokens(left, top, isTeleporter);
+								window.TOKEN_OBJECTS[teleporterTokenId].highlight();
+							}
+							catch{
+								window.TELEPORTER_PASTE_BUFFER = undefined;
+							}
+							
+						}
+
+
+						let mixerState = window.MIXER.state();
+						for(let i in mixerState.channels){
+							if(mixerState.channels[i].token != undefined){
+								window.MIXER.deleteChannel(i);
+							}
+						}
+						let audioTokens = $('.audio-token');
+				        if(audioTokens.length > 0){
+				            for(let i = 0; i < audioTokens.length; i++){
+				                setTokenAudio($(audioTokens[i]), window.TOKEN_OBJECTS[$(audioTokens[i]).attr('data-id')]);
+				            }
+				        }
+						
+						ct_load({
+							loading: true,
+							current: $("#combat_area [data-current]").attr('data-target')
+						});
+
+
+						$('.import-loading-indicator .percentageLoaded').css('width', '95%');	
+						if (window.EncounterHandler !== undefined) {
+							fetch_and_cache_scene_monster_items();
+						}
+						did_update_scenes();
+						if (window.reorderState === ItemType.Scene) {
+							enable_draggable_change_folder(ItemType.Scene);
+						}
+						update_pc_token_rows();
+						$('.import-loading-indicator').remove();
+						delete window.LOADING;
+						
+
+
+
+						do_check_token_visibility();
+						
+						$('#loadingStyles').remove();
+
+						console.groupEnd()
+
+						
+						window.MB.loadNextScene();	
+						
+						
+					});
+					
+					remove_loading_overlay();
+				}
+			}
+		}
+		catch (e) {
+			window.MB.loadNextScene();
+			showError(e);
+		}
+		
+		// console.groupEnd()
+	}
+	loadNextScene(){
+		if (window.handleSceneQueue == undefined || window.handleSceneQueue?.length == 0)
+			return;
+		const msg = window.handleSceneQueue.pop(); // get most recent item and load it
+		window.handleSceneQueue = [];
+		AboveApi.getScene(msg.data.sceneid).then((response) => {
+			window.MB.handleScene(response);
+		}).catch((error) => {
+			if (window.handleSceneQueue?.length > 0) {
+				setTimeout(loadNextScene, 100);
+			}
+			console.error("Failed to download scene", error);
+		});
+	}
   	handleCT(data){
 		ct_load(data);
 	}
@@ -1801,368 +2213,9 @@ class MessageBroker {
 			check_single_token_visibility(data.id);
 	
 		}
-}
-
-	async handleScene(msg, forceRefresh=false) {
-		console.debug("handlescene", msg);
-		try{
-			if(msg.data.scale_factor == undefined || msg.data.scale_factor == ''){
-				msg.data.scale_factor = 1;
-			}
-			let isCurrentScene = window.CURRENT_SCENE_DATA?.id != undefined && msg.data.id == window.CURRENT_SCENE_DATA.id
-			let dmMapEqual = msg.data.dm_map == window.CURRENT_SCENE_DATA.dm_map && msg.data.dm_map_usable == '1' || msg.data.player_map == window.CURRENT_SCENE_DATA.player_map && msg.data.dm_map_usable == '0'
-			let dmMapToggleEqual = msg.data.dm_map_usable == window.CURRENT_SCENE_DATA.dm_map_usable
-			let playerMapEqual = msg.data.player_map == window.CURRENT_SCENE_DATA.player_map
-			let scaleFactorEqual = (msg.data.scale_factor == window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion || 
-																		((msg.data.scale_factor == undefined || msg.data.scale_factor=='') && window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion == 1))
-			let hppsEqual = window.CURRENT_SCENE_DATA.hpps==parseFloat(msg.data.hpps*msg.data.scale_factor)
-			let vppsEqual = window.CURRENT_SCENE_DATA.vpps==parseFloat(msg.data.vpps*msg.data.scale_factor)
-			let isVideoEqual = window.CURRENT_SCENE_DATA.player_map_is_video == msg.data.player_map_is_video && window.CURRENT_SCENE_DATA.dm_map_is_video == msg.data.dm_map_is_video
-
-			let isSameScaleAndMaps = isCurrentScene && scaleFactorEqual && hppsEqual && vppsEqual && isVideoEqual && ((window.DM && dmMapEqual && dmMapToggleEqual) || (!window.DM && playerMapEqual))
-			
-			const isSameTokenLight = window.CURRENT_SCENE_DATA.disableSceneVision == msg.data.disableSceneVision;																		
-			
-
-			if(isSameScaleAndMaps && !forceRefresh){
-				let scaleFactor = window.CURRENT_SCENE_DATA.scale_factor;
-				let conversion = window.CURRENT_SCENE_DATA.conversion;
-
-				window.CURRENT_SCENE_DATA = {
-					...msg.data,
-					conversion: conversion,
-					scale_factor: scaleFactor
-				};
-				window.CURRENT_SCENE_DATA.daylight = window.CURRENT_SCENE_DATA.daylight ? window.CURRENT_SCENE_DATA.daylight : `rgba(255, 255, 255, 1)`
-		 		$('#VTT').css('--daylight-color', window.CURRENT_SCENE_DATA.daylight);
-
-		 		if(!window.CURRENT_SCENE_DATA.scale_factor)
-					window.CURRENT_SCENE_DATA.scale_factor = 1;
-				window.CURRENT_SCENE_DATA.vpps=parseFloat(msg.data.vpps*msg.data.scale_factor);
-				window.CURRENT_SCENE_DATA.hpps=parseFloat(msg.data.hpps*msg.data.scale_factor);
-				window.CURRENT_SCENE_DATA.offsetx=parseFloat(msg.data.offsetx*msg.data.scale_factor);
-				window.CURRENT_SCENE_DATA.offsety=parseFloat(msg.data.offsety*msg.data.scale_factor);
-
-				// Store current scene width and height
-				let mapHeight = await $("#scene_map").height();
-				let mapWidth = await $("#scene_map").width();
-		
-
-				
-				// Scale map according to scaleFactor
-				$("#VTT").css("--scene-scale", scaleFactor)
-				window.CURRENT_SCENE_DATA.width = mapWidth;
-				window.CURRENT_SCENE_DATA.height = mapHeight;
-				
-
-				if(window.CURRENT_SCENE_DATA.gridType == 2 || window.CURRENT_SCENE_DATA.gridType == 3){
-					const a = 2 * Math.PI / 6;
-					const hexWidth = window.CURRENT_SCENE_DATA.hpps * Math.sin(a) * 2 * window.CURRENT_SCENE_DATA.scale_factor;
-					const hexHeight = window.CURRENT_SCENE_DATA.hpps * (1 + Math.cos(a)) * window.CURRENT_SCENE_DATA.scale_factor;
-					window.hexGridSize = {
-						width: hexWidth,
-						height: hexHeight
-					}
-				}
-				if(!isSameTokenLight){
-					for(let i in window.TOKEN_OBJECTS){
-						const token = $(`#tokens div[data-id='${i}']`);
-						setTokenLight(token, window.TOKEN_OBJECTS[i].options);
-					}
-				}
-				await reset_canvas(false);
-				if(!window.DM || window.SelectedTokenVision)
-					check_token_visibility();
-			}
-			else{
-				window.DRAWINGS = [];
-				window.wallUndo = [];
-				$('#exploredCanvas').remove();
-				window.sceneRequestTime = Date.now();
-		    	let lastSceneRequestTime = window.sceneRequestTime;   
-				window.TOKEN_OBJECTS = {};
-				window.videoTokenOld = {};
-				let data = msg.data;
-				let self=this;
-
-					if(data.dm_map_usable=="1"){ // IN THE CLOUD WE DON'T RECEIVE WIDTH AND HEIGT. ALWAYS LOAD THE DM_MAP FIRST, AS TO GET THE PROPER WIDTH
-						data.map=data.dm_map;
-						if(data.dm_map_is_video=="1" || data.dm_map?.includes('youtube.com') || data.dm_map?.includes("youtu.be"))
-							data.is_video=true;
-					}
-					else{
-						data.map=data.player_map;
-						if(data.player_map_is_video=="1")
-							data.is_video=true;
-					}
-
-				for(const i in msg.data.tokens){
-					if(i == msg.data.tokens[i].id)
-						continue;
-					msg.data.tokens[msg.data.tokens[i].id] = msg.data.tokens[i];
-					delete msg.data.tokens[i];
-				}
-				msg.data.tokens = Object.fromEntries(Object.entries(msg.data.tokens).filter(([_, v]) => v != null));
-				window.CURRENT_SCENE_DATA = msg.data;
-				window.CURRENT_SCENE_DATA.daylight = window.CURRENT_SCENE_DATA.daylight ? window.CURRENT_SCENE_DATA.daylight : `rgba(255, 255, 255, 1)`
-		 		$('#VTT').css('--daylight-color', window.CURRENT_SCENE_DATA.daylight);
-				if(window.DM){
-					window.ScenesHandler.scene=window.CURRENT_SCENE_DATA;
-				}
-
-				if(!window.CURRENT_SCENE_DATA.scale_factor)
-					window.CURRENT_SCENE_DATA.scale_factor = 1;
-				window.CURRENT_SCENE_DATA.vpps=parseFloat(window.CURRENT_SCENE_DATA.vpps*window.CURRENT_SCENE_DATA.scale_factor);
-				window.CURRENT_SCENE_DATA.hpps=parseFloat(window.CURRENT_SCENE_DATA.hpps*window.CURRENT_SCENE_DATA.scale_factor);
-				window.CURRENT_SCENE_DATA.offsetx=parseFloat(window.CURRENT_SCENE_DATA.offsetx*window.CURRENT_SCENE_DATA.scale_factor);
-				window.CURRENT_SCENE_DATA.offsety=parseFloat(window.CURRENT_SCENE_DATA.offsety*window.CURRENT_SCENE_DATA.scale_factor);
-				$('#vision_menu #draw_line_width').val(window.CURRENT_SCENE_DATA.hpps);
-				$('#fog_menu #draw_line_width').val(window.CURRENT_SCENE_DATA.hpps);
-				console.log("SETTO BACKGROUND A " + msg.data);
-				$("#tokens").children().remove();
-				$(".aura-element[id^='aura_'").remove();
-				$(".aura-element-container-clip").remove();
-				$("[data-darkness]").remove();
-				$("[data-notatoken]").remove();
-
-				let old_src = $("#scene_map").attr('src');
-				$('.import-loading-indicator').remove();
-				if(data.UVTTFile == 1){
-					build_import_loading_indicator("Loading UVTT Map");
-					try{
-						if(window.DM && data.dm_map && data.dm_map_usable){
-							data.map = await get_map_from_uvtt_file(data.map)
-						}
-						else{
-							data.map = await get_map_from_uvtt_file(data.player_map);
-						}			
-					}
-					catch{
-						console.log('non-UVTT file found for map')
-						if(window.DM && data.dm_map && data.dm_map_usable){
-							data.map = data.dm_map;
-						}
-						else{
-							data.map = data.player_map;
-						}
-					}
-				}
-				else{
-					await build_import_loading_indicator(`Loading ${window.DM ? data.title : 'Scene'}`);		
-				}
-				$('.import-loading-indicator .percentageLoaded').css('width', `0%`);
-				if(msg.data.id == window.CURRENT_SCENE_DATA.id){ // incase another map was loaded before we get uvtt data back
-
-
-					if (data.fog_of_war == 1) {
-						window.FOG_OF_WAR = true;
-						window.REVEALED = data.reveals;
-					}
-					else {
-						window.FOG_OF_WAR = false;
-						window.REVEALED = [];
-					}
-					if (typeof data.drawings !== "undefined") {
-						window.DRAWINGS = data.drawings;
-
-					}
-					else {
-						window.DRAWINGS = [];
-					}
-					window.LOADING = true;
-					if(!window.DM && (data.player_map_is_video == '1' || data.player_map?.includes('youtube.com') || data.player_map?.includes("youtu.be") || data.is_video == '1')){
-						data.map = data.player_map;
-						data.is_video = data.player_map_is_video;
-					}
-
-					load_scenemap(data.map, data.is_video, data.width, data.height, data.UVTTFile, async function() {
-						console.group("load_scenemap callback")
-						if(!window.CURRENT_SCENE_DATA.scale_factor)
-							window.CURRENT_SCENE_DATA.scale_factor = 1;
-						let scaleFactor = window.CURRENT_SCENE_DATA.scale_factor;
-						// Store current scene width and height
-						let mapHeight = await $("#scene_map").height();
-						let mapWidth = await $("#scene_map").width();
+	}
 
 	
-						window.CURRENT_SCENE_DATA.conversion = 1;
-
-						if(data.scale_check && !data.UVTTFile && !data.is_video && (mapHeight > 2500 || mapWidth > 2500)){
-							let conversion = 2;
-							if(mapWidth >= mapHeight){
-								conversion = 1980 / mapWidth;
-							}
-							else{
-								conversion = 1980 / mapHeight;
-							}
-							mapHeight = mapHeight*conversion;
-							mapWidth = mapWidth*conversion;
-							$("#scene_map").css({
-								'height': mapHeight,
-								'width': mapWidth
-							});
-							scaleFactor = scaleFactor / conversion		
-							window.CURRENT_SCENE_DATA.scale_factor = scaleFactor;
-							window.CURRENT_SCENE_DATA.conversion = conversion;
-						}
-						else if(!data.scale_check){ //older than 0.98
-							window.CURRENT_SCENE_DATA = {
-								...window.CURRENT_SCENE_DATA,
-								hpps: window.CURRENT_SCENE_DATA.hpps / window.CURRENT_SCENE_DATA.scale_factor,
-								vpps: window.CURRENT_SCENE_DATA.vpps / window.CURRENT_SCENE_DATA.scale_factor,
-								offsetx: window.CURRENT_SCENE_DATA.offsetx / window.CURRENT_SCENE_DATA.scale_factor,
-								offsety: window.CURRENT_SCENE_DATA.offsety / window.CURRENT_SCENE_DATA.scale_factor
-							}
-						}
-						$('.import-loading-indicator .percentageLoaded').css('width', `10%`);	
-						window.CURRENT_SCENE_DATA.width = mapWidth;
-						window.CURRENT_SCENE_DATA.height = mapHeight;
-						
-
-						if(window.CURRENT_SCENE_DATA.gridType == 2 || window.CURRENT_SCENE_DATA.gridType == 3){
-							const a = 2 * Math.PI / 6;
-							const hexWidth = window.CURRENT_SCENE_DATA.hpps * Math.sin(a) * 2 * window.CURRENT_SCENE_DATA.scale_factor;
-							const hexHeight = window.CURRENT_SCENE_DATA.hpps * (1 + Math.cos(a)) * window.CURRENT_SCENE_DATA.scale_factor;
-							window.hexGridSize = {
-								width: hexWidth,
-								height: hexHeight
-							}
-						}
-
-						// Scale map according to scaleFactor
-						$("#VTT").css("--scene-scale", scaleFactor)
-						$('#loadingStyles').remove(); // incase 2nd load
-						if(!window.DM){
-							$('body').append($(`<style id='loadingStyles'>
-								.token,
-								.door-button,
-								.aura-element-container-clip{
-									display: none !important;
-								}
-								.token[data-id*='${window.PLAYER_ID}']{
-									display: flex !important;
-								}
-								
-								.aura-element-container-clip[id*='${window.PLAYER_ID}']{
-									display:unset !important;
-								}
-							</style>`))
-						}
-
-						
-
-						// WE USED THE DM MAP TO GET RIGH WIDTH/HEIGHT. NOW WE REVERT TO THE PLAYER MAP
-						if(!window.DM && data.dm_map_usable=="1" && data.UVTTFile != 1 && !data.is_video){
-							$("#scene_map").stop();
-							$("#scene_map").css("opacity","0");
-							console.log("switching back to player map");
-							$("#scene_map").off("load");
-							$("#scene_map").on("load", () => {
-								$("#scene_map").css('opacity', 1)
-								$("#darkness_layer").show();
-							});
-							
-						
-							$("#scene_map").attr('src', await getGoogleDriveAPILink(data.player_map));
-							$('.import-loading-indicator .percentageLoaded').css('width', `20%`);		
-						}
-						reset_canvas();
-		        		set_default_vttwrapper_size();
-						
-						console.log("LOADING TOKENS!");
-						let tokensLength = Object.keys(data.tokens).length;
-						let count = 0;
-						const tokenLoop = async function(data, count, tokensLength){
-								for (let id in data.tokens) {
-									if(msg.data.id != window.CURRENT_SCENE_DATA.id || lastSceneRequestTime != window.sceneRequestTime){
-										return;
-									}
-									if(forceRefresh)
-										delete window.all_token_objects[id]
-									await self.handleToken({
-										data: data.tokens[id],
-										loading: true,
-										persist: false			
-									})
-									count += 1;
-									await async_sleep(0.01);
-									$('.import-loading-indicator .percentageLoaded').css('width', `${20 + count/tokensLength*75}%`)
-									
-								}
-								return true;
-							}
-			
-						await tokenLoop(data, count, tokensLength);
-
-
-						if(msg.data.id != window.CURRENT_SCENE_DATA.id || lastSceneRequestTime != window.sceneRequestTime){
-							return;
-						}
-
-						let mixerState = window.MIXER.state();
-						for(let i in mixerState.channels){
-							if(mixerState.channels[i].token != undefined){
-								window.MIXER.deleteChannel(i);
-							}
-						}
-						let audioTokens = $('.audio-token');
-				        if(audioTokens.length > 0){
-				            for(let i = 0; i < audioTokens.length; i++){
-				                setTokenAudio($(audioTokens[i]), window.TOKEN_OBJECTS[$(audioTokens[i]).attr('data-id')]);
-				            }
-				        }
-						if(window.TELEPORTER_PASTE_BUFFER != undefined){
-							try{
-								const teleporterTokenId = window.TELEPORTER_PASTE_BUFFER.targetToken
-								const targetPortal = window.TOKEN_OBJECTS[teleporterTokenId];
-								const top = parseInt(targetPortal.options.top)+25;
-								const left = parseInt(targetPortal.options.left)+25;
-								const isTeleporter = true;
-								paste_selected_tokens(left, top, isTeleporter);
-							}
-							catch{
-								window.TELEPORTER_PASTE_BUFFER = undefined;
-							}
-							
-						}
-						ct_load({
-							loading: true,
-							current: $("#combat_area [data-current]").attr('data-target')
-						});
-
-
-						$('.import-loading-indicator .percentageLoaded').css('width', '95%');	
-						if (window.EncounterHandler !== undefined) {
-							fetch_and_cache_scene_monster_items();
-						}
-						did_update_scenes();
-						if (window.reorderState === ItemType.Scene) {
-							enable_draggable_change_folder(ItemType.Scene);
-						}
-						update_pc_token_rows();
-						$('.import-loading-indicator').remove();
-						delete window.LOADING;
-						if(!window.DM) {
-						 	window.MB.sendMessage('custom/myVTT/syncmeup');
-							do_check_token_visibility();
-						}
-						$('#loadingStyles').remove();
-						console.groupEnd()
-
-					});
-					
-					remove_loading_overlay();
-				}
-
-			
-			}
-		}
-		catch (e) {
-			showError(e);
-		}
-		
-		// console.groupEnd()
-	}
 
 	handleSyncMeUp(msg) {
 		if (DM) {

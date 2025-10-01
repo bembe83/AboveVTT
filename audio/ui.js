@@ -182,7 +182,7 @@ function init_mixer() {
                     channel.paused = true;
                     window.MIXER.updateChannel(id, channel);
                 }
-            });
+            });``
 
             if(channel.loop) {
                 loop.toggleClass('pressed', true);
@@ -286,8 +286,8 @@ function init_mixer() {
     clear.append(clear_svg);
     clear.on('click', function(){window.MIXER.clear()});
 
-    let sequentialPlay = $('<button class="sequential-button"></button>');
-    let sequential_svg = $(`<span class="material-symbols-outlined">format_list_numbered_rtl</span>`)
+    let sequentialPlay = $(`<button class="sequential-button ${window.MIXER.mixerMode == 'playlist' ? 'pressed' : window.MIXER.mixerMode == 'shuffle' ? 'pressed shuffle' : ''}"></button>`);
+    let sequential_svg = $(`<span class="material-symbols-outlined">${window.MIXER.mixerMode == 'shuffle' ? 'shuffle' : 'format_list_numbered_rtl'}</span>`)
     sequentialPlay.append(sequential_svg);
     sequentialPlay.off().on("click", function() {
         const icon = sequentialPlay.find(".material-symbols-outlined"); // Find the icon span
@@ -300,19 +300,32 @@ function init_mixer() {
             if(currentlyPlaying.length>0){
                 currentlyPlaying.click();
             }
+            window.MIXER.mixerMode = 'playlist';
             // icon.text("repeat"); // Continuous Play icon
         } else if (!sequentialPlay.hasClass("shuffle")) {
             sequentialPlay.addClass("shuffle");
             sequentialPlay.attr("title", "Shuffle Play");
             icon.text("shuffle"); // Shuffle Play icon
+            window.MIXER.mixerMode = 'shuffle';
         } else {
             sequentialPlay.removeClass("shuffle pressed");
-            sequentialPlay.attr("title", "Loop Off");
+            sequentialPlay.attr("title", "Soundboard/Playlist Mode");
             icon.text("format_list_numbered_rtl"); // Default icon
+            window.MIXER.mixerMode = 'soundboard';
         }
     
         console.log("Playback Mode:", sequentialPlay.attr("title"));
     });
+
+    let crossFade = $(`<button class="cross-fade-button ${window.MIXER.state().fade == true ? 'pressed' : ''}"></button>`);
+    let crossFadeSvg = $(`<span class="material-symbols-outlined">edit_audio</span>`)
+    crossFade.append(crossFadeSvg);
+    crossFade.off().on("click", function () {
+        const isPressed = $(this).hasClass('pressed')
+        crossFade.toggleClass('pressed', !isPressed);
+        window.MIXER.fade = !isPressed;
+    });
+
 
     // play/pause button
     let playPause = $('<button class="mixer-play-pause-button" style="font-size:10px;"></button>');
@@ -372,7 +385,7 @@ function init_mixer() {
         });   
     })
     $("#sounds-panel .sidebar-panel-header").append(header, playlistInput, addPlaylistButton, copyPlaylistButton, removePlaylistButton, playlistFields, masterVolumeSlider(), mixerChannels);
-    $('#master-volume').append(clear, sequentialPlay, playPause);
+    $('#master-volume').append(clear, sequentialPlay, crossFade, playPause);
 }
 
 
@@ -422,7 +435,7 @@ function init_trackLibrary() {
     const header = document.createElement("h3");
     header.textContent = "Track Library";
 
-    const searchTrackLibary = $(`<input type='search' placeholder='Search' style='margin-bottom: 5px; width: 100%;'></input>`)
+    const searchTrackLibary = $(`<input type='search' placeholder='Search' style='margin-bottom: 5px; width: 97%;'></input>`)
     searchTrackLibary.off().on('change keyup blur search', (e) => {      
         debounceSearch(e.target.value);
     });

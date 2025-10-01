@@ -30,49 +30,53 @@ function context_menu_flyout(id, hoverEvent, buildFunction) {
 	if (contextMenu.length === 0) {
 		console.warn("context_menu_flyout, but #tokenOptionsPopup could not be found");
 		return;
+	}	
+	
+	if (hoverEvent.type === "mouseleave") {
+		clearTimeout(window.contextFlyoutTimeout)
 	}
-
 	if (hoverEvent.type === "mouseenter") {
-		let flyout = $(`<div id='${id}' class='context-menu-flyout'></div>`);
-		$(`.context-menu-flyout`).remove(); // never duplicate
+		window.contextFlyoutTimeout = setTimeout(() => {
+			let flyout = $(`<div id='${id}' class='context-menu-flyout'></div>`);
+			$(`.context-menu-flyout`).remove(); // never duplicate
 
-		buildFunction(flyout);
-		$("#tokenOptionsContainer").append(flyout);
-		observe_hover_text(flyout);
+			buildFunction(flyout);
+			$("#tokenOptionsContainer").append(flyout);
+			observe_hover_text(flyout);
 
-		let contextMenuCenter = (contextMenu.height() / 2);
-		let flyoutHeight = flyout.height();
-		let diff = (contextMenu.height() - flyoutHeight);
-		let flyoutTop = contextMenuCenter - (flyoutHeight / 2); // center alongside the contextmenu
+			let contextMenuCenter = (contextMenu.height() / 2);
+			let flyoutHeight = flyout.height();
+			let diff = (contextMenu.height() - flyoutHeight);
+			let flyoutTop = contextMenuCenter - (flyoutHeight / 2); // center alongside the contextmenu
 
 
-		if (diff > 0) {
-			// the flyout is smaller than the contextmenu. Make sure it's alongside the hovered row			
-			// align to the top of the row. 14 is half the height of the button
-			let buttonPosition = $(hoverEvent.currentTarget).closest('.flyout-from-menu-item')[0].getBoundingClientRect().y - $("#tokenOptionsPopup")[0].getBoundingClientRect().y + 14
-			if(buttonPosition < contextMenuCenter) {
-				flyoutTop =  buttonPosition - (flyoutHeight / 5)
+			if (diff > 0) {
+				// the flyout is smaller than the contextmenu. Make sure it's alongside the hovered row			
+				// align to the top of the row. 14 is half the height of the button
+				let buttonPosition = $(hoverEvent.currentTarget).closest('.flyout-from-menu-item')[0].getBoundingClientRect().y - $("#tokenOptionsPopup")[0].getBoundingClientRect().y + 14
+				if (buttonPosition < contextMenuCenter) {
+					flyoutTop = buttonPosition - (flyoutHeight / 5)
+				}
+				else {
+					flyoutTop = buttonPosition - (flyoutHeight / 2)
+				}
 			}
-			else{
-				flyoutTop =  buttonPosition - (flyoutHeight / 2)
-			}				
-		}	
 
-		flyout.css({
-			left: contextMenu.width(),
-			top: flyoutTop,
-		});
-
-		if ($(".context-menu-flyout")[0].getBoundingClientRect().top < 0) {
-			flyout.css("top", 0)
-		}
-		else if($(".context-menu-flyout")[0].getBoundingClientRect().bottom > window.innerHeight-15) {
 			flyout.css({
-				top: 'unset',
-				bottom: 0
+				left: contextMenu.width(),
+				top: flyoutTop,
 			});
-		}
-		
+
+			if ($(".context-menu-flyout")[0].getBoundingClientRect().top < 0) {
+				flyout.css("top", 0)
+			}
+			else if ($(".context-menu-flyout")[0].getBoundingClientRect().bottom > window.innerHeight - 15) {
+				flyout.css({
+					top: 'unset',
+					bottom: 0
+				});
+			}
+		}, 150)
 	} 
 }
 
@@ -83,12 +87,10 @@ function close_token_context_menu() {
 
 function select_tokens_in_aoe(aoeTokens, selectPlayerTokens = true){
 	deselect_all_tokens();
-	let canvas = document.createElement('canvas');
-	let ctx = canvas.getContext('2d', { willReadFrequently: true }); //rare case where we can allow cpu do so all the lifting since it is not rendered
 	let rayCast = document.getElementById("raycastingCanvas");
-
-	canvas.width = rayCast.width;
-	canvas.height = rayCast.height;
+	let canvas = new OffscreenCanvas(rayCast.width, rayCast.height);
+	let ctx = canvas.getContext('2d', { willReadFrequently: true }); //rare case where we can allow cpu do so all the lifting since it is not rendered
+	
 
 
 	ctx.globalCompositeOperation='source-over';
@@ -156,20 +158,14 @@ function token_context_menu_expanded(tokenIds, e) {
 
 
 	$("#tokenOptionsPopup").remove();
-	let tokenOptionsClickCloseDiv = $("<div id='tokenOptionsClickCloseDiv'></div>");
-	tokenOptionsClickCloseDiv.off("click").on("click", function(){
-		$("#tokenOptionsPopup").remove();
+
+	create_context_background(['#tokenOptionsPopup', '.context-menu-flyout'], function(){
 		$('.context-menu-list').trigger('contextmenu:hide')
-		tokenOptionsClickCloseDiv.remove();
 		$("#tokenOptionsContainer .sp-container").spectrum("destroy");
 		$("#tokenOptionsContainer .sp-container").remove();
-		$(`.context-menu-flyout`).remove(); 
 		clear_temp_canvas();
 	});
 
-	tokenOptionsClickCloseDiv.off("contextmenu").on("contextmenu", function(e){
-		e.preventDefault();
-	})
 
 	let moveableTokenOptions = $("<div id='tokenOptionsPopup'></div>");
 
@@ -178,7 +174,7 @@ function token_context_menu_expanded(tokenIds, e) {
 	moveableTokenOptions.append(body);
 
 	$('body').append(moveableTokenOptions);
-	$('body').append(tokenOptionsClickCloseDiv);
+
 	$("#tokenOptionsPopup").addClass("moveableWindow");
 	$("#tokenOptionsPopup").draggable({
 		addClasses: false,
@@ -212,7 +208,8 @@ function token_context_menu_expanded(tokenIds, e) {
 					imgsrc: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=`,
 					type: 'door',
 					size: 50,
-					scaleCreated: window.CURRENT_SCENE_DATA.scale_factor
+					scaleCreated: window.CURRENT_SCENE_DATA.scale_factor,
+					auraislight: false
 				};
 				window.ScenesHandler.create_update_token(options)
 			}
@@ -280,7 +277,7 @@ function token_context_menu_expanded(tokenIds, e) {
 					let [endX, endY] = [window.TOKEN_OBJECTS[tokenIds].options.teleporterCoords.left*teleScale, window.TOKEN_OBJECTS[tokenIds].options.teleporterCoords.top*teleScale]
 
 					let [rectX, rectY] = [endX - window.CURRENT_SCENE_DATA.hpps/2, endY-window.CURRENT_SCENE_DATA.vpps/2]
-					context.setLineDash([30, 30])
+					context.setLineDash([5, 5])
 					drawRect(context, rectX, rectY, window.CURRENT_SCENE_DATA.hpps, window.CURRENT_SCENE_DATA.vpps, '#fff', false)
 
 
@@ -315,7 +312,7 @@ function token_context_menu_expanded(tokenIds, e) {
 						let [endX, endY] = get_event_cursor_position(e);
 
 						let [rectX, rectY] = [endX - window.CURRENT_SCENE_DATA.hpps/2, endY-window.CURRENT_SCENE_DATA.vpps/2]
-						context.setLineDash([30, 30])
+						context.setLineDash([5, 5])
 						drawRect(context, rectX, rectY, window.CURRENT_SCENE_DATA.hpps, window.CURRENT_SCENE_DATA.vpps, '#fff', false)
 
 
@@ -374,7 +371,7 @@ function token_context_menu_expanded(tokenIds, e) {
 						let [endX, endY] = get_event_cursor_position(e);
 
 						let [rectX, rectY] = [endX - window.CURRENT_SCENE_DATA.hpps/2, endY-window.CURRENT_SCENE_DATA.vpps/2]
-						context.setLineDash([30, 30])
+						context.setLineDash([5, 5])
 						drawRect(context, rectX, rectY, window.CURRENT_SCENE_DATA.hpps, window.CURRENT_SCENE_DATA.vpps, '#fff', false)
 
 
@@ -459,7 +456,7 @@ function token_context_menu_expanded(tokenIds, e) {
 				});
 				body.append(teleportTwoWayButton);
 
-				let copyPortalId = $(`<button class=" context-menu-icon-hidden door-open material-icons">Copy Portal ID</button>`)
+				let copyPortalId = $(`<button class=" context-menu-icon-hidden link material-icons">Copy Portal ID</button>`)
 				copyPortalId.off().on("click", function(clickEvent){
 					const copyLink = `${tokenIds};${window.CURRENT_SCENE_DATA.id}`
 			        navigator.clipboard.writeText(copyLink);
@@ -480,12 +477,21 @@ function token_context_menu_expanded(tokenIds, e) {
 					const values = $(this).val().split(';')
 					const portalTokenId = values[0];
 					const sceneId = values[1];
-					window.TOKEN_OBJECTS[tokenIds].options.teleporterCoords = {'linkedPortalId': portalTokenId, 'sceneId': sceneId}
-					if(window.all_token_objects[tokenIds] != undefined){
-						window.all_token_objects[tokenIds].options.teleporterCoords = {'linkedPortalId': portalTokenId, 'sceneId': sceneId}
+					if(sceneId == undefined || portalTokenId == undefined){
+						delete window.TOKEN_OBJECTS[tokenIds].options.teleporterCoords;
+						if(window.all_token_objects[tokenIds] != undefined){
+							delete window.all_token_objects[tokenIds].options.teleporterCoords;
+						}
+					} else{
+						window.TOKEN_OBJECTS[tokenIds].options.teleporterCoords = {'linkedPortalId': portalTokenId, 'sceneId': sceneId}
+						if(window.all_token_objects[tokenIds] != undefined){
+							window.all_token_objects[tokenIds].options.teleporterCoords = {'linkedPortalId': portalTokenId, 'sceneId': sceneId}
+						}
 					}
+					
 					window.TOKEN_OBJECTS[tokenIds].place(0);
 					window.TOKEN_OBJECTS[tokenIds].sync($.extend(true, {}, window.TOKEN_OBJECTS[tokenIds].options));
+					redraw_light_walls();
 				})
 
 				body.append(crossSceneIdInputContainer);
@@ -708,6 +714,13 @@ function token_context_menu_expanded(tokenIds, e) {
 	if(audioToken != undefined){
 		if(!window.DM)
 			return;
+		
+		
+		if(window.TOKEN_OBJECTS[tokenIds].options.audioChannel?.audioArea != undefined){
+			clear_temp_canvas();
+			drawPolygon(temp_context, window.TOKEN_OBJECTS[tokenIds].options.audioChannel.audioArea, 'rgba(255, 0, 0, 0.3)', true);
+		}
+		
 		if (tokens.length > 1 || (tokens.length == 1 && tokens[0].options.groupId != undefined)) {
 			let addButtonInternals = `Group Tokens<span class="material-icons add-link"></span>`;
 			let removeButtonInternals = `Remove From Group<span class="material-icons link-off"></span>`;
@@ -738,6 +751,22 @@ function token_context_menu_expanded(tokenIds, e) {
 			});
 			body.append(groupTokens);
 		}
+		let polygonAudioButton = $(`<button class="context-menu-icon-hidden spatial-tracking material-icons">${window.TOKEN_OBJECTS[tokenIds].options.audioChannel.audioArea == undefined ? 'Draw Polygon Audio Area' : 'Remove Polygon Audio Area'}</button>`)
+		polygonAudioButton.off().on("click", function(clickEvent){
+			let clickedItem = $(this);
+			if(window.TOKEN_OBJECTS[tokenIds].options.audioChannel.audioArea == undefined){
+				window.drawingAudioTokenId = tokenIds[0];
+				window.drawAudioPolygon = true;
+				close_token_context_menu();
+			}
+			else{
+				$(this).text('Draw Polygon Audio Area')
+				delete window.TOKEN_OBJECTS[tokenIds].options.audioChannel.audioArea;
+				window.TOKEN_OBJECTS[tokenIds].place_sync_persist();
+				clear_temp_canvas();
+			}
+
+		});
 		let toTopMenuButton = $("<button class='material-icons to-top'>Move to Top</button>");
 		let toBottomMenuButton = $("<button class='material-icons to-bottom'>Move to Bottom</button>")
 
@@ -811,28 +840,27 @@ function token_context_menu_expanded(tokenIds, e) {
 		});
 		body.append(hiddenMenuButton);
 
-
 		let attenuateButton = $(`<button class="${window.TOKEN_OBJECTS[tokenIds].options.audioChannel.attenuate ? 'single-active active-condition' : 'none-active'} context-menu-icon-hidden spatial-audio-off material-icons">Distance based volume</button>`)
-			attenuateButton.off().on("click", function(clickEvent){
-				let clickedItem = $(this);
-				
-				window.TOKEN_OBJECTS[tokenIds].options.audioChannel.attenuate = !window.TOKEN_OBJECTS[tokenIds].options.audioChannel.attenuate;
-				let classes = window.TOKEN_OBJECTS[tokenIds].options.audioChannel.attenuate ? 'single-active active-condition context-menu-icon-hidden spatial-audio-off material-icons' : 'none-active context-menu-icon-hidden spatial-audio-off material-icons';
-				$(this).attr('class', `${classes}`)
-				window.TOKEN_OBJECTS[tokenIds].place_sync_persist();
-			});
+		attenuateButton.off().on("click", function(clickEvent){
+			let clickedItem = $(this);
+			
+			window.TOKEN_OBJECTS[tokenIds].options.audioChannel.attenuate = !window.TOKEN_OBJECTS[tokenIds].options.audioChannel.attenuate;
+			let classes = window.TOKEN_OBJECTS[tokenIds].options.audioChannel.attenuate ? 'single-active active-condition context-menu-icon-hidden spatial-audio-off material-icons' : 'none-active context-menu-icon-hidden spatial-audio-off material-icons';
+			$(this).attr('class', `${classes}`)
+			window.TOKEN_OBJECTS[tokenIds].place_sync_persist();
+		});
 
 
 		body.append(attenuateButton);
 		let wallsBlockedButton = $(`<button class="${window.TOKEN_OBJECTS[tokenIds].options.audioChannel.wallsBlocked ? 'single-active active-condition' : 'none-active'} context-menu-icon-hidden select-to-speak material-icons">Blocked by Walls</button>`)
-			wallsBlockedButton.off().on("click", function(clickEvent){
-				let clickedItem = $(this);
-				
-				window.TOKEN_OBJECTS[tokenIds].options.audioChannel.wallsBlocked = !window.TOKEN_OBJECTS[tokenIds].options.audioChannel.wallsBlocked;
-				let classes = window.TOKEN_OBJECTS[tokenIds].options.audioChannel.wallsBlocked ? 'single-active active-condition context-menu-icon-hidden select-to-speak material-icons' : 'none-active context-menu-icon-hidden select-to-speak material-icons';
-				$(this).attr('class', `${classes}`)
-				window.TOKEN_OBJECTS[tokenIds].place_sync_persist();
-			});
+		wallsBlockedButton.off().on("click", function(clickEvent){
+			let clickedItem = $(this);
+			
+			window.TOKEN_OBJECTS[tokenIds].options.audioChannel.wallsBlocked = !window.TOKEN_OBJECTS[tokenIds].options.audioChannel.wallsBlocked;
+			let classes = window.TOKEN_OBJECTS[tokenIds].options.audioChannel.wallsBlocked ? 'single-active active-condition context-menu-icon-hidden select-to-speak material-icons' : 'none-active context-menu-icon-hidden select-to-speak material-icons';
+			$(this).attr('class', `${classes}`)
+			window.TOKEN_OBJECTS[tokenIds].place_sync_persist();
+		});
 
 		body.append(wallsBlockedButton);
 		let upsq = window.CURRENT_SCENE_DATA.upsq;
@@ -854,6 +882,10 @@ function token_context_menu_expanded(tokenIds, e) {
 		});
 
 		body.append(audioRangeInput);
+
+
+
+		body.append(polygonAudioButton);
 
 		if (tokens.length === 1) {
 			let notesRow = $(`<div class="token-image-modal-footer-select-wrapper flyout-from-menu-item"><div class="token-image-modal-footer-title">Token Note</div></div>`);
@@ -1055,19 +1087,100 @@ function token_context_menu_expanded(tokenIds, e) {
 				clickedButton.html(removeButtonInternals);
 				const reset_init = getCombatTrackersettings().remove_init;
 
-				tokens.forEach(t => {
-					if(window.all_token_objects[t.options.id] == undefined)
-						window.all_token_objects[t.options.id] = t;
-					t.options.combatGroup = undefined;
-					window.all_token_objects[t.options.id].options.combatGroup = undefined;
+				const autoGroup = getCombatTrackersettings().autoGroup;
 
-					if(reset_init == true){
-						t.options.init = undefined;
-						window.all_token_objects[t.options.id].options.init = undefined;
+				if(autoGroup === '1'){
+					const groupedByStat = tokens.reduce((acc, token) => {
+						//split  into groups based on statblock - players get added individually
+						const key = token.options.statBlock ? `SB-${token.options.statBlock}` : token.options.sheet ? token.options.sheet : token.options.stat;
+						if (!acc[key]) {
+							acc[key] = [];
+						}
+						acc[key].push(token);
+						return acc;
+					}, {});
+
+					for(let i in groupedByStat){		
+						let group = uuid();
+						let allHidden = true;
+						let allVisibleNames = true
+						const reset_init = getCombatTrackersettings().remove_init;
+						
+						groupedByStat[i].forEach(t => {
+							if(t.isPlayer()){
+								if(window.all_token_objects[t.options.id] == undefined)
+									window.all_token_objects[t.options.id] = t;
+								t.options.combatGroup = undefined;
+								window.all_token_objects[t.options.id].options.combatGroup = undefined;
+
+								if(reset_init == true){
+									t.options.init = undefined;
+									window.all_token_objects[t.options.id].options.init = undefined;
+								}
+								ct_add_token(t, false, undefined, clickEvent.shiftKey, clickEvent.ctrlKey)
+								t.update_and_sync();
+								return;
+							}
+							ct_remove_token(t, false);
+							if(t.options.combatGroup != undefined && Object.values(window.TOKEN_OBJECTS)?.filter(d=>d.options.combatGroup == t.options.combatGroup)?.length == 2 && window.TOKEN_OBJECTS[t.options.combatGroup]){
+								window.TOKEN_OBJECTS[t.options.combatGroup].delete()
+							}
+							if(t.options.hidden !== true){
+								allHidden = false
+							}
+							if(!t.isPlayer() && t.options.revealname == false){
+								allVisibleNames = false;
+							}
+							if(window.all_token_objects[t.options.id] == undefined)
+								window.all_token_objects[t.options.id] = t;
+							if(reset_init == true){
+								t.options.init = undefined;
+								window.all_token_objects[t.options.id].options.init = undefined;
+							}
+							t.options.combatGroup = group;
+							window.all_token_objects[t.options.id].options.combatGroup = group;
+
+							ct_add_token(t, false, undefined, clickEvent.shiftKey,  clickEvent.ctrlKey);
+							t.update_and_sync();
+						});
+						if(i.includes('/character')) // player was added invidiually don't put a group in the combat tracker
+							continue;
+						let t = new Token({
+							...groupedByStat[i][0].options,
+							id: group,
+							combatGroupToken: group,
+							ct_show: !allHidden,
+							revealname: allVisibleNames,
+							name: `${groupedByStat[i][0].options.name} Group`,
+						});
+						delete t.options.groupId; 
+						window.TOKEN_OBJECTS[group] = t;
+						if(window.all_token_objects[group] == undefined){
+							window.all_token_objects[group] = t;
+						}
+						t.sync = mydebounce(function(options) { // VA IN FUNZIONE SOLO SE IL TOKEN NON ESISTE GIA					
+							window.MB.sendMessage('custom/myVTT/token', options);
+						}, 300);
+						t.place_sync_persist();
+						ct_add_token(window.TOKEN_OBJECTS[group], false, clickEvent.shiftKey, clickEvent.ctrlKey)	
+					
 					}
-					ct_add_token(t, false, undefined, clickEvent.shiftKey, clickEvent.ctrlKey)
-					t.update_and_sync();
-				});
+				}
+				else{
+					tokens.forEach(t => {
+						if(window.all_token_objects[t.options.id] == undefined)
+							window.all_token_objects[t.options.id] = t;
+						t.options.combatGroup = undefined;
+						window.all_token_objects[t.options.id].options.combatGroup = undefined;
+
+						if(reset_init == true){
+							t.options.init = undefined;
+							window.all_token_objects[t.options.id].options.init = undefined;
+						}
+						ct_add_token(t, false, undefined, clickEvent.shiftKey, clickEvent.ctrlKey)
+						t.update_and_sync();
+					});
+				}
 			}
 
 			debounceCombatReorder();
@@ -1590,7 +1703,7 @@ function build_token_auras_inputs(tokenIds) {
 	})
 
 	let allTokensArePlayer = true;
-	for(let token in tokens){
+	for(let token = 0; token < tokens.length; token++){
 		if(!window.TOKEN_OBJECTS[tokens[token].options.id].isPlayer()){
 			allTokensArePlayer=false;
 			break;
@@ -1779,7 +1892,7 @@ function build_token_auras_inputs(tokenIds) {
 			token.place_sync_persist();
 		});
 	});
-	for(let i in window.AURA_PRESETS){
+	for(let i = 0; i<window.AURA_PRESETS.length; i++){
 		wrapper.find('.token-config-aura-preset').append(`<option value="${window.AURA_PRESETS[i].name}">${window.AURA_PRESETS[i].name}</option>`)
 	}
 
@@ -1796,7 +1909,7 @@ function build_token_auras_inputs(tokenIds) {
 		let selected = allTokenSelected.length === 1 ? allTokenSelected[0] : "";
 		wrapper.find('.token-config-animation-preset').append(`<option ${animationPresets[option] == selected ? `selected=true` : ''} value="${animationPresets[option]}">${option}</option>`)
 	}
-	for(let i in window.ANIMATION_PRESETS){
+	for(let i = 0; i<window.ANIMATION_PRESETS.length; i++){
 		let allTokenSelected = tokens.map(t => t.options.animation?.aura);
 		let selected = allTokenSelected.length === 1 ? allTokenSelected[0] : "";
 		wrapper.find('.token-config-animation-preset').append(`<option ${window.ANIMATION_PRESETS[i].name == selected ? `selected=true` : ''} value="${window.ANIMATION_PRESETS[i].name}">${window.ANIMATION_PRESETS[i].name}</option>`)
@@ -1963,7 +2076,7 @@ function build_token_light_inputs(tokenIds, door=false) {
 	})
 
 	let allTokensArePlayer = true;
-	for(let token in tokens){
+	for(let token = 0; token<tokens.length; token++){
 		if(!window.TOKEN_OBJECTS[tokens[token].options.id].isPlayer()){
 			allTokensArePlayer=false;
 			break;
@@ -2181,7 +2294,7 @@ function build_token_light_inputs(tokenIds, door=false) {
 		'Truesight': 'truesight'	
 	}
 
-	for(let i in window.LIGHT_PRESETS){
+	for(let i=0; i<window.LIGHT_PRESETS.length; i++){
 		wrapper.find('.token-config-aura-preset').append(`<option value="${window.LIGHT_PRESETS[i].name}">${window.LIGHT_PRESETS[i].name}</option>`)
 	}
 
@@ -2191,7 +2304,7 @@ function build_token_light_inputs(tokenIds, door=false) {
 		wrapper.find('.token-config-animation-preset').append(`<option ${animationPresets[option] == selected ? `selected=true` : ''} value="${animationPresets[option]}">${option}</option>`)
 	}
 
-	for(let i in window.ANIMATION_PRESETS){
+	for(let i=0; i<window.ANIMATION_PRESETS.length; i++){
 		let allTokenSelected = tokens.map(t => t.options.animation?.light);
 		let selected = allTokenSelected.length === 1 ? allTokenSelected[0] : "";
 		wrapper.find('.token-config-animation-preset').append(`<option ${window.ANIMATION_PRESETS[i].name == selected ? `selected=true` : ''} value="${window.ANIMATION_PRESETS[i].name}">${window.ANIMATION_PRESETS[i].name}</option>`)
@@ -2245,7 +2358,7 @@ function build_token_light_inputs(tokenIds, door=false) {
 		defaultValue: false
 	};
 
-	for(let i in window.playerUsers){
+	for(let i=0; i<window.playerUsers.length; i++){
 		if(!revealvisionOption.options.some(d => d.value == window.playerUsers[i].userId)){
 			let option = {value: window.playerUsers[i].userId, label: window.playerUsers[i].userName, desciption: `Token vision is shared with ${window.playerUsers[i].userName}`}
 			revealvisionOption.options.push(option)
@@ -2480,7 +2593,7 @@ function create_aura_presets_edit(){
 			</tr>
 			`)
 	aura_presets.append(titleRow);
-	for(let i in window.AURA_PRESETS){
+	for(let i=0; i<window.AURA_PRESETS.length; i++){
 		let row = $(`
 			<tr class='aura_preset_row' data-index='${i}'>
 				<td>
@@ -2599,7 +2712,7 @@ function create_light_presets_edit(){
 			</tr>
 			`)
 	light_presets.append(titleRow);
-	for(let i in window.LIGHT_PRESETS){
+	for(let i=0; i<window.LIGHT_PRESETS.length; i++){
 		let row = $(`
 			<tr class='light_preset_row' data-index='${i}'>
 				<td>
@@ -2728,7 +2841,7 @@ function create_animation_presets_edit(isVision = false){
 			</tr>
 			`)
 	animation_presets.append(titleRow);
-	for(let i in window.ANIMATION_PRESETS){
+	for(let i=0; i<window.ANIMATION_PRESETS.length; i++){
 		
 
 		let row = $(`
@@ -3025,10 +3138,15 @@ function build_notes_flyout_menu(tokenIds, flyout) {
 					if(id in window.JOURNAL.notes){
 						delete window.JOURNAL.notes[id];
 						window.JOURNAL.persist();
-						window.TOKEN_OBJECTS[id].place();	
+						window.TOKEN_OBJECTS[id].place_sync_persist();	
 						body.remove();
 						if(flyout != undefined)
-							flyout.append(build_notes_flyout_menu(tokenIds, flyout))		
+							flyout.append(build_notes_flyout_menu(tokenIds, flyout))	
+						window.MB.sendMessage("custom/myVTT/note", {
+							note: window.JOURNAL.notes[id],
+							id: id,
+							delete: true
+						})		
 					}
 				}
 			});
@@ -3046,8 +3164,14 @@ function build_notes_flyout_menu(tokenIds, flyout) {
 						player: true
 					}
 				}
+				window.MB.sendMessage("custom/myVTT/note", {
+					note: window.JOURNAL.notes[id],
+					id: id
+				})
+				window.TOKEN_OBJECTS[id].place_sync_persist();
 				$('#tokenOptionsClickCloseDiv').click();
 				window.JOURNAL.edit_note(id);
+
 			});	
 			body.append(editSharedNoteButton);
 		}
@@ -3061,6 +3185,12 @@ function build_notes_flyout_menu(tokenIds, flyout) {
 					plain: '',
 					player: false
 				}
+				window.MB.sendMessage("custom/myVTT/note", {
+					note: window.JOURNAL.notes[id],
+					id: id
+				})
+				window.TOKEN_OBJECTS[id].place_sync_persist();
+
 			}
 			$('#tokenOptionsClickCloseDiv').click();
 			window.JOURNAL.edit_note(id);
@@ -3313,10 +3443,6 @@ function build_adjustments_flyout_menu(tokenIds) {
 			return;
 		}
 		tokens.forEach(token => {			
-			// Reset imageScale if new size is larger
-			if(token.options.size < newSize) {
-				token.imageSize(1);
-			}
 			token.size(newSize, linewidth);
 			clampTokenImageSize(token.options.imageSize, token.options.size);
 		});
@@ -3364,8 +3490,8 @@ function build_adjustments_flyout_menu(tokenIds) {
 				token.options.offset = {x: 0, y:0};
 				token.options.offset.x = offsetX;
 				$(`.VTTToken[data-id='${token.options.id}']`).css({
-					"--offsetX": `${parseFloat(offsetX) * token.options.gridSquares}px`,
-					"--offsetY": `${parseFloat(token.options.offset.y) * token.options.gridSquares}px`
+					"--offsetX": `${parseFloat(offsetX) / 90 * token.options.size}px`,
+					"--offsetY": `${parseFloat(token.options.offset.y) / 90 * token.options.size}px`
 				})
 
 				if(persist)
@@ -3385,8 +3511,8 @@ function build_adjustments_flyout_menu(tokenIds) {
 					token.options.offset = {x: 0, y:0};
 				token.options.offset.y = offsetY;
 				$(`.VTTToken[data-id='${token.options.id}']`).css({
-					"--offsetX": `${parseFloat(token.options.offset.x) * token.options.gridSquares}px`,
-					"--offsetY": `${parseFloat(offsetY) * token.options.gridSquares}px`
+					"--offsetX": `${parseFloat(token.options.offset.x) / 90 * token.options.size}px`,
+					"--offsetY": `${parseFloat(offsetY) / 90 * token.options.size}px`
 				})
 				if(persist)
 					token.place_sync_persist();
@@ -4337,6 +4463,14 @@ function open_quick_roll_menu(e){
 			else{
 				$(this).toggleClass('save-success', true)
 			}
+		})
+		const rows = results.find('tr[data-target]');
+		rows.each(function(){
+			const target = $(this).attr('data-target');
+			if (window.all_token_objects[target]?.options.revealname != true){
+				$(this).toggleClass('hideQrmRowFromPlayers')
+			}
+
 		})
 		results.attr('id','qrm-gamelog');
 		let msgdata = {
