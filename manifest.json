@@ -103,6 +103,7 @@
 			"godice-roller.bundle.js",
 			"WeatherOverlay.js",
 			"iframe.html",
+			"avttS3Upload.js",
 			"loadFrame.js"
 			],
 			"matches": [ "*://*.dndbeyond.com/*" ]	

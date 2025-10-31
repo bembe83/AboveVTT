@@ -6,6 +6,77 @@ var cursor_y = -1;
 var arrowKeysHeld = [0, 0, 0, 0];
 
 const sb_scroll_style = "avtt-scroll-hidden"
+
+function avttIsFilePickerVisible() {
+    const picker = document.getElementById("avtt-file-picker");
+    if (!picker) {
+        return false;
+    }
+    return $(picker).is(":visible");
+}
+
+function avttShouldBypassFilePickerHotkey(targetElement) {
+    const picker = document.getElementById("avtt-file-picker");
+    if (!picker) {
+        return false;
+    }
+    let element = null;
+    if (targetElement && picker.contains(targetElement)) {
+        element = targetElement;
+    } else if (document.activeElement && picker.contains(document.activeElement)) {
+        element = document.activeElement;
+    }
+    if (!element) {
+        return false;
+    }
+    if (!element) {
+        return false;
+    }
+    const tagName = String(element.tagName || "").toLowerCase();
+    if (tagName === "input" || tagName === "textarea") {
+        return true;
+    }
+    return Boolean(element.isContentEditable);
+}
+
+function avttHandleFilePickerCut(e) {
+    if (!avttIsFilePickerVisible()) {
+        return false;
+    }
+    if (avttShouldBypassFilePickerHotkey(e?.target)) {
+        return false;
+    }
+    if (typeof window.avttCutSelectedFiles === "function") {
+        const didCut = window.avttCutSelectedFiles();
+        if (didCut) {
+            e?.preventDefault?.();
+            return true;
+        }
+    }
+    return false;
+}
+
+async function avttHandleFilePickerPaste(e) {
+    if (!avttIsFilePickerVisible()) {
+        return false;
+    }
+    if (avttShouldBypassFilePickerHotkey(e?.target)) {
+        return false;
+    }
+    if (typeof window.avttPasteFiles === "function") {
+        try {
+            const didPaste = await window.avttPasteFiles();
+            if (didPaste) {
+                e?.preventDefault?.();
+                return true;
+            }
+        } catch (error) {
+            console.error("Failed to paste files from file picker clipboard", error);
+        }
+    }
+    return false;
+}
+
 function hide_scrollbar() {
     if (!document.getElementById(sb_scroll_style)) {
         const style = document.createElement("style");
@@ -52,7 +123,7 @@ function unhide_interface() {
         $('#hide_interface_button').hide().removeClass('unhidden');
         $('.hideable').show();
         $(".dice-toolbar").css({'visibility': '', 'pointer-events': ''});
-        hide_scrollbar();
+        hide_or_unhide_scrollbar() 
     } else {
         if ($('#hide_rightpanel').hasClass('point-right')) {
             $('#hide_rightpanel').click();
@@ -63,9 +134,7 @@ function unhide_interface() {
         $(".dice-toolbar").css({'visibility': 'hidden', 'pointer-events': 'none'});
         $('#hide_interface_button').show().addClass('unhidden');
         $('.hideable').hide();
-        if (!get_avtt_setting_value("alwaysHideScrollbar")) {        
-            allow_scrollbar();        
-        }
+        hide_scrollbar();
     }
 }
 
@@ -668,6 +737,12 @@ Mousetrap.bind('shift+h', function () {
     unhide_interface();
 });
 
+Mousetrap.bind('mod+x', function(e) {
+    if (avttHandleFilePickerCut(e)) {
+        return;
+    }
+}, 'keydown');
+
 Mousetrap.bind('mod+c', function(e) {
     if(window.selectedWalls?.length==0){
         copy_selected_tokens();
@@ -679,7 +754,10 @@ Mousetrap.bind('mod+c', function(e) {
 });
 
 
-Mousetrap.bind('mod+v', function(e) {
+Mousetrap.bind('mod+v', async function(e) {
+    if (await avttHandleFilePickerPaste(e)) {
+        return;
+    }
     if($('#temp_overlay:hover').length>0){
         if(window.TOKEN_PASTE_BUFFER?.[0]?.wall == undefined){
             paste_selected_tokens(window.cursor_x, window.cursor_y);

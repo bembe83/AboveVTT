@@ -55,11 +55,11 @@ function parse_img(url) {
 		else if(retval.includes("https://1drv.ms/"))
 		{
 			if(retval.split('/')[4].length == 1){
-	      retval = retval;
-	    }
-	    else{
-	      retval = "https://api.onedrive.com/v1.0/shares/u!" + btoa(url) + "/root/content";
-	    }
+				retval = retval;
+			}
+			else{
+				retval = "https://api.onedrive.com/v1.0/shares/u!" + btoa(url) + "/root/content";
+			}
 		}
 		if(retval.includes("discordapp.com")){
 			retval = update_old_discord_link(retval)
@@ -536,6 +536,11 @@ async function load_scenemap(url, is_video = false, width = null, height = null,
 			newmap.width(width);
 			newmap.height(height);		
 		}
+		else if(url.startsWith('above-bucket-not-a-url')){
+			url = await getAvttStorageUrl(url, true);
+			newmap = $(`<img id='scene_map' src='${url}' style='position:absolute;top:0;left:0;z-index:10'>`);
+
+		}
 		else{
 			url = await getGoogleDriveAPILink(url)
 			newmap = $(`<img id='scene_map' src='${url}' style='position:absolute;top:0;left:0;z-index:10'>`);
@@ -567,26 +572,29 @@ async function load_scenemap(url, is_video = false, width = null, height = null,
 		videoVolume = videoVolume * $("#master-volume input").val();
 		
 		if(url.includes('google')){
-	    if (url.startsWith("https://drive.google.com") && url.indexOf("uc?id=") < 0 && url.indexOf("thumbnail?id=") < 0 ) {
-	        const parsed = 'https://drive.google.com/uc?id=' + url.split('/')[5];
-	        const fileid = parsed.split('=')[1];
-	        url = `https://www.googleapis.com/drive/v3/files/${fileid}?alt=media&key=AIzaSyBcA_C2gXjTueKJY2iPbQbDvkZWrTzvs5I`;     
-	    } 
-	    else if (url.startsWith("https://drive.google.com") && url.indexOf("uc?id=") > -1) {
-	        const fileid = url.split('=')[1];
-	        url = `https://www.googleapis.com/drive/v3/files/${fileid}?alt=media&key=AIzaSyBcA_C2gXjTueKJY2iPbQbDvkZWrTzvs5I`;   
-	    }
-	    else if (url.startsWith("https://drive.google.com") && url.indexOf("thumbnail?id=") > -1) {
-	        const fileid = url.split('=')[1].split('&')[0];
-	        url = `https://www.googleapis.com/drive/v3/files/${fileid}?alt=media&key=AIzaSyBcA_C2gXjTueKJY2iPbQbDvkZWrTzvs5I`;   
-	    }
+			if (url.startsWith("https://drive.google.com") && url.indexOf("uc?id=") < 0 && url.indexOf("thumbnail?id=") < 0 ) {
+				const parsed = 'https://drive.google.com/uc?id=' + url.split('/')[5];
+				const fileid = parsed.split('=')[1];
+				url = `https://www.googleapis.com/drive/v3/files/${fileid}?alt=media&key=AIzaSyBcA_C2gXjTueKJY2iPbQbDvkZWrTzvs5I`;     
+			} 
+			else if (url.startsWith("https://drive.google.com") && url.indexOf("uc?id=") > -1) {
+				const fileid = url.split('=')[1];
+				url = `https://www.googleapis.com/drive/v3/files/${fileid}?alt=media&key=AIzaSyBcA_C2gXjTueKJY2iPbQbDvkZWrTzvs5I`;   
+			}
+			else if (url.startsWith("https://drive.google.com") && url.indexOf("thumbnail?id=") > -1) {
+				const fileid = url.split('=')[1].split('&')[0];
+				url = `https://www.googleapis.com/drive/v3/files/${fileid}?alt=media&key=AIzaSyBcA_C2gXjTueKJY2iPbQbDvkZWrTzvs5I`;   
+			}
 		}
 		else if(url.includes('onedrive')){
-	    url = url.replace('embed?', 'download?');
+	    	url = url.replace('embed?', 'download?');
 		}
 		else if(url.includes("https://1drv.ms/"))
 		{
 		  url = "https://api.onedrive.com/v1.0/shares/u!" + btoa(url) + "/root/content";
+		}
+		else if (url.startsWith('above-bucket-not-a-url')) {
+			url = await getAvttStorageUrl(url, true)
 		}
 		let newmap = $(`<video style="${newmapSize} position: absolute; top: 0; left: 0;z-index:10" playsinline autoplay loop data-volume='0.25' onplay="this.volume=${videoVolume/100}" id="scene_map" src="${url}" />`);
 		newmap.off("loadeddata").one("loadeddata", callback);
@@ -1557,8 +1565,8 @@ function minimize_player_window_double_click(titleBar) {
  */
 function frame_z_index_when_click(moveableFrame){
 
-	if(moveableFrame.css('z-index') != 50000) {
-		moveableFrame.css('z-index', 50000);
+	if(moveableFrame.css('z-index') != 90000) {
+		moveableFrame.css('z-index', 90000);
 		$(".moveableWindow, [role='dialog']").not(moveableFrame).each(function() {
 			$(this).css('z-index',($(this).css('z-index')-1));
 		});
@@ -1906,8 +1914,8 @@ function close_player_sheet()
 		window.character_sheet_observer.disconnect();
 		delete window.character_sheet_observer;
 	}
-	if(!window.DM){
-			observe_character_sheet_changes($('#site-main, .ct-sidebar__portal'));
+	if(!window.DM && !is_spectator_page()){
+		observe_character_sheet_changes($('#site-main, .ct-sidebar__portal'));
 	}
 }
 /**
@@ -2397,7 +2405,8 @@ function init_ui() {
 		if (curDown) {
 			let scrollOptions = {
 				left: window.scrollX + curXPos - m.pageX,
-				top: window.scrollY + curYPos - m.pageY
+				top: window.scrollY + curYPos - m.pageY,
+				behavior: "instant"
 			}
 			requestAnimationFrame(function(){
 				window.scrollTo(scrollOptions)
@@ -2431,8 +2440,7 @@ function init_ui() {
 		
 		curDown = false;
 		$("#VTT, #black_layer").css("cursor", "");
-		//remove iframe cover that prevents mouse interaction
-		$('.iframeResizeCover').remove();
+
 		if (event.target.tagName.toLowerCase() !== 'a') {
 			$("#splash").remove(); // don't remove the splash screen if clicking an anchor tag otherwise the browser won't follow the link
 		}
@@ -2444,6 +2452,8 @@ function init_ui() {
 				close_sidebar_modal();
 			}
 		}
+		//remove iframe cover that prevents mouse interaction
+		$('.iframeResizeCover').remove();
 		let sidebarMonsterStatBlock = $("#monster-details-page-iframe");
 		if (sidebarMonsterStatBlock.length > 0 && !event.target.closest("#monster-details-page-iframe")) {
 			sidebarMonsterStatBlock.remove();
@@ -2555,7 +2565,8 @@ function init_zoom_buttons() {
 	if ($("#zoom_buttons").length > 0) {
 		return;
 	}
-	let defaultValues = get_avtt_setting_value('quickToggleDefaults');
+	let defaultValues = get_avtt_setting_value('quickToggleDefaults') || {};
+
 	// ZOOM BUTTON
 	let zoom_section = $("<div id='zoom_buttons' />");
 	const youtube_controls_button = $(`<div id='youtube_controls_button' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Quick toggle youtube controls'></div>`);
@@ -2799,8 +2810,17 @@ function init_zoom_buttons() {
 				$(".dm-paused-indicator").remove();
 			}
 		});
-
-		zoom_section.append(select_locked, ping_center, pause_players);
+		let avttS3FileShare = $(`<div id='aboveFileHostButton' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='AVTT File Hosting'> 
+		<div class="ddbc-tab-options__header-heading">
+				<span class="material-icons button-icon">folder</span>
+		</div></div>
+		`);
+		avttS3FileShare.click(launchFilePicker);
+		if (window.testAvttFilePicker === true) { //console testing var
+			zoom_section.append(avttS3FileShare, select_locked, ping_center, pause_players);
+		} else {
+			zoom_section.append(select_locked, ping_center, pause_players);
+		}
 	}
 
 
@@ -2896,15 +2916,17 @@ function init_zoom_buttons() {
 	zoom_section.append(zoom_plus);
 
 	let hide_interface = $(`<div id='hide_interface_button' class='ddbc-tab-options--layout-pill'><div class='ddbc-tab-options__header-heading hasTooltip button-icon' data-name='Unhide interface (shift+h)'><span class='material-icons md-16 button-icon'>visibility</span></div></div>`);
-	hide_interface.click(unhide_interface);
-	hide_interface.css("display", "none");
-	hide_interface.css("position", "absolute");
-	hide_interface.css("opacity", "50%");
-	hide_interface.css("right", "-136px");
+	hide_interface.css({
+		display: "none",
+		position: "absolute",
+		opacity: 0.1,
+		right: '0px',
+		top: "-30px"
+	});
 	zoom_section.append(hide_interface);
 
 	$(".avtt-sidebar-controls").append(zoom_section);
-	if (window.DM) {
+	if (window.DM || is_spectator_page()) {
 		zoom_section.css("right","371px");
 	} else {
 		zoom_section.css("right","420px");
@@ -3908,6 +3930,7 @@ function popoutGamelogCleanup(){
 		}
 	</style>`);
 	$(childWindows["Gamelog"].document).find(".gamelog-button, button[class*='gamelog-button']").click();
+	$(childWindows["Gamelog"].document).find(".sidebar__control-group--lock button").click();
 	removeFromPopoutWindow("Gamelog", ".dice-roller");
 	removeFromPopoutWindow("Gamelog", ".sidebar-panel-content:not('.glc-game-log')");
 	removeFromPopoutWindow("Gamelog", ".chat-text-wrapper");

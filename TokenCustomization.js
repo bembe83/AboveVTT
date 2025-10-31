@@ -57,6 +57,183 @@ class RootFolder {
     }
 }
 
+const AVTT_TOKEN_CUSTOMIZATION_CHUNK_SIZE = 100000;
+const AVTT_TOKEN_CUSTOMIZATION_STRATEGY = "chunked-json";
+
+function avttTokenPromisifyRequest(request) {
+    if (typeof avttPromisifyIdbRequest === "function") {
+        return avttPromisifyIdbRequest(request);
+    }
+    if (!request) {
+        return Promise.reject(new Error("Missing IDB request"));
+    }
+    return new Promise((resolve, reject) => {
+        request.onsuccess = (event) => resolve(event?.target?.result);
+        request.onerror = (event) => reject(event?.target?.error || event);
+    });
+}
+
+function avttTokenResolveDefaultValue(dataType) {
+    return dataType === "array" ? [] : {};
+}
+
+async function avttTokenSaveChunkedCustomizations(objectStore, baseKey, data, options = {}) {
+    if (!objectStore || !baseKey) {
+        return;
+    }
+    const chunkSize = Number.isFinite(options?.chunkSize)
+        ? Math.max(1, options.chunkSize)
+        : AVTT_TOKEN_CUSTOMIZATION_CHUNK_SIZE;
+    const dataType = options?.dataType === "array" ? "array" : "object";
+    const normalizedData =
+        data !== undefined && data !== null ? data : avttTokenResolveDefaultValue(dataType);
+
+    let serialized;
+    try {
+        serialized = JSON.stringify(normalizedData);
+    } catch (error) {
+        console.warn("Failed to serialize token customization payload for", baseKey, error);
+        return;
+    }
+
+    let existingManifest = null;
+    try {
+        existingManifest = await avttTokenPromisifyRequest(objectStore.get(baseKey));
+    } catch (error) {
+        console.warn("Failed to read existing customization manifest for", baseKey, error);
+    }
+    const previousChunkKeys = Array.isArray(existingManifest?.customizationData?.chunkKeys)
+        ? existingManifest.customizationData.chunkKeys
+        : [];
+
+    const newChunkKeys = [];
+    for (let offset = 0, index = 0; offset < serialized.length; offset += chunkSize, index += 1) {
+        const chunkValue = serialized.slice(offset, offset + chunkSize);
+        const chunkKey = `${baseKey}::chunk::${index}`;
+        newChunkKeys.push(chunkKey);
+        try {
+            await avttTokenPromisifyRequest(
+                objectStore.put({ customizationId: chunkKey, customizationData: chunkValue }),
+            );
+        } catch (error) {
+            console.error("Failed to store token customization chunk", chunkKey, error);
+            return;
+        }
+    }
+
+    for (const previousKey of previousChunkKeys) {
+        if (!newChunkKeys.includes(previousKey)) {
+            try {
+                await avttTokenPromisifyRequest(objectStore.delete(previousKey));
+            } catch (error) {
+                console.warn("Failed to delete stale customization chunk", previousKey, error);
+            }
+        }
+    }
+
+    const manifestPayload = {
+        version: 2,
+        strategy: AVTT_TOKEN_CUSTOMIZATION_STRATEGY,
+        chunkSize,
+        chunkCount: newChunkKeys.length,
+        chunkKeys: newChunkKeys,
+        dataType,
+        totalLength: serialized.length,
+        updatedAt: Date.now(),
+    };
+    try {
+        await avttTokenPromisifyRequest(
+            objectStore.put({ customizationId: baseKey, customizationData: manifestPayload }),
+        );
+    } catch (error) {
+        console.error("Failed to store token customization manifest for", baseKey, error);
+    }
+}
+
+async function avttTokenLoadChunkedCustomizations(objectStore, baseKey, options = {}) {
+    if (!objectStore || !baseKey) {
+        return options?.defaultValue !== undefined
+            ? options.defaultValue
+            : avttTokenResolveDefaultValue(options?.dataType === "array" ? "array" : "object");
+    }
+    let record;
+    try {
+        record = await avttTokenPromisifyRequest(objectStore.get(baseKey));
+    } catch (error) {
+        console.warn("Failed to read token customization record for", baseKey, error);
+        return options?.defaultValue !== undefined
+            ? options.defaultValue
+            : avttTokenResolveDefaultValue(options?.dataType === "array" ? "array" : "object");
+    }
+
+    const payload = record?.customizationData;
+    if (
+        payload &&
+        payload.strategy === AVTT_TOKEN_CUSTOMIZATION_STRATEGY &&
+        Array.isArray(payload.chunkKeys)
+    ) {
+        const chunks = [];
+        for (const chunkKey of payload.chunkKeys) {
+            try {
+                const chunkRecord = await avttTokenPromisifyRequest(objectStore.get(chunkKey));
+                if (typeof chunkRecord?.customizationData === "string") {
+                    chunks.push(chunkRecord.customizationData);
+                }
+            } catch (error) {
+                console.warn("Failed to load token customization chunk", chunkKey, error);
+            }
+        }
+        const combined = chunks.join("");
+        if (!combined) {
+            return options?.defaultValue !== undefined
+                ? options.defaultValue
+                : avttTokenResolveDefaultValue(payload.dataType === "array" ? "array" : "object");
+        }
+        try {
+            return JSON.parse(combined);
+        } catch (error) {
+            console.warn("Failed to parse chunked customizations for", baseKey, error);
+            return options?.defaultValue !== undefined
+                ? options.defaultValue
+                : avttTokenResolveDefaultValue(payload.dataType === "array" ? "array" : "object");
+        }
+    }
+
+    if (payload !== undefined) {
+        return payload;
+    }
+    if (options?.defaultValue !== undefined) {
+        return options.defaultValue;
+    }
+    return undefined;
+}
+
+async function avttTokenDeleteChunkedCustomizations(objectStore, baseKey) {
+    if (!objectStore || !baseKey) {
+        return;
+    }
+    let record;
+    try {
+        record = await avttTokenPromisifyRequest(objectStore.get(baseKey));
+    } catch (error) {
+        console.warn("Failed to read customization record before delete", baseKey, error);
+    }
+    const payload = record?.customizationData;
+    const chunkKeys = Array.isArray(payload?.chunkKeys) ? payload.chunkKeys : [];
+    for (const chunkKey of chunkKeys) {
+        try {
+            await avttTokenPromisifyRequest(objectStore.delete(chunkKey));
+        } catch (error) {
+            console.warn("Failed to delete customization chunk", chunkKey, error);
+        }
+    }
+    try {
+        await avttTokenPromisifyRequest(objectStore.delete(baseKey));
+    } catch (error) {
+        console.warn("Failed to delete customization manifest for", baseKey, error);
+    }
+}
+
 /**
  * @param name {string} the name displayed to the user
  * @param image {string} the src of the img tag
@@ -175,7 +352,9 @@ class TokenCustomization {
     }
 
     setTokenOption(key, value) {
-        let currSrc = $('.sidebar-panel-body .example-token.selected .div-token-image')?.attr('src')
+        let currSrc = $('.sidebar-panel-body .example-token.selected :is(.div-token-image')?.attr('data-src')
+       
+    
         let target = this.tokenOptions;
         if(currSrc != undefined){
             if(this.tokenOptions.alternativeImagesCustomizations == undefined)
@@ -654,74 +833,72 @@ function migrate_convert_mytokens_to_customizations(listOfMyTokenFolders, listOf
 }
 
 function rollback_token_customizations_migration() {
-    try {
+    (async () => {
+        try {
+            const storeImage = window.globalIndexedDB.transaction(
+                [`customizationData`],
+                "readwrite",
+            );
+            const objectStore = storeImage.objectStore(`customizationData`);
+            await avttTokenDeleteChunkedCustomizations(objectStore, `TokenCustomizations`);
+            await avttTokenSaveChunkedCustomizations(
+                objectStore,
+                `TokenCustomizations`,
+                [],
+                { dataType: "array" },
+            );
 
-        let storeImage = window.globalIndexedDB.transaction([`customizationData`], "readwrite")
-        let objectStore = storeImage.objectStore(`customizationData`)
+            localStorage.setItem("TokenCustomizations", JSON.stringify([]));
 
-
-        let deleteRequest = objectStore.delete(`TokenCustomizations`);
-        deleteRequest.onsuccess = (event) => {
-          const objectStoreRequest = objectStore.add({customizationId: `TokenCustomizations`, 'customizationData': []});
-        };
-        deleteRequest.onerror = (event) => {
-          const objectStoreRequest = objectStore.add({customizationId: `TokenCustomizations`, 'customizationData': []});
-        };
-
-
-        localStorage.setItem("TokenCustomizations", JSON.stringify([]));
-
-
-
-        let playerCustomizations = read_player_token_customizations();
-        for (let playerId in playerCustomizations) {
-            playerCustomizations[playerId].didMigrate = false;
+            let playerCustomizations = read_player_token_customizations();
+            for (let playerId in playerCustomizations) {
+                playerCustomizations[playerId].didMigrate = false;
+            }
+            write_player_token_customizations(playerCustomizations);
+            delete window.CUSTOM_TOKEN_IMAGE_MAP.didMigrate;
+            save_custom_monster_image_mapping();
+        } catch (error) {
+            console.error("Failed to rollback token customization", error);
         }
-        write_player_token_customizations(playerCustomizations);
-        delete window.CUSTOM_TOKEN_IMAGE_MAP.didMigrate;
-        save_custom_monster_image_mapping();
-    } catch (error) {
-        console.error("Failed to rollback token customization", error);
-    }
+    })();
 }
 
 function persist_all_token_customizations(customizations, callback) {
     if (typeof callback !== 'function') {
         callback = function(){};
     }
-    console.log("persist_all_token_customizations starting", customizations, JSON.stringify(customizations));
+    console.log("persist_all_token_customizations starting");
 
- 
-            
+    const persist = async () => {
+        try {
+            const transaction = globalIndexedDB.transaction([`customizationData`], "readwrite");
+            const objectStore = transaction.objectStore(`customizationData`);
+            await avttTokenSaveChunkedCustomizations(objectStore, `TokenCustomizations`, customizations, {
+                dataType: "array",
+            });
+        } catch (error) {
+            console.error("Failed to persist token customizations to IndexedDB", error);
+            callback(false, "IndexedDbError");
+            return;
+        }
 
-    let storeImage = globalIndexedDB.transaction([`customizationData`], "readwrite")
-    let objectStore = storeImage.objectStore(`customizationData`)
+        try{
+            /*stop saving this here in 1.30 - clear out at later date
+            localStorage.setItem("TokenCustomizations", JSON.stringify(customizations));
+            */
+        }    
+        catch(e){
+            console.warn('localStorage saving Token Customizations Failed', e);
+        }
 
-
-    let deleteRequest = objectStore.delete(`TokenCustomizations`);
-    deleteRequest.onsuccess = (event) => {
-      const objectStoreRequest = objectStore.add({customizationId: `TokenCustomizations`, 'customizationData': customizations});
+        window.TOKEN_CUSTOMIZATIONS = customizations;
+        callback(true);
     };
-    deleteRequest.onerror = (event) => {
-      const objectStoreRequest = objectStore.add({customizationId: `TokenCustomizations`, 'customizationData': customizations});
-    };
 
-            
-    try{
-        /*stop saving this here in 1.30 - clear out at later date
-        localStorage.setItem("TokenCustomizations", JSON.stringify(customizations));
-        */
-    }    
-    catch(e){
-        console.warn('localStorage saving Token Customizations Failed', e)
-    }
-
-
-
-
-
-    window.TOKEN_CUSTOMIZATIONS = customizations;
-    callback(true);
+    persist().catch((error) => {
+        console.error("persist_all_token_customizations encountered an unexpected error", error);
+        callback(false, "UnexpectedError");
+    });
 }
 function persist_token_customization(customization, callback) {
     if (typeof callback !== 'function') {
@@ -803,53 +980,52 @@ function fetch_token_customizations(callback) {
     if (typeof callback !== 'function') {
         callback = function(){};
     }
-    try {
+    const load = async () => {
         console.log("fetch_token_customizations starting");
-        // TODO: fetch from the cloud instead of storing locally
+        let customMappingData;
+        try {
+            const objectStore = globalIndexedDB.transaction(["customizationData"]).objectStore(`customizationData`);
+            customMappingData = await avttTokenLoadChunkedCustomizations(objectStore, `TokenCustomizations`, {
+                dataType: "array",
+            });
+        } catch (error) {
+            console.warn("Failed to load token customizations from IndexedDB", error);
+        }
 
-          
-        let objectStore = globalIndexedDB.transaction(["customizationData"]).objectStore(`customizationData`)
-        let promises = [];
-        promises.push(new Promise((resolve) => { 
-            let customMappingData = undefined;
-            objectStore.get(`TokenCustomizations`).onsuccess = (event) => {
-                if(event?.target?.result?.customizationData){
-                   customMappingData = event?.target?.result?.customizationData
+        if (customMappingData === undefined) {
+            const localCustomizations = localStorage.getItem('TokenCustomizations');
+            if(localCustomizations != null && localCustomizations !== undefined && localCustomizations !== "undefined") {
+                try {
+                    customMappingData = $.parseJSON(localCustomizations);
+                } catch (error) {
+                    console.warn("Failed to parse legacy token customization storage", error);
+                    customMappingData = [];
                 }
-                else {
-                    let localCustomizations = localStorage.getItem('TokenCustomizations');
-                    if(localCustomizations != null && localCustomizations !== undefined && localCustomizations !== "undefined")
-                        customMappingData = $.parseJSON(localCustomizations)
-                }
-                let parsedCustomizations = [];
-
-
-                
-                if (customMappingData != undefined) {
-                    console.debug("fetch_token_customizations customMappingData", customMappingData, typeof customMappingData);
-                    customMappingData.forEach(obj => {
-                        try {
-                            let parsed = TokenCustomization.fromJson(obj);
-                            parsedCustomizations.push(parsed);
-                        } catch (error) {
-                            // this one failed, but keep trying to parse the others
-                            console.error("fetch_token_customizations failed to parse customization object", obj, error);
-                        }
-                    });
-                }
-                window.TOKEN_CUSTOMIZATIONS = parsedCustomizations;
-                resolve(true);
             }
-        }))
-        Promise.all(promises).then((values) => {          
-            callback(window.TOKEN_CUSTOMIZATIONS);
-        })
+        }
 
-        
-    } catch (error) {
+        if (!Array.isArray(customMappingData)) {
+            customMappingData = [];
+        }
+
+        const parsedCustomizations = [];
+        customMappingData.forEach(obj => {
+            try {
+                let parsed = TokenCustomization.fromJson(obj);
+                parsedCustomizations.push(parsed);
+            } catch (error) {
+                console.error("fetch_token_customizations failed to parse customization object", obj, error);
+            }
+        });
+
+        window.TOKEN_CUSTOMIZATIONS = parsedCustomizations;
+        callback(window.TOKEN_CUSTOMIZATIONS);
+    };
+
+    load().catch((error) => {
         console.error("fetch_token_customizations failed", error);
         callback(false);
-    }
+    });
 }
 
 // deletes everything within a folder
@@ -861,8 +1037,16 @@ function delete_token_customization_by_parent_id(parentId, callback) {
         console.warn("delete_token_customization_by_parent_id received an invalid parentId", parentId);
         callback(false);
         return;
-    }
-    let tokensToBeDeleted = window.TOKEN_CUSTOMIZATIONS.filter(tc => tc.parentId == parentId);
+    } 
+
+    const path = (parentId == RootFolder.MyTokens.id) 
+        ? RootFolder.MyTokens.path 
+        : (parentId == RootFolder.Players.id) 
+            ? RootFolder.Players.path 
+            : window.TOKEN_CUSTOMIZATIONS.find(d => d.id == parentId)?.fullPath()
+    if(!path)
+        return;
+    let tokensToBeDeleted = window.TOKEN_CUSTOMIZATIONS.filter(tc => tc.fullPath().includes(path));
     for(i = 0; i < tokensToBeDeleted.length; i++){
         let statBlockID = tokensToBeDeleted[i].tokenOptions?.statBlock;
         if(statBlockID){
@@ -872,9 +1056,7 @@ function delete_token_customization_by_parent_id(parentId, callback) {
             window.JOURNAL.persist();
         }
     }
-
-
-    window.TOKEN_CUSTOMIZATIONS = window.TOKEN_CUSTOMIZATIONS.filter(tc => tc.parentId !== parentId);
+    window.TOKEN_CUSTOMIZATIONS = window.TOKEN_CUSTOMIZATIONS.filter(tc => !tc.fullPath().includes(path));
 
     persist_all_token_customizations(window.TOKEN_CUSTOMIZATIONS, callback);
 }
@@ -964,7 +1146,6 @@ function rebuild_ddb_npcs(redrawList = false) {
         } else if (name.includes("Genasi") || name.includes("Simic")) { // Most names have hyphens, but Simic Hybrid and all the Genasi variants have spaces.
             name = name.replaceAll("-", " ");
         }
-        console.debug("rebuild_ddb_npcs Adding playable race", name, portraitId);
         if (playableRaces[name]) {
             playableRaces[name].push(portraitId);
         } else {
@@ -984,9 +1165,7 @@ function rebuild_ddb_npcs(redrawList = false) {
                 name: playableRaceName,
                 alternativeImages: altImages
             }));
-        } else {
-            console.log("rebuild_ddb_npcs DDB doesn't have any images for", playableRaceName);
-        }
+        } 
     }
 
     if (redrawList) {
@@ -1012,7 +1191,7 @@ function fetch_ddb_portraits() {
             success: function (responseData) {
                 console.log("Successfully fetched config/json from DDB API");
                 window.ddbPortraits = responseData.data;
-                rebuild_ddb_npcs(true); // this is the first time we've had enough data to draw the list so do it
+                rebuild_ddb_npcs(false);
             },
             error: function (errorMessage) {
                 console.warn("Failed to fetch config json from DDB API", errorMessage);

@@ -979,7 +979,7 @@ async function init_character_sheet_page() {
         .then(store_campaign_info)      // store gameId and campaign secret in localStorage for use on other pages     
         .then(async () => {
           window.CAMPAIGN_INFO = await DDBApi.fetchCampaignInfo(window.gameId);
-          window.myUser = $('#message-broker-client').attr('data-userid');
+          window.myUser = $('#message-broker-client').attr('data-userid') || Cobalt?.User?.ID;
         })
     }, 5000)
   }
@@ -1534,7 +1534,7 @@ function observe_character_sheet_changes(documentToObserve) {
       .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane']):last-of-type>div>div[class*='ct-item-detail__customize']:nth-child(4) p:not(.above-vtt-visited),
       .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane']):last-of-type>div>div:not(.ct-item-detail__customize):not([class*='__intro']) tr:not(.above-vtt-visited),
       .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane']):last-of-type>div>div:not(.ct-item-detail__customize):not([class*='__intro']) div[class*='--damage']:not([class*='__modifier']):not(.ct-customize-data-editor__property--damagetypeid):not(.above-vtt-visited),
-      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane']):last-of-type>div>div:not(.ct-item-detail__customize):not([class*='__intro']) span:not([class*='button']):not([class*='casting']):not([class*='__modifier']):not(.above-vtt-visited),
+      .ct-sidebar__inner [class*='styles_content']>div:first-of-type>div:not([class*='styles_gameLogPane']):not([class*='ct-preferences-pane']):last-of-type>div>div:not(.ct-item-detail__customize):not([class*='__intro']) span:not([class*='button']):not([class*='casting']):not([class*='__modifier']):not([class*='Checkbox_inputContainer']):not(.above-vtt-visited),
       [class*='spell-damage-group'] span[class*='__value']:not(.above-vtt-visited)
     `);
   
@@ -1553,7 +1553,7 @@ function observe_character_sheet_changes(documentToObserve) {
       })
       snippets.each(function(){
         const curr = $(this);
-        if (curr.has('>button').length > 0 || curr.closest(`[class*='styles_maxHeight']>div:not(.sidebar-panel-content), [class*='styles_content']>div>div:not(.sidebar-panel-content)`).has('input[type="search"], .ct-preferences-pane').length>0)
+        if (curr.has('>button').length > 0 || curr.closest(`[class*='styles_sidebar'] [class*='styles_pane']>[class*='styles_content']>div:not(.sidebar-panel-content), [class*='styles_content']>div>div:not(.sidebar-panel-content)`).has('input[type="search"], .ct-preferences-pane').length > 0 || curr.closest('.ct-spell-manage-pane').length>0)
           return; // do not adjust side bar when it includes a search such as adding extras as it causes crashing
         add_journal_roll_buttons(curr);
         add_aoe_statblock_click(curr, `/profile/${window.myUser}/characters/${window.PLAYER_ID}`);
