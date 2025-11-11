@@ -3839,14 +3839,19 @@ async function avttHandleFolderDrop(event, destinationPath) {
 }
 
 async function avttHandleMapDrop(event, listItemArray) {
-  if(listItemArray.length>10){
-    alert('Can only drop 10 tokens or less at once')
-    return;
+  if (listItemArray.length == 1){
+    create_and_place_token(listItemArray[0].listItem, event.shiftKey, listItemArray[0].url, event.pageX, event.pageY, false, undefined, undefined, { tokenStyleSelect: "definitelyNotAToken" });
   }
-  for(item of listItemArray){
-    create_and_place_token(item.listItem, event.shiftKey, item.url, event.pageX, event.pageY, false, undefined, undefined, { tokenStyleSelect: "definitelyNotAToken" });
+  else if (listItemArray.length < 10 || confirm(`This will add ${listItemArray.length} tokens which could lead to unexpected results. Are you sure you want to add all of these tokens?`)) {
+    let distanceFromCenter = window.CURRENT_SCENE_DATA.hpps * window.ZOOM * (listItemArray.length / 8); 
+    for (let index = 0; index<listItemArray.length; index++) {
+      let item = listItemArray[index];
+      let radius = index / listItemArray.length;
+      let left = event.pageX + (distanceFromCenter * Math.cos(2 * Math.PI * radius));
+      let top = event.pageY + (distanceFromCenter * Math.sin(2 * Math.PI * radius));
+      create_and_place_token(item.listItem, event.shiftKey, item.url, left, top, false, undefined, undefined, { tokenStyleSelect: "definitelyNotAToken" });
+    }
   }
-    
 }
 
 
@@ -4668,6 +4673,10 @@ const PatreonAuth = (() => {
       avttUploadController.abort('User cancelled upload by logout.')
       avttActiveSearchAbortController = null; 
     }catch{};
+    try{
+      window.abortGetAllUserFilesController.abort('User logged out, aborting file fetch.');
+    }
+    catch{};
   }
 
   return {
@@ -6788,8 +6797,8 @@ function refreshFiles(
     avttHideActionsMenu();
     avttHideExportMenu();
     avttUpdateSortIndicators();
-    if (recheckSize) {
-        getUserUploadedFileSize(false, { signal })
+    if (recheckSize || window.filePickerFirstLoad) {
+      getUserUploadedFileSize(false, { signal, bypassCache: window.filePickerFirstLoad })
         .then((size) => {
           S3_Current_Size = size;
           document.getElementById("user-used").innerHTML = formatFileSize(S3_Current_Size);
@@ -7213,6 +7222,13 @@ function refreshFiles(
                 avttDragItems = draggedItems;
                 avttHandleFolderDrop(event, closestFolder.attr('data-path'));
               }
+              const allCheckboxes = avttGetAllCheckboxElements();
+              allCheckboxes.forEach((checkbox) => {
+                checkbox.checked = false;
+              });
+              avttUpdateSelectNonFoldersCheckbox();
+              avttUpdateActionsMenuState();
+              avttApplyClipboardHighlights();
             },
           })
        
@@ -8320,6 +8336,9 @@ async function getUserUploadedFileSize(forceFullCheck = false, options = {}) {
         });
         continue;
       }
+      if (avttIsFileCacheRelativeKey(relative)) {
+        continue;
+      }
       const normalizedRelative = avttNormalizeRelativePath(relative);
       if (normalizedRelative) {
         nonThumbnailKeys.add(normalizedRelative);
@@ -8416,10 +8435,10 @@ async function getUserUploadedFileSize(forceFullCheck = false, options = {}) {
     }
   })();
 
-  if (shouldUseCache) {
-    avttUsageCache.pending = usagePromise;
-  }
-
+ 
+  avttUsageCache.pending = usagePromise;
+  
+  
   try {
     const totalBytes = await usagePromise;
     avttUsageCache.totalBytes = Number.isFinite(Number(totalBytes))
@@ -8444,8 +8463,8 @@ async function getAllUserFiles(options = {}) {
     return avttWrapPromiseWithAbort(existing.promise, signal);
   }
 
-  const abortController = new AbortController();
-  const { signal: internalSignal } = abortController;
+  window.abortGetAllUserFilesController = new AbortController();
+  const { signal: internalSignal } = window.abortGetAllUserFilesController;
   let linkedAbortHandler = null;
   if (signal) {
     linkedAbortHandler = () => {
@@ -8542,7 +8561,6 @@ async function avttExecuteGetAllUserFilesRequest(options, signal) {
   let continuationToken = null;
   let iterationSafeGuard = 0;
   const MAX_ITERATIONS = 2000;
-
   while (iterationSafeGuard < MAX_ITERATIONS) {
     iterationSafeGuard += 1;
     if (signal?.aborted) {

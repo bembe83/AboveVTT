@@ -631,12 +631,7 @@ function deleteDB(){
     const objectStore = gameIndexedDb.transaction([`exploredData`], "readwrite").objectStore('exploredData');
     const objectStoreRequest = objectStore.clear();
     objectStoreRequest.onsuccess = function(event) {       
-      exploredCanvas =  document.getElementById("exploredCanvas");
-      if(exploredCanvas != undefined){
-        let exploredCanvasContext = exploredCanvas.getContext('2d');
-        exploredCanvasContext.fillStyle = "black";
-        exploredCanvasContext.fillRect(0,0,exploredCanvas.width,exploredCanvas.height); 
-      }
+      $('#exploredCanvas').remove();
       redraw_light();
       alert('This campaigns local explored vision data has been cleared.')
     };
@@ -657,13 +652,7 @@ function deleteExploredScene(sceneId){
      .delete(`explore${window.gameId}${sceneId}`);
     deleteRequest.onsuccess = function(event) {  
       if(sceneId == window.CURRENT_SCENE_DATA.id){
-        let exploredCanvas = $('#exploredCanvas')
-        if(exploredCanvas.length > 0){
-          let exploredCanvasContext = exploredCanvas[0].getContext('2d');
-          exploredCanvasContext.globalCompositeOperation ='source-over';
-          exploredCanvasContext.fillStyle = "black";
-          exploredCanvasContext.fillRect(0,0,exploredCanvas[0].width,exploredCanvas[0].height); 
-        }
+        $('#exploredCanvas').remove();
         redraw_light();
         alert('Scene Explore Trail Data Cleared')
       }        
@@ -1783,31 +1772,43 @@ const debounce_pc_token_update = mydebounce(() => {
   window.PC_TOKENS_NEEDING_UPDATES.forEach((playerId) => {
     const pc = find_pc_by_player_id(playerId, false);
     let token = window.TOKEN_OBJECTS[pc?.sheet];     
+    let crossSceneToken = window.all_token_objects[pc?.sheet]; 
 
-    let crossSceneToken = window.all_token_objects[pc?.sheet] //for the combat tracker and cross scene syncing/tokens - we want to update this even if the token isn't on the current map
-   
-    if (crossSceneToken && pc) {
-      let currentImage = crossSceneToken.options.imgsrc;
-      if (currentImage != undefined) {
-        const newImage = (crossSceneToken.options.alternativeImages == undefined || crossSceneToken.options.alternativeImages?.length == 0) ? pc.image : currentImage;
-        const options = $.extend(true, token.options, pc, { imgsrc: newImage });
-        for (let i = 0; i < unusedPlayerData.length; i++) {
-          delete options[unusedPlayerData[i]];
-        }
-        crossSceneToken.options = $.extend(true, {}, options);
-        if(token){
-          token.hp = pc.hitPointInfo.current; // triggers concentration checks
-          token.options.hitPointInfo = pc.hitPointInfo;
-          token.options = options;
-          if (window.DM) {
-            token.place_sync_persist(); // update it on the server
-          }
-          else {
-            token.place(); // update token for players even if dm isn't connected to websocket
-          }
-        }
+    if (token) {
+      let currentImage = token.options.imgsrc;
+      const newImage = (token.options.alternativeImages == undefined || token.options.alternativeImages?.length == 0) ? pc.image : currentImage;
+      const options = $.extend(true, {}, token.options, pc, { imgsrc: newImage });
+      options.conditions = pc.conditions || [];
+      for (let i = 0; i < unusedPlayerData.length; i++) {
+        delete options[unusedPlayerData[i]];
       }
-    }   
+      token.hp = pc.hitPointInfo.current; // triggers concentration checks
+      token.options.hitPointInfo = pc.hitPointInfo;
+      token.options = $.extend(true, {}, options, { left: token.options.left, top: token.options.top });
+      if (window.DM) {
+        token.place_sync_persist(); // update it on the server
+      }
+      else {
+        token.place(); // update token for players even if dm isn't connected to websocket
+      }
+     
+      if (crossSceneToken && pc) {    
+        crossSceneToken = $.extend(true, {}, options);
+      } 
+    }
+    else if (crossSceneToken && pc) {
+      let currentImage = crossSceneToken.options.imgsrc;
+      const newImage = (crossSceneToken.options.alternativeImages == undefined || crossSceneToken.options.alternativeImages?.length == 0) ? pc.image : currentImage;
+      const options = $.extend(true, {}, crossSceneToken.options, pc, { imgsrc: newImage });
+      options.conditions = pc.conditions || [];
+      for (let i = 0; i < unusedPlayerData.length; i++) {
+        delete options[unusedPlayerData[i]];
+      }
+      crossSceneToken.hp = pc.hitPointInfo.current; 
+      crossSceneToken.options.hitPointInfo = pc.hitPointInfo;
+      crossSceneToken.options = $.extend(true, {}, options);
+    }
+  
   });
   if (window.DM) {
     update_pc_token_rows();

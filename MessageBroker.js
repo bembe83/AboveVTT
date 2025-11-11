@@ -1714,7 +1714,7 @@ class MessageBroker {
 				console.log("SETTO BACKGROUND A " + msg.data);
 				$("#tokens").children().remove();
 				$(".aura-element[id^='aura_'").remove();
-				$(".aura-element-container-clip").remove();
+				$(".aura-clip-container").remove();
 				$("[data-darkness]").remove();
 				$("[data-notatoken]").remove();
 
@@ -1781,7 +1781,7 @@ class MessageBroker {
 	
 						window.CURRENT_SCENE_DATA.conversion = 1;
 
-						if(data.scale_check && !data.UVTTFile && !data.is_video && (mapHeight > 2500 || mapWidth > 2500)){
+						if(!data.is_video && (mapHeight > 2500 || mapWidth > 2500)){
 							let conversion = 2;
 							if(mapWidth >= mapHeight){
 								conversion = 1980 / mapWidth;
@@ -1854,9 +1854,9 @@ class MessageBroker {
 								$("#scene_map").css('opacity', 1)
 								$("#darkness_layer").show();
 							});
+							const url = data.player_map.startsWith(`above-bucket-not-a-url`) ? await getAvttStorageUrl(data.player_map) : await getGoogleDriveAPILink(data.player_map);
 							
-						
-							$("#scene_map").attr('src', await getGoogleDriveAPILink(data.player_map));
+							$("#scene_map").attr('src', url);
 							$('.import-loading-indicator .percentageLoaded').css('width', `20%`);		
 						}
 						await reset_canvas();
@@ -1956,7 +1956,7 @@ class MessageBroker {
 			remove_loading_overlay();
 			showError(e);
 		}
-		
+		remove_loading_overlay();
 		// console.groupEnd()
 	}
 	loadNextScene(){

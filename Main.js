@@ -31,13 +31,11 @@ function parse_img(url) {
 		} else if (retval.includes("https://drive.google.com") && !retval.match(/id=([a-zA-Z0-9_-]+)/g)) {
 			const parsed = 'https://drive.google.com/thumbnail?id=' + retval.split('/')[5] +'&sz=w3000';
 			retval = parsed;
-			console.log("parse_img is converting", url, "to", retval);
 			return retval;		
 		} 
 		else if (retval.startsWith("https://drive.google.com") || (retval.includes("https://drive.usercontent.google.com")) && retval.match(/id=([a-zA-Z0-9_-]+)/g)) {
 			const parsed = 'https://drive.google.com/thumbnail?id=' + retval.matchAll(/id=([a-zA-Z0-9_-]+)/g).next().value[1] +'&sz=w3000';
 			retval = parsed;
-			console.log("parse_img is converting", url, "to", retval);
 			return retval;		
 		} 
 		else if(retval.startsWith("https://www.googleapis.com/drive/v3/files/")){ // fix due to 1.5/1.6 beta 
@@ -49,7 +47,6 @@ function parse_img(url) {
 		else if(retval.includes("dropbox.com")){
 			const splitUrl = url.split('dropbox.com');
 			const parsed = `https://dl.dropboxusercontent.com${splitUrl[splitUrl.length-1]}`
-			console.log("parse_img is converting", url, "to", parsed);
 			retval = parsed;
 		}
 		else if(retval.includes("https://1drv.ms/"))
@@ -442,7 +439,11 @@ function map_load_error_cb(e) {
 		}
 	}
 	window.LOADING = false
+	remove_loading_overlay();
+	$('.import-loading-indicator').remove();
+	delete window.LOADING;
 	window.MB.loadNextScene();
+	console.groupEnd();
 }
 
 /**
@@ -2232,7 +2233,7 @@ function init_ui() {
 	weatherLight.css("position", "absolute");
 	weatherLight.css("top", "0");
 	weatherLight.css("left", "0");
-	weatherLight.css("z-index", "10000000");
+	weatherLight.css("z-index", "25");
 
 	const fog = $("<canvas id='fog_overlay'></canvas>");
 	fog.css("top", "0");
@@ -2433,6 +2434,13 @@ function init_ui() {
 			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
 			//return false;
 		}
+		let modal = m.target.closest(".sidebar-modal");
+		if(modal){
+			window.MODALDOWN = true;
+		}
+		else{
+			window.MODALDOWN = false;
+		}
 	}
 
 	// Function separated so it can be dis/enabled
@@ -2444,7 +2452,7 @@ function init_ui() {
 		if (event.target.tagName.toLowerCase() !== 'a') {
 			$("#splash").remove(); // don't remove the splash screen if clicking an anchor tag otherwise the browser won't follow the link
 		}
-		if (sidebar_modal_is_open() && event.which === 1) {
+		if (sidebar_modal_is_open() && event.which === 1 && !window.MODALDOWN) {
 			// check if the click was within the modal or within an element that we specifically don't want to close the modal
 			let modal = event.target.closest(".sidebar-modal");
 			let preventSidebarModalClose = event.target.closest(".prevent-sidebar-modal-close");
@@ -3801,7 +3809,7 @@ function is_sidebar_visible() {
  * This will show/hide the sidebar regardless of which page we are playing on.
  */
 function toggle_sidebar_visibility() {
-		if (is_sidebar_visible() || (!window.DM && window.innerWidth < 1024 && $(`[class*='styles_mobileNav']>div`).length==0)) {
+	if (is_sidebar_visible() || (!window.DM && !is_spectator_page() && window.innerWidth < 1024 && $(`[class*='styles_mobileNav']>div`).length==0)) {
 			hide_sidebar();
 		} else {
 			show_sidebar();

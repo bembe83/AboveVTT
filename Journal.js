@@ -53,7 +53,13 @@ async function avttSaveChunkedJson(objectStore, baseKey, data, options = {}) {
 	const previousChunkKeys = Array.isArray(existingManifest?.journalData?.chunkKeys)
 		? existingManifest.journalData.chunkKeys
 		: [];
-
+	for (const previousKey of previousChunkKeys) {
+		try {
+			await avttPromisifyIdbRequest(objectStore.delete(previousKey));
+		} catch (error) {
+			console.warn("Failed to delete stale journal chunk", previousKey, error);
+		}
+	}
 	const newChunkKeys = [];
 	for (let offset = 0, index = 0; offset < serialized.length; offset += chunkSize, index += 1) {
 		const chunkValue = serialized.slice(offset, offset + chunkSize);
@@ -66,16 +72,6 @@ async function avttSaveChunkedJson(objectStore, baseKey, data, options = {}) {
 		} catch (error) {
 			console.error("Failed to store journal chunk", chunkKey, error);
 			return;
-		}
-	}
-
-	for (const previousKey of previousChunkKeys) {
-		if (!newChunkKeys.includes(previousKey)) {
-			try {
-				await avttPromisifyIdbRequest(objectStore.delete(previousKey));
-			} catch (error) {
-				console.warn("Failed to delete stale journal chunk", previousKey, error);
-			}
 		}
 	}
 
@@ -168,7 +164,16 @@ class JournalManager{
 			let journalData;
 			try {
 				const objectStore = gameIndexedDb.transaction(["journalData"]).objectStore(`journalData`);
-				journalData = await avttLoadChunkedJson(objectStore, `Journal`, { dataType: "object" });
+				if(window.DM){
+					journalData = {
+						...await avttLoadChunkedJson(objectStore, `Journal`, { dataType: "object" }),
+						...await avttLoadChunkedJson(objectStore, `PlayerJournal`, { dataType: "object" })
+					};
+				}
+				else{
+					journalData = await avttLoadChunkedJson(objectStore, `PlayerJournal`, { dataType: "object" })
+				}
+				
 			} catch (error) {
 				console.warn("Failed to load journal entries", error);
 			}
@@ -276,20 +281,27 @@ class JournalManager{
 			return;
 		}
 		const executePersist = async () => {
-			const notes =
-				this.notes && typeof this.notes === "object" ? this.notes : {};
+			const notes = this.notes && typeof this.notes === "object" ? this.notes : {};
 			const statBlocks = Object.fromEntries(
-				Object.entries(notes).filter(([key]) => notes[key]?.statBlock === true),
+				Object.entries(notes).filter(([key]) => notes[key]?.statBlock === true)
 			);
 			const journal = Object.fromEntries(
-				Object.entries(notes).filter(([key]) => notes[key]?.statBlock !== true),
+				Object.entries(notes).filter(([key]) => notes[key]?.statBlock !== true && !notes[key]?.player)
 			);
+			const journalPlayersOnly = Object.fromEntries(
+				Object.entries(notes).filter(([key]) => notes[key]?.statBlock !== true && notes[key]?.player)
+			);
+			
 			const chapters = Array.isArray(this.chapters) ? this.chapters : [];
 
+			
 			try {
 				const transaction = gameIndexedDb.transaction([`journalData`], "readwrite");
 				const objectStore = transaction.objectStore(`journalData`);
-				await avttSaveChunkedJson(objectStore, `Journal`, journal, { dataType: "object" });
+				if(window.DM){
+					await avttSaveChunkedJson(objectStore, `Journal`, journal, { dataType: "object" });
+				}				
+				await avttSaveChunkedJson(objectStore, `PlayerJournal`, journalPlayersOnly, { dataType: "object" })
 				await avttSaveChunkedJson(objectStore, `JournalChapters`, chapters, {
 					dataType: "array",
 				});
@@ -317,21 +329,6 @@ class JournalManager{
 				console.warn("Failed to persist journal stat blocks", error);
 			}
 
-			if(window.DM){ // old storage kept as backup for now. 
-				try{
-					/*
-					Stop saving this here in 1.30 - remove at later date once confirmed migrated. 
-
-					localStorage.setItem('JournalStatblocks', JSON.stringify(statBlocks));   
-					localStorage.setItem('Journal' + this.gameid, JSON.stringify(journal));
-					localStorage.setItem('JournalChapters' + this.gameid, JSON.stringify(chapters));
-
-					*/ 
-				}
-				catch(e){
-					console.warn('localStorage Journal Storage Failed', e) // prevent errors from stopping code when local storage is full.
-				}
-			}
 		};
 
 		executePersist().catch((error) => {
@@ -1877,7 +1874,8 @@ class JournalManager{
 					    overflow: auto !important;
 					}
 				</stlye>`);
-				
+				if(!window.DM)
+					$(window.childWindows[title].document).find("body").addClass('body-rpgcharacter-sheet');
 				
 				$(this).siblings(".ui-dialog-titlebar").children(".ui-dialog-titlebar-close").click();
 			});
@@ -3369,8 +3367,9 @@ class JournalManager{
 			    font-weight: 700;
 			}		
 			.ddbc-creature-block {
-			    background: url(https://www.dndbeyond.com/Content/Skins/Waterdeep/images/mon-summary/stat-block-top-texture.png),url(https://www.dndbeyond.com/Content/Skins/Waterdeep/images/mon-summary/paper-texture.png);
-			    background-size: 100% auto;
+				--image-background: url(https://www.dndbeyond.com/Content/Skins/Waterdeep/images/mon-summary/stat-block-top-texture.png),url(https://www.dndbeyond.com/Content/Skins/Waterdeep/images/mon-summary/paper-texture.png);
+				background: var(--background-color, var(--image-background));
+			   	background-size: 100% auto;
 			    background-position: top;
 			    background-repeat: no-repeat,repeat;
 			    position: relative;
@@ -3378,7 +3377,8 @@ class JournalManager{
 			    border: 1px solid #d4d0ce;
 			    padding: 15px 10px;
 			    font-family: Scala Sans Offc,Roboto,Helvetica,sans-serif;
-			    font-size: 15px
+			    font-size: 15px;
+
 			}
 
 			.ddbc-creature-block:after,.ddbc-creature-block:before {
@@ -3739,12 +3739,15 @@ class JournalManager{
 					const avttImages = body.find('img[data-src*="above-bucket-not-a-url"]');
 					const backgroundColor = $(':root').css('--background-color'); // support azmoria's dark mode without requiring inverse filters
 					const fontColor = $(':root').css('--font-color');
-					body.css({
-						background: backgroundColor,
-						color: fontColor,
-						'--font-color': fontColor,
-						'--background-color': backgroundColor
-					});
+					if(backgroundColor && fontColor){
+						body.css({
+							background: backgroundColor,
+							color: fontColor,
+							'--font-color': fontColor,
+							'--background-color': backgroundColor
+						});
+					}
+
 					avttImages.each(async (index, image) => {
 						const src = await getAvttStorageUrl(image.getAttribute('data-src'), true);
 						image.src = src;
