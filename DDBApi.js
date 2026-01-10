@@ -56,6 +56,35 @@ class DDBApi {
     return await request.json();
   }
 
+  static async fetchItemsJsonWithToken(itemsArray = [], page = 0, pageSize = 1000) {
+    const url = `https://character-service.dndbeyond.com/character/v5.1/game-data/items?campaignId=${find_game_id()}&sharingSetting=2&page=${page}&pageSize=${pageSize}`;
+    const response = await DDBApi.fetchJsonWithToken(url);
+    if (!response) {
+      console.warn(`DDBApi.fetchItemsJsonWithToken received no response for url: ${url}`);
+      return itemsArray;
+    } 
+    itemsArray.push(...response.data);
+    if (response.pagination.total > response.pagination.skip + response.pagination.take) {
+      return await DDBApi.fetchItemsJsonWithToken(itemsArray, page + 1, pageSize);
+    }
+    window.ITEMS_CACHE = itemsArray
+    return itemsArray;
+  }
+  static debounceGetPartyInventory = mydebounce(async() => {
+    const partyInventory = await DDBApi.fetchJsonWithToken(`https://character-service.dndbeyond.com/character/v5/party/inventory/${find_game_id()}`);
+    window.PARTY_INVENTORY_DATA = partyInventory.data;
+    if(window.JOURNAL)
+      window.JOURNAL.update_party_available_currency();
+  }, 500);
+  static async addItemsToPartyInventory(items) {
+    DDBApi.postJsonWithToken("https://character-service.dndbeyond.com/character/v5/inventory/item", items);
+  }
+  static async addCurrenciesToPartyInventory(currencies) {
+    DDBApi.putJsonWithToken("https://character-service.dndbeyond.com/character/v5/inventory/currency/transaction", currencies);
+  }
+  static async addCustomItemToPartyInventory(item){
+    DDBApi.postJsonWithToken("https://character-service.dndbeyond.com/character/v5.1/custom/item", item);
+  }
   static async fetchHtmlWithToken(url, extraConfig = {}) {
     try{
       const token = await DDBApi.#refreshToken();
@@ -92,7 +121,13 @@ class DDBApi {
     }
     return await DDBApi.fetchJsonWithTokenOmitCred(url, config);
   }
-
+  static async putJsonWithToken(url, body) {
+    const config = {
+      method: 'PUT',
+      body: JSON.stringify(body)
+    }
+    return await DDBApi.fetchJsonWithTokenOmitCred(url, config);
+  }
   static async deleteWithToken(url) {
     const token = await DDBApi.#refreshToken();
     const config = {

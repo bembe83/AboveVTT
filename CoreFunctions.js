@@ -1053,10 +1053,8 @@ function process_monitored_logs() {
 }
 function inject_dice(){
 
-  const initialSetupTime = Date.now();
-
-
-  $('body .container').append(`
+  $('body #site').append(`
+    <div class='container'>
         <div id="encounter-builder-root" data-config="{&quot;assetBasePath&quot;:&quot;https://media.dndbeyond.com/encounter-builder&quot;,&quot;authUrl&quot;:&quot;https://auth-service.dndbeyond.com/v1/cobalt-token&quot;,&quot;campaignDetailsPageBaseUrl&quot;:&quot;https://www.dndbeyond.com/campaigns&quot;,&quot;campaignServiceUrlBase&quot;:&quot;https://www.dndbeyond.com/api/campaign&quot;,&quot;characterServiceUrlBase&quot;:&quot;https://character-service-scds.dndbeyond.com/v2/characters&quot;,&quot;diceApi&quot;:&quot;https://dice-service.dndbeyond.com&quot;,&quot;gameLogBaseUrl&quot;:&quot;https://www.dndbeyond.com&quot;,&quot;ddbApiUrl&quot;:&quot;https://api.dndbeyond.com&quot;,&quot;ddbBaseUrl&quot;:&quot;https://www.dndbeyond.com&quot;,&quot;ddbConfigUrl&quot;:&quot;https://www.dndbeyond.com/api/config/json&quot;,&quot;debug&quot;:false,&quot;encounterServiceUrl&quot;:&quot;https://encounter-service.dndbeyond.com/v1&quot;,&quot;featureFlagsDomain&quot;:&quot;https://api.dndbeyond.com&quot;,&quot;mediaBucket&quot;:&quot;https://media.dndbeyond.com&quot;,&quot;monsterServiceUrl&quot;:&quot;https://monster-service.dndbeyond.com/v1/Monster&quot;,&quot;sourceUrlBase&quot;:&quot;https://www.dndbeyond.com/sources/&quot;,&quot;subscriptionUrl&quot;:&quot;https://www.dndbeyond.com/subscribe&quot;,&quot;toastAutoDeleteInterval&quot;:3000000}" >
            <div class="dice-rolling-panel">
               <div class="dice-toolbar  ">
@@ -1124,7 +1122,7 @@ function inject_dice(){
               </div>
               <canvas class="dice-rolling-panel__container" width="1917" height="908" data-engine="Babylon.js v6.3.0" touch-action="none" tabindex="1" style="touch-action: none; -webkit-tap-highlight-color: transparent;"></canvas>
            </div>
-        </div>
+        </div> 
         <script src="https://media.dndbeyond.com/encounter-builder/static/js/main.221d749b.js"></script>
 
         <style>
@@ -1145,8 +1143,9 @@ function inject_dice(){
               left: 10px;
               pointer-events: all
           }
-        </style>
 
+        </style>
+    </div>
   `);
  window.encounterObserver = new MutationObserver(function(mutationList, observer) {
 
@@ -1156,7 +1155,6 @@ function inject_dice(){
        
        if(mutationTarget.hasClass(['encounter-details', 'encounter-builder', 'release-indicator'])){
          mutationTarget.remove();
-
        }
        if($(mutation.addedNodes).is('.encounter-builder, .release-indicator')){
          $(mutation.addedNodes).remove();
@@ -1176,7 +1174,7 @@ function inject_dice(){
  setTimeout(function(){
    window.encounterObserver.disconnect();
    delete window.encounterObserver;
- }, 20000);
+ }, 300000);
  
 }
 /**
@@ -1293,7 +1291,7 @@ function removeError() {
   delete window.logSnapshot;
 }
 
-function createCustomOnedriveChooser(text, callback = function(){}, selectionMode = 'single', selectionType = ['photo', 'video', '.webp']){
+function createCustomOnedriveChooser(text, callback = function(){}, selectionMode = 'single', selectionType = ['photo', '.webp']){
   let button = $(`<button class="launchPicker"><span class='onedrive-btn-status'></span>${text}</button>`);
   button.off('click.onedrive').on('click.onedrive', function(e){
     e.stopPropagation();
@@ -1336,26 +1334,10 @@ function dropBoxOptions(callback, multiselect = false, fileType=['images', 'vide
       cancel: function() {
 
       },
-
-      // Optional. "preview" (default) is a preview link to the document for sharing,
-      // "direct" is an expiring link to download the contents of the file. For more
-      // information about link types, see Link types below.
-      linkType: "preview", // or "direct"
-
-      // Optional. A value of false (default) limits selection to a single file, while
-      // true enables multiple file selection.
-      multiselect: multiselect, // or true
-
-      // Optional. This is a list of file extensions. If specified, the user will
-      // only be able to select files with these extensions. You may also specify
-      // file types, such as "video" or "images" in the list. For more information,
-      // see File types below. By default, all extensions are allowed.
+      linkType: "preview",
+      multiselect: multiselect,
       extensions: fileType,
-
-      // Optional. A value of false (default) limits selection to files,
-      // while true allows the user to select both folders and files.
-      // You cannot specify `linkType: "direct"` when using `folderselect: true`.
-      folderselect: false, // or true
+      folderselect: false, 
   }
 
   return options
@@ -2339,7 +2321,7 @@ function inject_sidebar_send_to_gamelog_button(sidebarPaneContent) {
         text: html
       };
       window.MB.inject_chat(data);
-      notify_gamelog();
+      notify_gamelog([]);
     }
     else{
       
@@ -2356,6 +2338,200 @@ function inject_sidebar_send_to_gamelog_button(sidebarPaneContent) {
     
     
   });
+}
+
+function find_items_in_cache_by_id_and_name(items = []) {
+  const foundItems = [];
+  for (let item of items) {
+    const cachedItem = window.ITEMS_CACHE.find(ci => ci.id.toString() === item.id.toString() && ci.name.toLowerCase().replace(/[^a-z0-9]/g, '').includes(item.name.toLowerCase().replace(/[^a-z0-9]/g, '')));
+    if (cachedItem) {
+      foundItems.push(cachedItem);
+    }
+  }
+  return foundItems;
+}
+function find_items_in_cache_by_name(names = [], exactMatch = false) {
+  names = names.map(name => name.toLowerCase());
+  
+  if(exactMatch){
+    return window.ITEMS_CACHE.filter(ci => names.includes(ci.name.toString().toLowerCase()));
+  }
+  return window.ITEMS_CACHE.filter(ci => ci.name.toString().toLowerCase().includes(names));
+}
+
+
+class PartyInventoryQueue {
+  constructor() {
+    this.queue = [];
+    this.isProcessing = false;
+    this.batchTimer = null;
+    this.requestTimeout = null;
+  }
+
+  addToQueue(item) {
+    this.queue.push(item);
+    
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+    }
+    
+    if (!this.isProcessing) {
+      this.batchTimer = setTimeout(() => {
+        this.batchTimer = null;
+        this.processQueue();
+      }, 10);
+    }
+  }
+
+  processQueue() {
+    if (this.isProcessing || this.queue.length === 0) {
+       return;
+    }
+
+    this.isProcessing = true;
+    const item = this.queue.shift();
+
+    this.requestTimeout = setTimeout(() => {
+      this.isProcessing = false;
+      if (this.queue.length > 0) {
+        setTimeout(() => this.processQueue(), 100);
+      }
+    }, 15000);
+
+    try {
+      if (item.type === 'items') {
+        add_items_to_party_inventory(item.data);
+      } else if (item.type === 'currency') {
+        add_currency_to_party_inventory(item.data);
+      } else if (item.type === 'customItem') {
+        add_custom_item_to_party_inventory(item.data);
+      }
+    } catch (error) {
+      this.isProcessing = false;
+      if (this.queue.length > 0) {
+        setTimeout(() => this.processQueue(), 100); 
+      }
+    }
+  }
+
+  onResponseReceived() {    
+    if (this.requestTimeout) {
+      clearTimeout(this.requestTimeout);
+      this.requestTimeout = null;
+    }
+
+    this.isProcessing = false;
+    
+    if (this.queue.length > 0) {
+      setTimeout(() => this.processQueue(), 100);
+    } else {
+      if (window.MB) {
+        window.MB.sendMessage('character-sheet/item-shared/fulfilled', {});
+        if(DDBApi)
+          DDBApi.debounceGetPartyInventory();
+      }
+      else {
+        tabCommunicationChannel.postMessage({
+          msgType: 'DDBMessage',
+          action: 'character-sheet/item-shared/fulfilled',
+          data: {},
+          sendTo: window.sendToTab
+        });
+      }
+    }
+  }
+}
+
+window.partyInventoryQueue = new PartyInventoryQueue();
+
+function add_items_to_party_inventory(items = []) {
+  const itemIds = Object.keys(items);
+  if (itemIds.length === 0) {
+    console.warn('add_items_to_party_inventory called with no items');
+    return;
+  }
+  const characterId = window.DM || is_spectator_page() ? parseInt(window.playerUsers[0]?.id) : parseInt(my_player_id());
+  const data = { characterId, equipment: [] };
+  for (let item of items) {
+    const entityId = parseInt(item.id);
+    const entityTypeId = parseInt(item.entityTypeId);
+    const quantity = parseInt(item.quantity);
+    const containerEntityTypeId = 618115330; // campaign inventory enum. See ContainerTypeEnum[ContainerTypeEnum["CAMPAIGN"] on DDB.
+    const containerEntityId = parseInt(find_game_id());
+    data.equipment.push({
+      entityId,
+      entityTypeId,
+      containerEntityTypeId,
+      containerEntityId,
+      quantity
+    });
+  }
+
+  DDBApi.addItemsToPartyInventory(data).then(response => {
+    console.log('add_items_to_party_inventory response:', response);
+    window.partyInventoryQueue.onResponseReceived();
+  }).catch(error => {
+    console.error('add_items_to_party_inventory error:', error);
+    window.partyInventoryQueue.onResponseReceived();
+  });
+
+}
+function add_custom_item_to_party_inventory(item) {
+
+  if (!item) {
+    console.warn('add_items_to_party_inventory called with no items');
+    return;
+  }
+  const characterId = window.DM || is_spectator_page() ? parseInt(window.playerUsers[0]?.id) : parseInt(my_player_id());
+
+ 
+  const name = item.name ? item.name : 'Custom Item';
+  const weight = item.weight ? parseFloat(item.weight) : null;
+  const cost = item.cost ? parseFloat(item.cost) : null;
+  const notes = item.notes ? item.notes : null;
+  const description = item.description ? item.description : null;
+  const quantity = parseInt(item.quantity);
+  const containerEntityTypeId = 618115330; // campaign inventory enum. See ContainerTypeEnum[ContainerTypeEnum["CAMPAIGN"] on DDB.
+  const containerEntityId = parseInt(find_game_id());
+  const data = {
+    characterId,
+    containerEntityTypeId,
+    containerEntityId,
+    description,
+    notes,
+    cost,
+    weight,
+    name,
+    quantity,
+    partyId: containerEntityId
+  };
+  
+
+  DDBApi.addCustomItemToPartyInventory(data).then(response => {
+    console.log('add_custom_item_to_party_inventory response:', response);
+    window.partyInventoryQueue.onResponseReceived();
+  }).catch(error => {
+    console.error('add_custom_item_to_party_inventory error:', error);
+    window.partyInventoryQueue.onResponseReceived();
+  });
+
+}
+function add_currency_to_party_inventory(currency = {cp:0,sp:0,gp:0,ep:0,pp:0}) {
+  
+  const characterId = window.DM || is_spectator_page() ? parseInt(window.playerUsers[0]?.id) : parseInt(my_player_id());
+  const destinationEntityTypeId = 618115330; // campaign inventory enum. See ContainerTypeEnum[ContainerTypeEnum["CAMPAIGN"] on DDB.
+  const destinationEntityId = parseInt(find_game_id());
+  const data = { characterId, destinationEntityId, destinationEntityTypeId, ...currency };
+
+
+  DDBApi.addCurrenciesToPartyInventory(data).then(response => {
+    console.log('add_currency_to_party_inventory response:', response);
+    window.partyInventoryQueue.onResponseReceived();
+  }).catch(error => {
+    console.error('add_currency_to_party_inventory error:', error);
+    window.partyInventoryQueue.onResponseReceived();
+  });
+
 }
 async function fetch_github_issue_comments(issueNumber) {
   const request = await fetch("https://api.github.com/repos/cyruzzo/AboveVTT/issues?labels=bug", { credentials: "omit" });
@@ -2390,7 +2566,7 @@ function display_url_embeded(url){
   $('body').append(container);
 }
 
-function find_or_create_generic_draggable_window(id, titleBarText, addLoadingIndicator = true, addPopoutButton = false, popoutSelector=``, width='80%', height='80%', top='10%', left='10%', showSlow = true, cancelClasses='') {
+function find_or_create_generic_draggable_window(id, titleBarText, addLoadingIndicator = true, addPopoutButton = false, popoutSelector=``, width='80%', height='80%', top='10%', left='10%', showSlow = true, cancelClasses='', hideOnX = false) {
   console.log(`find_or_create_generic_draggable_window id: ${id}, titleBarText: ${titleBarText}, addLoadingIndicator: ${addLoadingIndicator}, addPopoutButton: ${addPopoutButton}`);
   const existing = id.startsWith("#") ? $(id) : $(`#${id}`);
   if (existing.length > 0) {
@@ -2406,7 +2582,7 @@ function find_or_create_generic_draggable_window(id, titleBarText, addLoadingInd
     "position": "fixed",
     "height": height,
     "width": width,
-    "z-index": "90000",
+    "z-index": "110000",
     "display": "none"
   });
 
@@ -2445,13 +2621,19 @@ function find_or_create_generic_draggable_window(id, titleBarText, addLoadingInd
   const close_title_button = $(`<div class="title_bar_close_button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g transform="rotate(-45 50 50)"><rect></rect></g><g transform="rotate(45 50 50)"><rect></rect></g></svg></div>`);
   titleBar.append(close_title_button);
   close_title_button.on("click.close", function (event) {
-    close_and_cleanup_generic_draggable_window($(event.currentTarget).closest('.resize_drag_window').attr('id'));
+    if(hideOnX){
+      $(event.currentTarget).closest('.resize_drag_window').hide();
+    }
+    else{
+      close_and_cleanup_generic_draggable_window($(event.currentTarget).closest('.resize_drag_window').attr('id'));
+    }
+
   });
 
   if (addPopoutButton) {
     let popoutButton = $(`<div class="popout-button"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"/></svg></div>`);
     titleBar.append(popoutButton);
-    popoutButton.off('click.popout').on('click.popout', function(){
+    popoutButton.off('click.popout').on('click.popout', function(event){
       if($(popoutSelector).is("iframe")){
         
         const name = titleBarText.replace(/(\r\n|\n|\r)/gm, "").trim();
@@ -2480,7 +2662,7 @@ function find_or_create_generic_draggable_window(id, titleBarText, addLoadingInd
       else{
         popoutWindow(titleBarText, $(popoutSelector), container.width(), container.height());
       }
-
+      $(event.currentTarget).closest('.resize_drag_window').hide();
     })
   }
 

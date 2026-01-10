@@ -289,6 +289,27 @@ function token_setting_options() {
 			],
 			defaultValue: false,
 			hiddenSetting: true
+		},
+		{
+			name: "tokenWall",
+			label: "Block Vision",
+			type: 'dropdown',
+			options: [
+				{ value: false, label: 'Disabled', description: "Token will not block line of sight." },
+				{ value: "circle", label: 'Circle Wall', description: "Token will block line of sight as if walls in a cirle." },
+				{ value: "circleObject", label: 'Circle Object Wall', description: "Token will block line of sight as if object walls in a cirle." },
+				{ value: "circleWindow", label: 'Circle Window', description: "Token will block line of sight as if windows in a cirle." },
+				{ value: "circleCurtain", label: 'Circle Curtain', description: "Token will block line of sight as if curtains in a cirle." },
+				{ value: "square", label: 'Square Wall', description: "Token will block line of sight as if walls in a square." },
+				{ value: "squareObject", label: 'Square Object Wall', description: "Token will block line of sight as if object walls in a square." },
+				{ value: "squareWindow", label: 'Square Window', description: "Token will block line of sight as if windows in a square." },
+				{ value: "squareCurtain", label: 'Square Curtain', description: "Token will block line of sight as if curtains in a square." },
+				{ value: "poly", label: 'Polygon Wall', description: "Token will block line of sight as if walls in a square." },
+				{ value: "polyObject", label: 'Polygon Object Wall', description: "Token will block line of sight as if object walls in a square." },
+				{ value: "polyWindow", label: 'Polygon Window', description: "Token will block line of sight as if windows in a square." },
+				{ value: "polyCurtain", label: 'Polygon Curtain', description: "Token will block line of sight as if curtains in a square." },
+			],
+			defaultValue: false
 		}
 		
 	];
@@ -315,7 +336,7 @@ function avtt_settings() {
 				{ value: true, label: "Enable", description: `` },
 				{ value: false, label: "Disable", description: `` }
 			],
-			defaultValue: false,
+			defaultValue: true,
 			class: 'ui'
 		},
 		{

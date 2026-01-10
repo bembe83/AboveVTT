@@ -176,13 +176,17 @@ function change_zoom(newZoom, x, y, reset = false) {
 	debounce_font_change();	
 	set_default_vttwrapper_size();
 	if(reset == true){
-		$("#scene_map")[0].scrollIntoView({
-			behavior: 'auto',
-			block: 'center',
-			inline: 'center'
-		});		
-		if($('#hide_rightpanel').hasClass('point-right') && $('.ct-sidebar.ct-sidebar--hidden').length == 0)
-			$(window).scrollLeft(window.scrollX + 170); // 170 half of game log			
+		//this was changed from scrollIntoView to calculate the center and scrollTo as if loaded in an iframe it would scroll the parent window in firefox
+		const sceneMap = $("#scene_map")[0];
+
+		const rect = sceneMap.getBoundingClientRect();
+		const sceneMapCenterX = Math.round(rect.left + rect.width / 2 + window.scrollX);
+		const sceneMapCenterY = Math.round(rect.top + rect.height / 2 + window.scrollY);
+		let scrollX = Math.max(0, sceneMapCenterX - Math.round(window.innerWidth / 2));
+		const scrollY = Math.max(0, sceneMapCenterY - Math.round(window.innerHeight / 2));
+		if ($('#hide_rightpanel').hasClass('point-right') && $('.ct-sidebar.ct-sidebar--hidden').length == 0)
+			scrollX += 170 // 170 half of game log		
+		window.scrollTo({ left: scrollX, top: scrollY, behavior: 'auto' });			
 	}
 
 
@@ -780,6 +784,72 @@ function should_use_iframes_for_monsters() {
 	return window.fetchMonsterStatBlocks;
 }
 
+async function popout_all_selected_token_stat(){
+	const selectedTokens = window.CURRENTLY_SELECTED_TOKENS;
+	if(!selectedTokens || selectedTokens.length < 1)
+		return;
+	for(let id of selectedTokens){
+		let container;
+		const token = window.TOKEN_OBJECTS[id];
+		if(token.isPlayer()){
+			continue;
+		}
+		if (token.options.statBlock) {
+			let customStatBlock = window.JOURNAL.notes[token.options.statBlock].text;
+			let pcURL = $(customStatBlock).find('.custom-pc-sheet.custom-stat').text();
+			if (pcURL) {
+				continue;
+			} 
+			container = await load_monster_stat(undefined, token.options.id, customStatBlock);
+		}
+		else if(token.options.monster){
+			container = await load_monster_stat(token.options.monster, token.options.id);
+		}
+		const windowName = `${token.options.name}_${token.options.id}`.replaceAll(/(\r\n|\n|\r)/gi, "").trim();
+		popoutWindow(windowName, container.find(".avtt-stat-block-container"));
+		$(window.childWindows[windowName].document).find(".avtt-roll-button").on("contextmenu", function (contextmenuEvent) {
+			$(window.childWindows[windowName].document).find("body").append($("div[role='presentation']").clone(true, true));
+			let popoutContext = $(window.childWindows[windowName].document).find(".dcm-container");
+			let maxLeft = window.childWindows[windowName].innerWidth - popoutContext.width();
+			let maxTop = window.childWindows[windowName].innerHeight - popoutContext.height();
+			if (parseInt(popoutContext.css("left")) > maxLeft) {
+				popoutContext.css("left", maxLeft)
+			}
+			if (parseInt(popoutContext.css("top")) > maxTop) {
+				popoutContext.css("top", maxTop)
+			}
+			$(window.childWindows[windowName].document).find("div[role='presentation']").on("click", function (clickEvent) {
+				$(window.childWindows[windowName].document).find("div[role='presentation']").remove();
+			});
+			$(".dcm-backdrop").remove();
+		});
+		close_player_monster_stat_block();
+	}
+}
+function open_selected_token_stat() {
+	const selectedTokens = window.CURRENTLY_SELECTED_TOKENS;
+	if (!selectedTokens || selectedTokens.length < 1)
+		return;
+
+	const token = window.TOKEN_OBJECTS[selectedTokens[0]];
+	if (token.isPlayer()) {
+		open_player_sheet(token.options.sheet, undefined, token.options.name);
+	}
+	else if (token.options.statBlock) {
+		let customStatBlock = window.JOURNAL.notes[token.options.statBlock].text;
+		let pcURL = $(customStatBlock).find('.custom-pc-sheet.custom-stat').text();
+		if (pcURL) {
+			open_player_sheet(pcURL, undefined, token.options.name);
+		}
+		else{
+			load_monster_stat(undefined, token.options.id, customStatBlock);
+		}
+	}
+	else if (token.options.monster) {
+		load_monster_stat(token.options.monster, token.options.id);
+	}
+}
+
 /**
  * Loads and displays a monster stats block
  * @param {Number} monsterId given monster ID
@@ -787,30 +857,31 @@ function should_use_iframes_for_monsters() {
  */
 function load_monster_stat(monsterId, tokenId, customStatBlock=undefined) {
 	if(customStatBlock){
-		let container = build_draggable_monster_window();
+		let container = build_draggable_monster_window(tokenId);
 		display_stat_block_in_container(customStatBlock, container, tokenId, customStatBlock);
 		$(".sidebar-panel-loading-indicator").remove();
 		container.attr('data-name', window.all_token_objects[tokenId].options.name);
-		return;
+		return container;
 	}
 	if(window.all_token_objects[tokenId].options.monster == 'open5e'){
-		let container = build_draggable_monster_window();
+		let container = build_draggable_monster_window(tokenId);
 		build_and_display_stat_block_with_id(window.all_token_objects[tokenId].options.stat, container, tokenId, function () {
 			$(".sidebar-panel-loading-indicator").remove();
 			container.attr('data-name', window.all_token_objects[tokenId].options.name);
 		}, true);
 
-		return;
+		return container;
 	}
 	if (should_use_iframes_for_monsters()) {
 		load_monster_stat_iframe(monsterId, tokenId);
-		return;
+		return container;
 	}
-	let container = build_draggable_monster_window();
+	let container = build_draggable_monster_window(tokenId);
 	build_and_display_stat_block_with_id(monsterId, container, tokenId, function () {
 		$(".sidebar-panel-loading-indicator").remove();
 		container.attr('data-name', window.all_token_objects[tokenId].options.name);
 	});
+	return container;
 }
 
 function load_monster_stat_iframe(monsterId, tokenId) {
@@ -993,8 +1064,7 @@ function load_monster_stat_iframe(monsterId, tokenId) {
 		handles: "all",
 		containment: "#windowContainment",
 		start: function () {
-			$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));
-			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+			$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 		},
 		stop: function () {
 			$('.iframeResizeCover').remove();
@@ -1011,8 +1081,7 @@ function load_monster_stat_iframe(monsterId, tokenId) {
 		scroll: false,
 		containment: "#windowContainment",
 		start: function () {
-			$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));
-			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+			$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 		},
 		stop: function () {
 			$('.iframeResizeCover').remove();
@@ -1021,7 +1090,7 @@ function load_monster_stat_iframe(monsterId, tokenId) {
 	minimize_player_monster_window_double_click($("#resizeDragMon"));
 }
 
-function build_draggable_monster_window() {
+function build_draggable_monster_window(tokenId) {
 
 	$("#resizeDragMon").append(build_combat_tracker_loading_indicator())
 	let container = $("<div id='resizeDragMon'/>");
@@ -1034,7 +1103,7 @@ function build_draggable_monster_window() {
 	container.resize(function(e) {
 		e.stopPropagation();
 	});
-
+	const token = window.TOKEN_OBJECTS[tokenId];
 	if(!$("#site #resizeDragMon").length>0){
 		$("#site").prepend(container);
 	}
@@ -1047,32 +1116,33 @@ function build_draggable_monster_window() {
 			close_player_monster_stat_block();
 		});
 	}
-	if($("#resizeDragMon .popout-button").length==0){
-		const monster_popout_button=$('<div class="popout-button"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"/></svg></div>')
-		$("#resizeDragMon").append(monster_popout_button);
-		monster_popout_button.click(function() {
-			let name = $("#resizeDragMon .avtt-stat-block-container .mon-stat-block__name-link").text();
-			popoutWindow(name, $("#resizeDragMon .avtt-stat-block-container"));
-			name = name.replace(/(\r\n|\n|\r)/gm, "").trim();
-			$(window.childWindows[name].document).find(".avtt-roll-button").on("contextmenu", function (contextmenuEvent) {
-				$(window.childWindows[name].document).find("body").append($("div[role='presentation']").clone(true, true));
-				let popoutContext = $(window.childWindows[name].document).find(".dcm-container");
-				let maxLeft = window.childWindows[name].innerWidth - popoutContext.width();
-				let maxTop =  window.childWindows[name].innerHeight - popoutContext.height();
-				if(parseInt(popoutContext.css("left")) > maxLeft){
-					popoutContext.css("left", maxLeft)
-				}
-				if(parseInt(popoutContext.css("top")) > maxTop){
-					popoutContext.css("top", maxTop)
-				}
-				$(window.childWindows[name].document).find("div[role='presentation']").on("click", function (clickEvent) {
-           			 $(window.childWindows[name].document).find("div[role='presentation']").remove();
-        		});
-				$(".dcm-backdrop").remove();
-			});
-			monster_close_title_button.click();
-		});
+	let popoutButton = $("#resizeDragMon .popout-button");
+	if (popoutButton.length==0){
+		popoutButton =$('<div class="popout-button"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"/></svg></div>')
+		$("#resizeDragMon").append(popoutButton);
 	}
+	popoutButton.off('click.popout').on('click.popout', function() {
+		let name = $("#resizeDragMon .avtt-stat-block-container .mon-stat-block__name-link").text();
+		const windowName = `${token?.options?.name ? token.options.name : name}_${tokenId ? tokenId : ''}`.replaceAll(/(\r\n|\n|\r)/gi, "").trim();
+		popoutWindow(windowName, $("#resizeDragMon .avtt-stat-block-container"));
+		$(window.childWindows[windowName].document).find(".avtt-roll-button").on("contextmenu", function (contextmenuEvent) {
+			$(window.childWindows[windowName].document).find("body").append($("div[role='presentation']").clone(true, true));
+			let popoutContext = $(window.childWindows[windowName].document).find(".dcm-container");
+			let maxLeft = window.childWindows[windowName].innerWidth - popoutContext.width();
+			let maxTop = window.childWindows[windowName].innerHeight - popoutContext.height();
+			if(parseInt(popoutContext.css("left")) > maxLeft){
+				popoutContext.css("left", maxLeft)
+			}
+			if(parseInt(popoutContext.css("top")) > maxTop){
+				popoutContext.css("top", maxTop)
+			}
+			$(window.childWindows[windowName].document).find("div[role='presentation']").on("click", function (clickEvent) {
+				$(window.childWindows[windowName].document).find("div[role='presentation']").remove();
+			});
+			$(".dcm-backdrop").remove();
+		});
+		monster_close_title_button.click();
+	});
 	$("#resizeDragMon").addClass("moveableWindow");
 	if(!$("#resizeDragMon").hasClass("minimized")) {
 		$("#resizeDragMon").addClass("restored");
@@ -1085,8 +1155,7 @@ function build_draggable_monster_window() {
 		handles: "all",
 		containment: "#windowContainment",
 		start: function() {
-			$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));
-			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+			$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 		},
 		stop: function() {
 			$('.iframeResizeCover').remove();
@@ -1103,8 +1172,7 @@ function build_draggable_monster_window() {
 		scroll: false,
 		containment: "#windowContainment",
 		start: function() {
-			$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));
-			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+			$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 		},
 		stop: function() {
 			$('.iframeResizeCover').remove();
@@ -1164,7 +1232,7 @@ function minimize_player_monster_window_double_click(titleBar) {
  * Creates sidebar menu.
  * @returns void
  */
-function init_controls() {
+async function init_controls() {
 	if($("#switch_gamelog").length > 0){
 			if($('#settings-panel').length == 0){
 				init_sidebar_tabs();
@@ -1185,7 +1253,7 @@ function init_controls() {
  	if(gameLogButton.length == 0){
    	gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
  	}
- 	gameLogButton.click()
+ 	gameLogButton.click();
 
 	init_sidebar_tabs();
 	let sidebarControlsParent = is_characters_page() ? $(".ct-sidebar__inner>[class*='styles_controls']") : $(".sidebar__controls");
@@ -1683,8 +1751,7 @@ function  init_sheet() {
 			handles: "all",
 			containment: "#windowContainment",
 			start: function () {
-				$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));
-				$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+				$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 			},
 			stop: function () {
 				$('.iframeResizeCover').remove();
@@ -1701,8 +1768,7 @@ function  init_sheet() {
 			scroll: false,
 			containment: "#windowContainment",
 			start: function () {
-				$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));
-				$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+				$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 			},
 			stop: function () {
 				$('.iframeResizeCover').remove();
@@ -1728,6 +1794,7 @@ function open_player_sheet(sheet_url, closeIfOpen = true, playerName = '') {
 	}
 	console.log("open_player_sheet"+sheet_url);
 
+	
 	close_player_sheet(); // always close before opening
 
 	let container = $("#sheet");
@@ -1888,6 +1955,7 @@ function open_player_sheet(sheet_url, closeIfOpen = true, playerName = '') {
 		iframe.attr('data-changed','false');
 		iframe.attr('src', function(i, val) { return val; });
 	}
+	return container;
 }
 
 /**
@@ -2552,7 +2620,7 @@ function init_buttons() {
 	buttons.css("position", "fixed");
 	buttons.css("top", '5px');
 	buttons.css("left", '5px');
-	buttons.css("z-index", '57000');
+	buttons.css("z-index", '125000');
 
 	// HIDE default SEND TO functiontality in the campaign page:
 
@@ -2595,6 +2663,26 @@ function init_zoom_buttons() {
 	
 	zoom_section.append(youtube_controls_button);
 	if(window.DM) {
+		
+		const dm_screen_button = $(`<div id='dm_screen_button' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Show/Hide DM Screen'> 
+			<div class="ddbc-tab-options__header-heading">
+					<span class="material-symbols-outlined" style="font-size: 20px;">
+						scrollable_header
+					</span>
+			</div></div>
+			`);
+		dm_screen_button.click(function (event) {
+			console.log("dm_screen_button", event);
+			const dmScreen = $(`#dmScreenDragContainer`);
+			if (dmScreen.length > 0){
+				dmScreen.show();
+			}
+			else{
+				const dmScreenContainer = find_or_create_generic_draggable_window("dmScreenDragContainer", "DM Screen", false, true, '#dmScreenContainer', '90%', '90%', '5%', '5%', false, '', true)
+				buildDMScreen(dmScreenContainer);
+			}
+		});
+		zoom_section.append(dm_screen_button);
 
 		const projector_toggle = $(`<div id='projector_toggle' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Quick toggle projector mode'></div>`);
 
@@ -2824,11 +2912,9 @@ function init_zoom_buttons() {
 		</div></div>
 		`);
 		avttS3FileShare.click(launchFilePicker);
-		if (window.testAvttFilePicker === true) { //console testing var
-			zoom_section.append(avttS3FileShare, select_locked, ping_center, pause_players);
-		} else {
-			zoom_section.append(select_locked, ping_center, pause_players);
-		}
+
+		zoom_section.append(avttS3FileShare, select_locked, ping_center, pause_players);
+
 	}
 
 
@@ -3140,6 +3226,18 @@ function init_help_menu() {
 						<dl>
 							<dt>Hold ${getModKeyName()} while using most tools</dt>
 							<dd>Temporary toggle snap tools to grid on/off (opposite of the toggle set). This includes drawings from most menus - fog, draw, light, walls etc.</dd>
+						</dl>
+						<dl>
+							<dt>B</dt>
+							<dd>Open selected token statblock</dd>
+						</dl>
+						<dl>
+							<dt>${getShiftKeyName()}+B</dt>
+							<dd>Popout selected token(s) statblocks. (Only works for statblocks that allow popout)</dd>
+						</dl>
+						<dl>
+							<dt>H</dt>
+							<dd>Hide/unhide selected tokens.</dd>
 						</dl>
 						<dl>
 							<dt>${getShiftKeyName()}+Click Token</dt>

@@ -278,12 +278,7 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 				window.CURRENT_SCENE_DATA.vpps = Math.abs(ppsy);
 				window.CURRENT_SCENE_DATA.offsetx = Math.abs(offsetx);
 				window.CURRENT_SCENE_DATA.offsety = Math.abs(offsety);
-				if(window.CURRENT_SCENE_DATA.gridType && window.CURRENT_SCENE_DATA.gridType != 1){
-					window.CURRENT_SCENE_DATA.scaleAdjustment = {
-						x: 1 + adjustmentSliders.x/10,
-						y: 1 + adjustmentSliders.y/10
-					}
-				}
+				
 				if($("#edit_dialog").length != 0){
 					$('#squaresWide').val(`${$('#scene_map').width()/window.CURRENT_SCENE_DATA.hpps}`)
 					$('#squaresTall').val(`${$('#scene_map').height()/window.CURRENT_SCENE_DATA.vpps}`)					
@@ -292,7 +287,15 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 					$('input[name="offsetx"]').attr('data-prev-value', window.CURRENT_SCENE_DATA.offsetx);
 					$('input[name="offsety"]').attr('data-prev-value', window.CURRENT_SCENE_DATA.offsety);
 				}
-
+				if(window.CURRENT_SCENE_DATA.gridType && window.CURRENT_SCENE_DATA.gridType != 1){
+					window.CURRENT_SCENE_DATA.scaleAdjustment = {
+						x: 1 + (adjustmentSliders.x / 50),
+						y: 1 + (adjustmentSliders.y / 50)
+					}
+				}
+				else {
+					delete window.CURRENT_SCENE_DATA.scaleAdjustment;
+				}
 				let width
 				if (window.ScenesHandler.scene.upscaled == "1")
 					width = 2;
@@ -574,7 +577,7 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 			return;
 		}
 		
-		let f = $("<iframe src='/sources'></iframe");
+		let f = $("<iframe src='/en/library'></iframe");
 		f.hide();
 		$("#site").append(f);
 		
@@ -584,11 +587,11 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 		f.on("load", function(event) {
 			console.log('iframe pronto..');
 			let iframe = $(event.target);
-			iframe.contents().find(".sources-listing--item--title").each(function(idx) {
+			iframe.contents().find("[class*='SourceCard_sourceTitle']").each(function(idx) {
 				let ddbtype=$(this).closest(".sources-listing").attr('id'); // get Sourcebooks of Adventures
 				let title = $(this).html();
-				let url = $(this).parent().attr("href");
-				let keyword = url.replace('https://www.dndbeyond.com', '').replace('sources/', '');
+				let url = $(this).attr("href");
+				let keyword = url.replaceAll(/https:\/\/www\.dndbeyond\.com|^\/?sources\/|/gi, '');
 
 				if (keyword in self.sources){ // OBJECT ALREADY EXISTS... evito di riscrivere per non perdere i dati
 					scraped_sources[keyword]=self.sources.keyword;
@@ -649,8 +652,7 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 		f.hide();
 		$("#site").append(f);
 
-		$('#sources-import-content-container').append(build_combat_tracker_loading_indicator('One moment while we load sourcebook'));
-	
+
 		f.on("load", function(event) {
 			let iframe = $(event.target);
 			console.log('caricato ' + window.frames['scraper'].location.href);
@@ -773,7 +775,7 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 				const bodyClass = body.attr('class');
 				const subClasses = ['p-article-a', 'p-article-content'] 
 
-				const section = body.find(href.match(/#.*$/gi)[0]);
+				const section = body.find(href.match(/#.*$/gi)?.[0]);
 				if(section.length == 0)
 					return // linking to another scene so return, don't add note or token
 				const sectionElementType = section[0].tagName;

@@ -611,7 +611,10 @@ class MessageBroker {
 				console.log("skipping msg from a different scene");
 				return;
 			}
-
+			if (msg.eventType == "character-sheet/item-shared/fulfilled"){
+				DDBApi.debounceGetPartyInventory();
+				return;
+			}
 			if (msg.eventType == "custom/myVTT/token" && (msg.sceneId == window.CURRENT_SCENE_DATA.id || msg.data.id in window.TOKEN_OBJECTS)) {
 				self.handleToken(msg);
 			}
@@ -1401,10 +1404,10 @@ class MessageBroker {
 
 										if(is_gamelog_popout()){
 											tabCommunicationChannel.postMessage({
-						           msgType: 'gamelogDamageButtons',
-						           damage: damage
-						          });
-						          return;
+												msgType: 'gamelogDamageButtons',
+												damage: damage
+											});
+											return;
 										}
 										if($(`.tokenselected:not([data-id*='profile'])`).length == 0){
 											showTempMessage('No non-player tokens selected');
@@ -1603,7 +1606,8 @@ class MessageBroker {
 			let dmMapEqual = msg.data.dm_map == window.CURRENT_SCENE_DATA.dm_map && msg.data.dm_map_usable == '1' || msg.data.player_map == window.CURRENT_SCENE_DATA.player_map && msg.data.dm_map_usable == '0'
 			let dmMapToggleEqual = msg.data.dm_map_usable == window.CURRENT_SCENE_DATA.dm_map_usable
 			let playerMapEqual = msg.data.player_map == window.CURRENT_SCENE_DATA.player_map
-			let scaleFactorEqual = (msg.data.scale_factor == window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion || 
+			let scaleFactorEqual = (msg.data.scale_factor == window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion ||
+																		(msg.data.UVTTFile == 1  && msg.data.scale_factor == window.CURRENT_SCENE_DATA.scale_factor) || 
 																		((msg.data.scale_factor == undefined || msg.data.scale_factor=='') && window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion == 1))
 			let hppsEqual = window.CURRENT_SCENE_DATA.hpps==parseFloat(msg.data.hpps*msg.data.scale_factor)
 			let vppsEqual = window.CURRENT_SCENE_DATA.vpps==parseFloat(msg.data.vpps*msg.data.scale_factor)
@@ -1668,6 +1672,7 @@ class MessageBroker {
 			else{
 				window.DRAWINGS = [];
 				window.wallUndo = [];
+				window.visionBlockingTokenCache = {};
 				$('#exploredCanvas').remove();
 				window.sceneRequestTime = Date.now();
 		    	let lastSceneRequestTime = window.sceneRequestTime;   
@@ -1821,6 +1826,8 @@ class MessageBroker {
 								width: hexWidth,
 								height: hexHeight
 							}
+						}else{
+							delete window.CURRENT_SCENE_DATA.scaleAdjustment;
 						}
 
 						// Scale map according to scaleFactor
@@ -1860,7 +1867,7 @@ class MessageBroker {
 							$('.import-loading-indicator .percentageLoaded').css('width', `20%`);		
 						}
 						await reset_canvas();
-		        		await set_default_vttwrapper_size();
+        		await set_default_vttwrapper_size();
 						remove_loading_overlay();
 						console.log("LOADING TOKENS!");
 						
@@ -2001,13 +2008,19 @@ class MessageBroker {
 	}
 	
 	convertChat(data,local=false) {
-
 		data.text = this.decode_message_text(data.text);
 
+
+		const isChatEnabled = is_encounters_page() || is_characters_page() || is_campaign_page();
+
 		//Security logic to prevent content being sent which can execute JavaScript.
-		data.player = DOMPurify.sanitize( data.player,{ALLOWED_TAGS: []});
-		data.img = DOMPurify.sanitize( data.img,{ALLOWED_TAGS: []});
+		let image = `<img class="${isChatEnabled ? 'tss-1e4a2a1-AvatarPortrait' : 'Avatar_AvatarPortrait__3cq6B'}" src="${encodeURI(data.img)}" alt="">`;
+		let player = `<span class="tss-1tj70tb-Sender" title="${data.player}">${data.player}</span>`;
+
+		player = DOMPurify.sanitize( player,{ALLOWED_TAGS: ['span']});
+		image = DOMPurify.sanitize( image,{ALLOWED_TAGS: ['img']});
 		data.text = DOMPurify.sanitize( data.text,{ALLOWED_TAGS: ['video','img','div','p', 'b', 'button', 'span', 'style', 'path', 'rect', 'svg', 'a', 'hr', 'ul', 'li', 'ol', 'h3', 'h2', 'h4', 'h1', 'table', 'tr', 'td', 'th', 'br', 'input', 'strong', 'em'], ADD_ATTR: ['target']}); //This array needs to include all HTML elements the extension sends via chat.
+
 
 		if(data.dmonly && !(window.DM) && !local) // /dmroll only for DM of or the user who initiated it
 			return $("<div/>");
@@ -2042,50 +2055,36 @@ class MessageBroker {
 		}
 
 
-		if (is_encounters_page() || is_characters_page() || is_campaign_page()) {
+		if (isChatEnabled) {
 			return $(`
 				<li class="tss-8-Other-ref tss-17y30t1-GameLogEntry-Other-Flex">
 					<p role="img" class="tss-wyeh8h-Avatar-Flex">
-						<img class="tss-1e4a2a1-AvatarPortrait" src="${data.img}" alt="">
+						${image}
 					</p>
 					<div class="tss-1e6zv06-MessageContainer-Flex">
 						<div class="tss-dr2its-Line-Flex">
-							<span class="tss-1tj70tb-Sender" title="${data.player}">${data.player}</span>
+							${player}
 						</div>
 						<div class="tss-8-Collapsed-ref tss-8-Other-ref tss-11w0h4e-Message-Collapsed-Other-Flex">${data.text}</div>
 						<time datetime="${datetime}" title="${datestamp} ${timestamp}" class="tss-1yxh2yy-TimeAgo-TimeAgo">${timestamp}</time>
 					</div>
 				</li>
 			`);
-		} /*else if (is_characters_page()) {
-			return $(`
-				<li class="cwBGi-s80YSXZFf9zFTAGg== wtVS4Bjey6LwdMo1GyKvpQ== QXDbdjnpeXLRB22KlOxDsA== _42x6X+dUmW-21eOxSO1c7Q== _9ORHCNDFVTb1uWMCEaGDYg==">
-					<p role="img" class="TILdlgSwOYvXr2yBdjxU7A== QXDbdjnpeXLRB22KlOxDsA==">
-						<img class="U5icMJo74qXY3K0pjow8zA==" src="${data.img}" alt="">
-					</p>
-					<div class="pw06vls7GmA2pPxoGyDytQ== QXDbdjnpeXLRB22KlOxDsA== VwlMdrxdj-7VFbj4bhgJCg== bDu7knPli3v29ahk5PQFIQ==">
-						<div class="zmFwkmlgaKJ3kVU14zW8Lg== QXDbdjnpeXLRB22KlOxDsA== CoBE7nCohYcFyEBBP3K93A==">
-							<span class="_22SVeI3ayk2KgS4V+GqCCA==">${data.player}</span>
-						</div>
-						<div class="oDA6c7IdLEVJ7uSe5103CQ== iQqUeZkD8989e4pBhSqIrQ== wtVS4Bjey6LwdMo1GyKvpQ== QXDbdjnpeXLRB22KlOxDsA==">${data.text}</div>
-						<time datetime="${datetime}" title="${datestamp} ${timestamp}" class="VL1LOQfDhMHRvAGyWG2vGg== _1-XSkDcxqHW18wFo5qzQzA==">${timestamp}</time>
-					</div>
-				</li>
-			`);
-		}*/
+		} 
 
 		let newentry = $("<div/>");
 		newentry.attr('class', 'GameLogEntry_GameLogEntry__2EMUj GameLogEntry_Other__1rv5g Flex_Flex__3cwBI Flex_Flex__alignItems-flex-end__bJZS_ Flex_Flex__justifyContent-flex-start__378sw');
-		newentry.append($("<p role='img' class='Avatar_Avatar__131Mw Flex_Flex__3cwBI'><img class='Avatar_AvatarPortrait__3cq6B' src='" + data.img + "'></p>"));
+		newentry.append($("<p role='img' class='Avatar_Avatar__131Mw Flex_Flex__3cwBI'>" + image + "</p>"));
 		let container = $("<div class='GameLogEntry_MessageContainer__RhcYB Flex_Flex__3cwBI Flex_Flex__alignItems-flex-start__HK9_w Flex_Flex__flexDirection-column__sAcwk'></div>");
 		container.append($("<div class='GameLogEntry_Line__3fzjk Flex_Flex__3cwBI Flex_Flex__justifyContent-space-between__1FcfJ'><span>" + data.player + "</span></div>"));
 		let entry = $("<div class='GameLogEntry_Message__1J8lC GameLogEntry_Collapsed__1_krc GameLogEntry_Other__1rv5g Flex_Flex__3cwBI'>" + data.text + "</div>");
+
+		
+		entry = DOMPurify.sanitize(entry, { ALLOWED_TAGS: allowedTagArray, ADD_ATTR: ['target'] }); //This array needs to include all HTML elements the extension sends via chat.
+
+
 		container.append(entry);
 
-		
-
-
-		
 		container.append($("<time datetime='" + datetime + "' class='GameLogEntry_TimeAgo__zZTLH TimeAgo_TimeAgo__2M8fr'></time"));
 
 		newentry.append(container);
@@ -2095,7 +2094,6 @@ class MessageBroker {
 		}
 
 		return newentry;
-		
 	}
 
 
@@ -2138,7 +2136,20 @@ class MessageBroker {
 			
 		if (data.id in window.TOKEN_OBJECTS) {
 
+			if(window.visionBlockingTokenCache?.[data.id] != undefined){
+				
+				const wallType = window.TOKEN_OBJECTS[data.id]?.options?.tokenWall;
+				const dataWall = data.tokenWall;
 
+				const wallOptions = window.TOKEN_OBJECTS[data.id]?.options?.tokenWallPoly;
+				const relativePoints = wallOptions?.relativePoints;
+
+				const dataWallPoints = data.tokenWallPoly?.relativePoints;
+
+				if(window.TOKEN_OBJECTS[data.id] == undefined || dataWall == undefined || dataWall == false || (wallType != dataWall) || relativePoints?.[0] != dataWallPoints?.[0]){
+					delete window.visionBlockingTokenCache[data.id];
+				}
+			}
 			for (let property in data) {
 				if(msg.sceneId != window.CURRENT_SCENE_DATA.id && (property == "left" || property == "top" || property == "hidden" || property == "scaleCreated"))
 					continue;	
@@ -2163,6 +2174,24 @@ class MessageBroker {
 			if(data.groupId == undefined){
 				delete window.TOKEN_OBJECTS[data.id].options.groupId;
 				delete window.all_token_objects[data.id].options.groupId;
+			}
+			if(data.tokenWallPoly == undefined){
+				delete window.TOKEN_OBJECTS[data.id].options.tokenWallPoly;
+				delete window.all_token_objects[data.id].options.tokenWallPoly;
+			}
+			if(window.visionBlockingTokenCache?.[data.id] != undefined){
+				
+				const wallType = window.TOKEN_OBJECTS[data.id]?.options?.tokenWall;
+				const dataWall = data.tokenWall;
+
+				const wallOptions = window.TOKEN_OBJECTS[data.id]?.options?.tokenWallPoly;
+				const relativePoints = wallOptions?.relativePoints;
+
+				const dataWallPoints = data.tokenWallPoly?.relativePoints;
+
+				if(window.TOKEN_OBJECTS[data.id] == undefined || dataWall == undefined || dataWall == false || (wallType != dataWall) || relativePoints?.[0] != dataWallPoints?.[0]){
+					delete window.visionBlockingTokenCache[data.id];
+				}
 			}
 			let selector = "div[data-id='" + data.id + "']";
 			let token = $("#tokens").find(selector);

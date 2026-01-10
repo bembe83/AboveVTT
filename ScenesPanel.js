@@ -486,25 +486,33 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function
 	);
 
 	gridType.find('input').on('change', function(){
+		$("#horizontalMinorAdjustmentInput").val('50');
+		$("#verticalMinorAdjustmentInput").val('50');
+		delete window.CURRENT_SCENE_DATA.scaleAdjustment;
+		if (window.CURRENT_SCENE_DATA.gridType == 1){
+			window.CURRENT_SCENE_DATA.hpps = $("#scene_map").width()/parseFloat($('#squaresWide').val());
+			window.CURRENT_SCENE_DATA.vpps = $("#scene_map").height()/parseFloat($('#squaresTall').val());
+		}
+		moveAligners(false, true, window.CURRENT_SCENE_DATA.gridType);
+		
 		window.CURRENT_SCENE_DATA.gridType = $(this).val();
-		if($(this).val() == 3){
+		if (window.CURRENT_SCENE_DATA.gridType == 3){
 			
 			$(scene_properties).toggleClass('verticalHex', true);
 			$(scene_properties).toggleClass('horizontalHex', false);
 			$('span.squaresWide').text(' hex columns');
 			$('#additionalGridInfo').toggleClass('closed', false);
 			$('#gridInstructions').text(`Top left draggable will position the hex grid, bottom right will adjust it's size. Use minor adjustment bars to skew the hex if it isn't a 'perfect hex' on the map. These bars will stretch/squash starting in the top left. To use manual options: Count the number of hex columns for sizing. If the hexes on the map are squashed/stretched at all use the minor adjustment sliders.`)
-		} else if($(this).val() == 2){
+		} else if (window.CURRENT_SCENE_DATA.gridType == 2){
 			$(scene_properties).toggleClass('verticalHex', false);
 			$(scene_properties).toggleClass('horizontalHex', true);
 		
 			$('span.squaresTall').text(` hex rows`);
 			$('#additionalGridInfo').toggleClass('closed', false);
 			$('#gridInstructions').text(`Top left draggable will position the hex grid, bottom right will adjust it's size. Use minor adjustment bars to skew the hex if it isn't a 'perfect hex' on the map. These bars will stretch/squash starting in the top left. To use manual options: Count the number of hex rows for sizing. If the hexes on the map are squashed/stretched at all use the minor adjustment sliders.`)
-		} else if($(this).val() == 1){
+		} else if (window.CURRENT_SCENE_DATA.gridType == 1){
 			$(scene_properties).toggleClass('verticalHex', false);
 			$(scene_properties).toggleClass('horizontalHex', false);
-			
 			$('span.squaresTall').text(' squares tall');
 			$('span.squaresWide').text(' squares wide');
 			$('#verticalMinorAdjustment label').text('Minor Vertical Adjustment')
@@ -577,11 +585,11 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function
 			<div title='The size the ruler will measure a side of a square.'><div style='display:inline-block; width:40%'>Measurement:</div><div style='display:inline-block; width:60'%'><input type='number' name='fpsq' placeholder='5' value='${window.CURRENT_SCENE_DATA.fpsq}'> <input name='upsq' placeholder='ft' value='${window.CURRENT_SCENE_DATA.upsq}'></div></div>
 			<div id='gridSubdividedRow' class='hideHex' style='display: ${(window.CURRENT_SCENE_DATA.fpsq == 10 || window.CURRENT_SCENE_DATA.fpsq == 15 || window.CURRENT_SCENE_DATA.fpsq == 20) ? 'block' : 'none'}' title='Split grid into 5ft sections'><div style='display:inline-block; width:40%'>Split into 5ft squares</div><div style='display:inline-block; width:60'%'><input style='display: none;' type='number' min='0' max='1' step='1' name='grid_subdivided'></div></div>
 			<div id='additionalGridInfo' class='closed'>Additional Grid Info / Manual Settings</div>
-			<div title='Number of grid squares Width x Height.'><div style='display:inline-block; width:30%'>Grid size</div><div style='display:inline-block;width:70%;'><input id='squaresWide' class='hideHorizontalHex' type='number' min='10' value='${$("#scene_map").width()/window.CURRENT_SCENE_DATA.hpps}'><span style='display: inline' class='squaresWide hideHorizontalHex'> squares wide</span><br class='hideHorizontalHex'/><input type='number' id='squaresTall' class='hideVerticalHex' value='${$("#scene_map").height()/window.CURRENT_SCENE_DATA.vpps}' min='10'><span style='display: inline' class='squaresTall hideVerticalHex'> squares tall</span></div></div>
+			<div title='Number of grid squares Width x Height.'><div style='display:inline-block; width:30%'>Grid size</div><div style='display:inline-block;width:70%;'><input id='squaresWide' class='hideHorizontalHex' type='number' min='1' step='any' value='${$("#scene_map").width() / window.CURRENT_SCENE_DATA.hpps}'><span style='display: inline' class='squaresWide hideHorizontalHex'> squares wide</span><br class='hideHorizontalHex'/><input type='number' id='squaresTall' class='hideVerticalHex' value='${$("#scene_map").height() / window.CURRENT_SCENE_DATA.vpps}' min='1' step="any"><span style='display: inline' class='squaresTall hideVerticalHex'> squares tall</span></div></div>
 			<div title='Grid offset from the sides of the map in pixels. From top left corner of square and from middle of hex.'>
 				<div style='display:inline-block; width:30%'>Offset</div><div style='display:inline-block;width:70%;'>
-				<input type='number' name='offsetx'>px from left<br/>
-				<input type='number' name='offsety'>px from top
+				<input type='number' name='offsetx' step='any'>px from left<br/>
+				<input type='number' name='offsety' step='any'>px from top
 				</div>
 			</div>
 			`));
@@ -671,7 +679,7 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function
         	$(this).select();	
 	})
 	
-	let moveAligners = function(moveAligner1 = false, minorAdjustments = false){
+	let moveAligners = function (moveAligner1 = false, minorAdjustments = false, gridType = $('#gridType input:checked').val()){
 		let width
 		if (window.ScenesHandler.scene.upscaled == "1")
 			width = 2;
@@ -679,7 +687,7 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function
 			width = 1;
 		const dash = [30, 5]
 		const color = "rgba(255, 0, 0,0.5)";
-		window.CURRENT_SCENE_DATA.gridType = $('#gridType input:checked').val();
+		window.CURRENT_SCENE_DATA.gridType = gridType;
 		if(manual.find('input[name="offsety"]').val()== undefined || manual.find('input[name="offsetx"]').val()==undefined || (manual.find('#squaresTall').val()==undefined || manual.find('#squaresWide').val()==undefined ))
 			return;
 		if(window.CURRENT_SCENE_DATA.gridType == 1){
@@ -755,7 +763,9 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function
 			remove_zoom_from_storage()
 			$('[id="aligner1"]').remove();
 			$('[id="aligner2"]').remove();
-
+			if(window.CURRENT_SCENE_DATA.gridType == 1){
+				delete window.CURRENT_SCENE_DATA.scaleAdjustment;
+			}
 			let gridMeasurement = $('input[name="fpsq"]').val();
 			if(gridMeasurement == 5){
 				grid_5();
@@ -1283,12 +1293,10 @@ function edit_scene_dialog(scene_id) {
 	playerMapRow.append(form_toggle("player_map_is_video", "Video map?", false, handle_map_toggle_click))
 	playerMapRow.find('button').append($(`<div class='isvideotogglelabel'>link is video</div>`));
 	
-	if (window.testAvttFilePicker === true) { //console testing
-		playerMapRow.append(dropBoxbutton1, avttButton1, onedriveButton1);
-	}
-	else{
-		playerMapRow.append(dropBoxbutton1, onedriveButton1);
-	}
+
+	playerMapRow.append(dropBoxbutton1, avttButton1, onedriveButton1);
+	
+
 	
 	
 	
@@ -1297,12 +1305,9 @@ function edit_scene_dialog(scene_id) {
 	dmMapRow.append(form_toggle("dm_map_is_video", "Video map?", false, handle_map_toggle_click))
 	dmMapRow.find('button').append($(`<div class='isvideotogglelabel'>link is video</div>`));
 	
-	if (window.testAvttFilePicker === true) { //console testing
-		dmMapRow.append(dropBoxbutton2, avttButton2, onedriveButton2);
-	}
-	else {
-		dmMapRow.append(dropBoxbutton2, onedriveButton2);
-	}
+	
+	dmMapRow.append(dropBoxbutton2, avttButton2, onedriveButton2);
+
 
 	
 	
@@ -2319,6 +2324,17 @@ async function redraw_scene_list(searchTerm) {
 										}
 
 										let input = createCountTracker(window.JOURNAL.notes[noteId], spellName, numberFound, remainingText, "", track_ability);
+										const playerDisabled = $(this).hasClass('player-disabled');
+										if (!window.DM && playerDisabled) {
+											input.prop('disabled', true);
+										}
+										const partyLootTable = $(this).closest('.party-item-table');
+										if (partyLootTable.hasClass('shop') && numberFound > 0) {
+											$(this).closest('tr').find('td>.item-quantity-take-input').val(1);
+										}
+										else {
+											$(this).closest('tr').find('td>.item-quantity-take-input').val(numberFound);
+										}
 										$(this).find('p').remove();
 										$(this).after(input)
 									})
@@ -3060,16 +3076,20 @@ function load_sources_iframe_for_map_import(hidden = false) {
 		const sourcesBody = $(event.target).contents();
 		sourcesBody.find('head').append(`<style id='dndbeyondSourcesiFrameStyles' type="text/css">
 			#site-main,
-			.single-column #content{
+			.single-column #content,
+			main[class*='page_root']{
 				padding: 0px !important;
 			} 
 			header[role='banner'],
+			header.navigationContainer,
 			#site-main > .site-bar,
 			#site-main > header.page-header,
 			#mega-menu-target,
 			footer,
 			.ad-container,
-			.ddb-site-banner{
+			.ddb-site-banner,
+			[href*='marketplace.dndbeyond.com'],
+			[src*='marketplace.dndbeyond.com']{
 				display:none !important;
 			}
 			.ddb-collapsible-filter{
@@ -3085,24 +3105,29 @@ function load_sources_iframe_for_map_import(hidden = false) {
 		$('#sources-import-content-container').find(".sidebar-panel-loading-indicator").remove();
 
 		// give the search bar focus, so we can just start typing to filter sources without having to click into it
-		sourcesBody.find(".ddb-collapsible-filter__input").focus();
+		sourcesBody.find("[class*='SearchInput_searchInput']").focus();
+
 
 		// hijack the links and open our importer instead
-		sourcesBody.find("a.sources-listing--item").click(function (event) {
+		sourcesBody.off('click.importer').on('click.importer', "a[class*='SourceCard_imageLink']", function (event) {
 			event.stopPropagation();
 			event.preventDefault();
 			const sourceAbbreviation = event.currentTarget.href.split("sources/").pop();
-			const image = $(event.currentTarget).find(".sources-listing--item--avatar").css("background-image").slice(4, -1).replace(/"/g, "");
-			const title = $(event.currentTarget).find(".sources-listing--item--title").text();
+			const image = $(event.currentTarget).find("[class*='SourceCard_image']").attr('src');
+			const title = $(event.currentTarget).closest("[class*='SourcesList_sourceWrapper']").find("a[class*='SourceCard_sourceTitle']").text().trim();
 			scene_importer_clicked_source(sourceAbbreviation, undefined, image, title);
+			$('#sources-import-content-container').append(build_combat_tracker_loading_indicator('One moment while we load sourcebook'));
 			mega_importer(true, sourceAbbreviation);
 			iframe.hide();
 		});
-
+		sourcesBody.find("a[class*='SourceCard_sourceTitle']").click(function (event) {
+			event.stopPropagation();
+			event.preventDefault();
+		})
 		add_scene_importer_back_button(sourcesBody);
 	});
 
-	iframe.attr("src", `/sources`);
+	iframe.attr("src", `/en/library?ownership=owned-shared`);
 }
 
 function adjust_create_import_edit_container(content='', empty=true, title='', width100Minus=500, minWidth=850){
@@ -3136,8 +3161,7 @@ function adjust_create_import_edit_container(content='', empty=true, title='', w
 			scroll: false,
 			containment: "#windowContainment",
 			start: function() {
-				$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));
-				$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+				$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 			},
 			stop: function() {
 				$('.iframeResizeCover').remove();
@@ -3256,14 +3280,14 @@ async function create_scene_root_container(fullPath, parentId) {
 	
 	const avttFileImport = await build_tutorial_import_list_item({
 		"title": "Azmoria's AVTT File Picker Image or Video",
-		"description": "Build a scene using Azmoria's AVTT File Picker image or video file.",
+		"description": "Build a scene using an image/video from Azmoria's AVTT File Picker.",
 		"category": "Scenes",
 		"player_map": "",
 	}, `${window.EXTENSION_PATH}assets/avtt-logo.png`, false);
 	avttFileImport.css("width", "25%");
-	if (window.testAvttFilePicker === true){ //console testing var
-		sectionHtml.find("ul").append(avttFileImport); 
-	}
+	
+	sectionHtml.find("ul").append(avttFileImport); 
+	
 	avttFileImport.find(".listing-card__callout").hide();
 	avttFileImport.find("a.listing-card__link").click(function (e) {
 		e.stopPropagation();
@@ -3280,8 +3304,8 @@ async function create_scene_root_container(fullPath, parentId) {
 
 
 	const onedriveImport = await build_tutorial_import_list_item({
-		"title": "Onedrive Image or Video",
-		"description": "Build a scene using a Onedrive image or video file.",
+		"title": "Onedrive Image",
+		"description": "Build a scene using a Onedrive image file.",
 		"category": "Scenes",
 		"player_map": "",
 	}, `${window.EXTENSION_PATH}images/Onedrive_icon.svg`, false);
@@ -3295,7 +3319,7 @@ async function create_scene_root_container(fullPath, parentId) {
 		e.preventDefault();
     	launchPicker(e, function(files){
 			create_scene_inside(parentId, fullPath, files[0].name, files[0].link);
-		});
+		}, 'single', ['photo', '.webp']);
 	});
 
 
@@ -3377,9 +3401,9 @@ function build_UVTT_import_container(){
 	const avttButton1 = createCustomAvttChooser("Choose UVTT File from Azmoria's AVTT File Picker", function (links) { $('#player_map_row input').val(links[0].link) }, [avttFilePickerTypes.UVTT]);
 
 	form.append(dropBoxbutton1);
-	if(window.testAvttFilePicker === true){ //console testing var
-		form.append(avttButton1);
-	}
+
+	form.append(avttButton1);
+	
 	//form.append(onedriveButton1); if we ever get this working again, or one drive changes things to make them accessible we can reenable it
 
 	const hiddenDoorToggle = form_toggle('hidden_doors_toggle', null, false, function(event) {
@@ -3558,7 +3582,7 @@ async function build_source_book_chapter_import_section(sceneSet) {
 function add_scene_importer_back_button(container) {
 	const backButton = $(`<a class="quick-menu-item-link importer-back-button" href="#">Back</a>`);
 
-	const searchContainer = container.find(".ddb-collapsible-filter").first();
+	const searchContainer = container.find(".ddb-collapsible-filter, [class*='SourcesContents_contents']").first();
 	searchContainer.prepend(backButton);
 	searchContainer.css({ "display": "flex" });
 	backButton.click(function (e) {

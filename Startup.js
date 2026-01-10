@@ -47,21 +47,24 @@ $(function() {
       })
       .then((campaignDmId) => {
         const isDmPage = is_encounters_page();
+        const isSpectator = is_spectator_page();
         const userId = $(`#message-broker-client[data-userid]`)?.attr('data-userid') || Cobalt?.User?.ID;
-        
-
-
-        if (isDmPage && campaignDmId == userId) {
+        if ((isDmPage && campaignDmId == userId) || isSpectator) {
           inject_dice();
+        }
+        return { campaignDmId, userId, isDmPage, isSpectator };
+      })
+      .then((data) => {
+        const { campaignDmId, userId, isDmPage, isSpectator } = data;  
+        if (isDmPage && campaignDmId == userId) {
           startup_step("Starting AboveVTT for DM");
           return start_above_vtt_for_dm();
         } 
-        else if (is_spectator_page()){
-          inject_dice();
+        else if (isSpectator){
           startup_step("Starting AboveVTT for Spectator");
           return start_above_vtt_for_spectator();
         }
-        else if(isDmPage ){
+        else if(isDmPage){
           startup_step("Player joining as DM")
           return start_player_joining_as_dm();
         }else if (is_characters_page()) {
@@ -76,7 +79,12 @@ $(function() {
         addExtensionPathStyles();
         $('body').append(`<script type="text/javascript" src="https://www.dropbox.com/static/api/2/dropins.js" id="dropboxjs" data-app-key="h3iaoazdu0wqrfd"></script>`)
       }).then(() => {     
+        DDBApi.fetchItemsJsonWithToken().then(data => {
+          window.ITEMS_CACHE = data;
+        })
+       DDBApi.debounceGetPartyInventory()
 
+       
         const lastSendToDefault = localStorage.getItem(`${gameId}-sendToDefault`, gamelog_send_to_text()); 
 
         if(lastSendToDefault != null){
@@ -86,7 +94,7 @@ $(function() {
           $(`[class*='listItemTextRoot']:contains('Everyone')`).parent().click();
         }
         $('body').toggleClass('reduceMovement', (window.EXPERIMENTAL_SETTINGS['reduceMovement'] == true));
-        $('body').toggleClass('mobileAVTTUI', (window.EXPERIMENTAL_SETTINGS['iconUi'] == true));
+        $('body').toggleClass('mobileAVTTUI', (window.EXPERIMENTAL_SETTINGS['iconUi'] != false));
         $('body').toggleClass('color-blind-avtt', (window.EXPERIMENTAL_SETTINGS['colorBlindText'] == true));
           // STREAMING STUFF
 
@@ -264,6 +272,11 @@ $(function() {
           }
           else if(event.data.msgType == 'CharacterData'){
             update_pc_with_data(event.data.characterId, event.data.pcData);
+          }
+          if (event.data.msgType == 'DDBMessage'){
+            if (event.data.sendTo == window.PLAYER_ID || (window.DM && event.data.sendTo == false)) {
+              window.MB.sendMessage(event.data.action, event.data.data);
+            }
           }
         })
         
@@ -454,6 +467,9 @@ async function start_above_vtt_for_dm() {
   window.CONNECTED_PLAYERS['0'] = window.AVTT_VERSION; // ID==0 is DM
 
   window.ScenesHandler = new ScenesHandler();
+  
+  startup_step("Initializing DM Screen");
+  initDmScreen(); // Initialize DM screen after ddbConfigJson is loaded
 
   startup_step("Fetching Encounters from DDB");
   const avttId = window.location.pathname.split("/").pop();
@@ -517,7 +533,7 @@ async function start_above_vtt_for_spectator() {
 
   window.document.title = `AVTT Spectator ${window.document.title}`
   $('meta[name="viewport"]').attr('content', 'width=device-width, initial-scale=1.0, user-scalable=no')
-  const playerId = `spectator-${window.gameId}`;
+  const playerId = `spectator-${window.gameId}-${uuid()}`;
   window.PLAYER_ID = playerId;
   window.PLAYER_IMG = dmAvatarUrl;
   window.PLAYER_NAME = playerId;

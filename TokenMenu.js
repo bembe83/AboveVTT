@@ -181,8 +181,7 @@ function token_context_menu_expanded(tokenIds, e) {
 		scroll: false,
 		handle: "div:not(:has(select)), button, label, input",
 		start: function () {
-			$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+			$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 		},
 		stop: function () {
 			$('.iframeResizeCover').remove();
@@ -3625,6 +3624,9 @@ function build_adjustments_flyout_menu(tokenIds) {
 			let inputWrapper = build_dropdown_input(setting, currentValue, function(name, newValue) {
 				tokens.forEach(token => {
 					token.options[name] = newValue;
+					if (name == 'tokenWall' && window.visionBlockingTokenCache?.[token.options.id] != undefined){
+						delete window.visionBlockingTokenCache[token.options.id];
+					}
 					token.place_sync_persist();
 				});
 				if(setting.name =='tokenStyleSelect'){		
@@ -3642,6 +3644,14 @@ function build_adjustments_flyout_menu(tokenIds) {
 						
 					}
 				}
+				else if(setting.name =='tokenWall'){
+					if(newValue.includes('poly')){
+						$('.token-wall-poly-button').toggleClass('visible', true);
+					}
+					else{
+						$('.token-wall-poly-button').toggleClass('visible', false);
+					}
+				}
 			});
 			if(setting.menuPosition != undefined){
 				const position = body.find(`>div:nth-of-type(${setting.menuPosition})`)
@@ -3653,7 +3663,28 @@ function build_adjustments_flyout_menu(tokenIds) {
 			else{
 				body.append(inputWrapper);
 			}
-			
+			if(setting.name =='tokenWall'){
+				const tokenId = tokenIds[0];
+				const polyButton = $(`<button class="token-wall-poly-button material-icons ${typeof currentValue === 'string' && currentValue.includes('poly') ? 'visible' : ''}" title="Edit Token Wall Polygon">${!window.TOKEN_OBJECTS[tokenId].options.tokenWallPoly ? "Draw" : "Delete"} Token Wall Polygon</button>`);
+				polyButton.off('click').on('click', function(){
+					let clickedItem = $(this);
+					if (window.visionBlockingTokenCache?.[tokenId] != undefined)
+						delete window.visionBlockingTokenCache[tokenId];
+					if (window.TOKEN_OBJECTS[tokenId].options.tokenWallPoly == undefined) {
+						window.drawingTokenWallTokenId = tokenId;
+						window.drawTokenWallPolygon = true;
+						$("#temp_overlay").css("z-index", "50");
+						close_token_context_menu();
+					}
+					else {
+						$(this).text('Draw Token Wall Polygon')
+						delete window.TOKEN_OBJECTS[tokenId].options.tokenWallPoly;
+						window.TOKEN_OBJECTS[tokenId].place_sync_persist();
+						clear_temp_canvas();
+					}
+				});
+				inputWrapper.after(polyButton);
+			}	
 		} else if (setting.type === "toggle") {
 			let inputWrapper = build_toggle_input(setting, currentValue, function (name, newValue) {
 				tokens.forEach(token => {
@@ -4635,8 +4666,7 @@ function open_quick_roll_menu(e){
 		scroll: false,
 		containment: "#windowContainment",
 		start: function () {
-			$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+			$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 		},
 		stop: function () {
 			$('.iframeResizeCover').remove();
@@ -4647,8 +4677,7 @@ function open_quick_roll_menu(e){
 		handles: "all",
 		containment: "#windowContainment",
 		start: function () {
-			$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+			$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 		},
 		stop: function () {
 			$('.iframeResizeCover').remove();
@@ -5007,7 +5036,10 @@ function qrm_fetch_stat(token) {
 		if(token.options.customStat != undefined){
 			roll_bonus = token.options.customStat[save_dropdown_value]['save']
 		}
-		if(roll_bonus == undefined){
+		if (roll_bonus >= 0) {
+			roll_bonus = "+" + parseInt(roll_bonus);
+		}
+		else if(roll_bonus == undefined){
 			roll_bonus = "+"+0;	
 		}
 	}
