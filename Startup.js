@@ -8,6 +8,7 @@ import { init_audio_mixer } from './audio/index.js'
 $(function() {
   if (is_abovevtt_page()) { // Only execute if the app is starting up
     console.log("startup calling init_splash");
+    init_my_dice_details();
     init_loading_overlay_beholder();
     addBeyond20EventListener("rendered-roll", (request) => {$('.avtt-sidebar-controls #switch_gamelog').click();});
     $('meta[name="viewport"]').attr('content', 'width=device-width, initial-scale=1.0, user-scalable=no')
@@ -23,7 +24,9 @@ $(function() {
       .then((databases)=> {
         window.gameIndexedDb = databases[0];
         window.globalIndexedDB = databases[1];
-        window.EXPERIMENTAL_SETTINGS = JSON.parse(localStorage.getItem(`ExperimentalSettings${window.gameId}`)) || {};
+        const campaignSettings = JSON.parse(localStorage.getItem(`ExperimentalSettings${window.gameId}`)) || {};
+        const globalSettings = JSON.parse(localStorage.getItem(`ExperimentalSettingsGlobal`)) || {}; ;
+        window.EXPERIMENTAL_SETTINGS = {...campaignSettings, ...globalSettings};
         if (is_release_build()) {
           // in case someone left this on during beta testing, we should not allow it here
           set_avtt_setting_value("aggressiveErrorMessages", false);
@@ -43,6 +46,7 @@ $(function() {
       .then(set_campaign_secret)      // set it to window.CAMPAIGN_SECRET
       .then(async () => {
         window.CAMPAIGN_INFO = await DDBApi.fetchCampaignInfo(window.gameId)
+        window.AVTT_CAMPAIGN_INFO = await AboveApi.getCampaignData();
         return window.CAMPAIGN_INFO.dmId;
       })
       .then((campaignDmId) => {
@@ -565,6 +569,7 @@ async function start_above_vtt_for_spectator() {
   const currentSceneData = await AboveApi.getCurrentScene();
   if (currentSceneData.playerscene) {
     window.startupSceneId = currentSceneData.playerscene;
+    window.LOADING = true;
     const activeScene = await AboveApi.getScene(currentSceneData.playerscene);
     console.log("attempting to handle scene", activeScene);
     startup_step("Loading Scene");
@@ -606,7 +611,7 @@ function inject_dm_roll_default_menu(){
   const selectMenu = $(`
   <div class="gameLogSendToMenu MuiPaper-root MuiPaper-elevation MuiPaper-rounded MuiPaper-elevation1 tss-13wrc40-menuPaper MuiMenu-paper MuiPaper-root MuiPaper-elevation MuiPaper-rounded MuiPaper-elevation0 tss-13wrc40-menuPaper MuiPopover-paper css-1os3rtf" tabindex="-1" >
    <ul class="MuiList-root MuiList-padding MuiMenu-list css-r8u8y9" role="menu" tabindex="-1">
-      <li class="tss-3a46y9-menuItemRoot MuiMenuItem-root MuiButtonBase-root css-qn0kvh" tabindex="0" role="menuitem" value="0">
+      <li class="tss-3a46y9-menuItemRoot MuiMenuItem-root MuiButtonBase-root css-qn0kvh" tabindex="0" role="menuitem" value="Everyone">
        <div class="tss-67466g-listItemIconRoot MuiListItemIcon-root css-17lvc79">
           <svg class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium css-vubbuv" focusable="false" aria-hidden="true" viewBox="0 0 24 24">
              <path d="M9 13.75C6.66 13.75 2 14.92 2 17.25V19H16V17.25C16 14.92 11.34 13.75 9 13.75ZM4.34 17C5.18 16.42 7.21 15.75 9 15.75C10.79 15.75 12.82 16.42 13.66 17H4.34ZM9 12C10.93 12 12.5 10.43 12.5 8.5C12.5 6.57 10.93 5 9 5C7.07 5 5.5 6.57 5.5 8.5C5.5 10.43 7.07 12 9 12ZM9 7C9.83 7 10.5 7.67 10.5 8.5C10.5 9.33 9.83 10 9 10C8.17 10 7.5 9.33 7.5 8.5C7.5 7.67 8.17 7 9 7ZM16.04 13.81C17.2 14.65 18 15.77 18 17.25V19H22V17.25C22 15.23 18.5 14.08 16.04 13.81V13.81ZM15 12C16.93 12 18.5 10.43 18.5 8.5C18.5 6.57 16.93 5 15 5C14.46 5 13.96 5.13 13.5 5.35C14.13 6.24 14.5 7.33 14.5 8.5C14.5 9.67 14.13 10.76 13.5 11.65C13.96 11.87 14.46 12 15 12Z" fill="currentColor"></path>
@@ -618,7 +623,7 @@ function inject_dm_roll_default_menu(){
          <path d="M9.00016 16.17L4.83016 12L3.41016 13.41L9.00016 19L21.0002 7.00003L19.5902 5.59003L9.00016 16.17Z" fill="currentColor"></path>
         </svg></div>
       </li>
-      <li class="tss-3a46y9-menuItemRoot MuiMenuItem-root MuiButtonBase-root css-qn0kvh" tabindex="-1" role="menuitem" value="1">
+      <li class="tss-3a46y9-menuItemRoot MuiMenuItem-root MuiButtonBase-root css-qn0kvh" tabindex="-1" role="menuitem" value="Self">
          <div class="tss-67466g-listItemIconRoot MuiListItemIcon-root css-17lvc79">
             <svg class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium css-vubbuv" focusable="false" aria-hidden="true" viewBox="0 0 24 24">
                <path d="M12 5.9C13.16 5.9 14.1 6.84 14.1 8C14.1 9.16 13.16 10.1 12 10.1C10.84 10.1 9.9 9.16 9.9 8C9.9 6.84 10.84 5.9 12 5.9ZM12 14.9C14.97 14.9 18.1 16.36 18.1 17V18.1H5.9V17C5.9 16.36 9.03 14.9 12 14.9ZM12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4ZM12 13C9.33 13 4 14.34 4 17V20H20V17C20 14.34 14.67 13 12 13Z" fill="currentColor"></path>
@@ -1055,7 +1060,18 @@ async function start_above_vtt_for_players() {
   reposition_player_sheet();
   hide_player_sheet();
   $("#loading_overlay").css("z-index", 0); // Allow them to see their character sheets, etc even if the DM isn't online yet
-
+  $('[data-floating-ui-portal], .roll-mod-container').addClass('hidden');
+  await $("[class*='DiceContainer_button']").click(); // initialize dice panel so first roll doesn't fail
+  setTimeout(() => {
+    $("[class*='DiceContainer_button']").click();//close dice panel
+    setTimeout(() => {
+      $('[data-floating-ui-portal], .roll-mod-container').removeClass('hidden');
+      $('[data-floating-ui-portal]').off('click.waiting').on('click.waiting', `[data-dd-action-name="Roll Dice Popup > Roll Dice"]`, function () {
+        window.diceRoller.setWaitingForRoll();
+      })
+    }, 200)
+  }, 5);
+  
   $(window).off("resize").on("resize", function() {
     if (window.showPanel === undefined) {
       window.showPanel = is_sidebar_visible();
@@ -1091,6 +1107,7 @@ async function start_above_vtt_for_players() {
   const currentSceneData = await AboveApi.getCurrentScene();
   if (currentSceneData.playerscene) {
     window.startupSceneId = currentSceneData.playerscene;
+    window.LOADING = true;
     const activeScene = await AboveApi.getScene(currentSceneData.playerscene);
     console.log("attempting to handle scene", activeScene);
     startup_step("Loading Scene");
@@ -1115,12 +1132,12 @@ async function lock_character_gamelog_open() {
   }
 
   // Open the gamelog, and lock it open
-  let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button, button[class*='-gamelog-button']");
+  let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button, button[class*='-gamelog-button'], div[class*='campaignButtonGroup'][class*='GameLogButton']");
   if(gameLogButton.length == 0){
     $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
   }
   gameLogButton.click()
-  $(".ct-sidebar__control--unlock").click();
+  $(".ct-sidebar__control--unlock, [class*='styles_controls'] [aria-label='Unlocked']").click();
 }
 
 async function migrate_to_cloud_if_necessary() {
@@ -1181,15 +1198,19 @@ async function fetch_sceneList_and_scenes() {
 
   let activeScene = undefined;
   if (currentSceneData.dmscene && window.ScenesHandler.scenes.find(s => s.id === currentSceneData.dmscene)) {
+    window.LOADING = true;
     activeScene = await AboveApi.getScene(currentSceneData.dmscene);
     console.log("attempting to handle scene", activeScene);
     // window.MB.handleScene(activeScene);
   } else if (window.ScenesHandler.scenes.length > 0) {
+    window.LOADING = true;
     activeScene = await AboveApi.getScene(window.ScenesHandler.scenes[0].id);
     console.log("attempting to handle scene", activeScene);
   }
   if(activeScene)
     window.MB.handleScene(activeScene);
+  else
+    delete window.LOADING
   console.log("fetch_sceneList_and_scenes done");
   return activeScene;
 }

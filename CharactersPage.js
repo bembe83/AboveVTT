@@ -192,6 +192,18 @@ const buffsDebuffs = {
     "check": "0",
     "type": "feat",
   },
+  "Reroll damage 1's": {
+    "tohit": "0",
+    "dmg": "0",
+    "save": "0",
+    "check": "0",
+    "replace": /(\d+d\d+)/gi,
+    "replaceType": {
+      "damage": 'button' 
+    },
+    "newRoll": '$1ro<2',//reroll 1 & 2
+    "type": "feat",
+  },
   "Call the Hunt": {
     "tohit": "0",
     "dmg": "+d6",
@@ -294,11 +306,21 @@ const buffsDebuffs = {
     "type": "spell"
   },
   "Hunter's Mark": {
-      "tohit": "0",
-      "dmg": "+d6",
-      "save": "0",
-      "check": "0",
-      "type": "spell"
+    "multiOptions": {
+	  "+6": {
+        "tohit": "0",
+        "dmg": "+d6",
+        "save": "0",
+        "check": "0"
+	  },
+	  "+10": {
+        "tohit": "0",
+        "dmg": "+d10",
+        "save": "0",
+        "check": "0"
+	  },
+	},
+    "type": "spell"
   },
   "Hex": {
       "tohit": "0",
@@ -429,6 +451,76 @@ const buffsDebuffs = {
       "dmg": "+2d6",
       "save": "0",
       "check": "0",
+      "type": "spell"
+  },
+  "Spirit Shroud": {
+      "multiOptions": {
+		  "1d8": {
+			"tohit": "0",
+			"dmg": "+1d8",
+			"save": "0",
+			"check": "0",
+		  },
+		  "2d8": {
+			"tohit": "0",
+			"dmg": "+2d8",
+			"save": "0",
+			"check": "0",
+		  },
+		  "3d8": {
+			"tohit": "0",
+			"dmg": "+3d8",
+			"save": "0",
+			"check": "0",
+		  },
+		  "4d8": {
+			"tohit": "0",
+			"dmg": "+4d8",
+			"save": "0",
+			"check": "0",
+		  },
+  	  },
+      "type": "spell"
+  },
+  "Conjure Minor Elementals": {
+      "multiOptions": {
+		  "2d8": {
+			"tohit": "0",
+			"dmg": "+2d8",
+			"save": "0",
+			"check": "0",
+		  },
+		  "3d8": {
+			"tohit": "0",
+			"dmg": "+3d8",
+			"save": "0",
+			"check": "0",
+		  },
+		  "4d8": {
+			"tohit": "0",
+			"dmg": "+4d8",
+			"save": "0",
+			"check": "0",
+		  },
+		  "5d8": {
+			"tohit": "0",
+			"dmg": "+5d8",
+			"save": "0",
+			"check": "0",
+		  },
+		  "6d8": {
+			"tohit": "0",
+			"dmg": "+6d8",
+			"save": "0",
+			"check": "0",
+		  },
+		  "7d8": {
+			"tohit": "0",
+			"dmg": "+7d8",
+			"save": "0",
+			"check": "0",
+		  },
+  	  },
       "type": "spell"
   },
   "Synaptic Static": {
@@ -816,7 +908,7 @@ function convertToRPGRoller(){
     }
 
     $(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`).off('contextmenu.rpg-roller').on('contextmenu.rpg-roller', function(e){
-          if($(this).parent().hasClass('ct-reset-pane__hitdie-manager-dice')) // allow hit dice roll to go through ddb for auto heals - maybe setup our own message by put to https://character-service.dndbeyond.com/character/v5/life/hp/damage-taken later
+          if ($(this).parent().hasClass('ct-reset-pane__hitdie-manager-dice') || $(this).prev().text().trim().match(/^death saves$/gi))// allow hit dice and death saves roll to go through ddb for auto heals - maybe setup our own message by put to https://character-service.dndbeyond.com/character/v5/life/hp/damage-taken later
             return;
           let rollData = {} 
           if($(this).hasClass('avtt-roll-formula-button')){
@@ -856,8 +948,9 @@ function convertToRPGRoller(){
       $(this).toggleClass('disadvantageHover', false)
     })
     $(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`).off('click.rpg-roller').on('click.rpg-roller', function(e){
-      if($(this).parent().hasClass('ct-reset-pane__hitdie-manager-dice'))// allow hit dice roll to go through ddb for auto heals - maybe setup our own message by put to https://character-service.dndbeyond.com/character/v5/life/hp/damage-taken later
+      if ($(this).parent().hasClass('ct-reset-pane__hitdie-manager-dice') || $(this).prev().text().trim().match(/^death saves$/gi))// allow hit dice and death saves roll to go through ddb for auto heals - maybe setup our own message by put to https://character-service.dndbeyond.com/character/v5/life/hp/damage-taken later
         return;
+
       let rollData = {} 
       rollData = getRollData(this);
       if(!rollData.expression.match(allDiceRegex) && (window.EXPERIMENTAL_SETTINGS['rpgRoller'] != true && window.EXPERIMENTAL_SETTINGS['godiceRoller'] != true)){
@@ -899,7 +992,7 @@ const debounceObserverSetup = mydebounce(function(){
 /** actions to take on the character sheet when AboveVTT is NOT running */
 async function init_character_sheet_page() {
   if (!is_characters_page()) return;
-
+  init_my_dice_details();
   // check for name and image
   set_window_name_and_image(function() {
     observe_character_sheet_changes($('#site-main, .ct-sidebar__portal'));
@@ -982,6 +1075,19 @@ async function init_character_sheet_page() {
         .then(async () => {
           window.CAMPAIGN_INFO = await DDBApi.fetchCampaignInfo(window.gameId);
           window.myUser = $('#message-broker-client').attr('data-userid') || Cobalt?.User?.ID;
+          window.MB = new MessageBroker();
+
+          $('[data-floating-ui-portal], .roll-mod-container').addClass('hidden');
+          await $("[class*='DiceContainer_button']").click(); // initialize dice panel so first roll doesn't fail
+          setTimeout(() => {
+            $("[class*='DiceContainer_button']").click();//close dice panel
+            setTimeout(()=> {
+              $('[data-floating-ui-portal], .roll-mod-container').removeClass('hidden');
+              $('[data-floating-ui-portal]').off('click.waiting').on('click.waiting', `[data-dd-action-name="Roll Dice Popup > Roll Dice"]`, function () {
+                window.diceRoller.setWaitingForRoll();
+              })
+            }, 200)
+          }, 5);
         })
     }, 5000)
   }
@@ -1426,6 +1532,29 @@ function observe_character_sheet_changes(documentToObserve) {
   if (window.character_sheet_observer) {
     window.character_sheet_observer.disconnect();
   }
+  window.sendToDefaultObserver = new MutationObserver(function () {
+    localStorage.setItem(`${window.gameId != undefined ? window.gameId : window.myUser}-sendToDefault`, gamelog_send_to_text());
+  })
+
+
+  let gamelogObserver = new MutationObserver((mutations) => {
+    mutations.every((mutation) => {
+      if (!mutation.addedNodes) return
+      for (let i = 0; i < mutation.addedNodes.length; i++) {
+        // do things to your newly added nodes here
+        let node = mutation.addedNodes[i]
+        if ($(node).attr('class')?.includes('-SendToLabel') || $('.glc-game-log [class*="-SendToLabel"] ~ button').length > 0) {
+          const sendto_mutation_target = $(".glc-game-log [class*='-SendToLabel'] ~ button")[0];
+          const sendto_mutation_config = { attributes: true, childList: true, characterData: true, subtree: true };
+          window.sendToDefaultObserver.observe(sendto_mutation_target, sendto_mutation_config);
+          return false;
+        }
+      }
+      return true // must return true if doesn't break
+    })
+  });
+
+  gamelogObserver.observe(document.body, { childList: true, subtree: true, attributes: false, characterData: false });
 
   window.character_sheet_observer = new MutationObserver(function(mutationList, observer) {
     if(window.DRAGGING || (typeof arrowKeysHeld !== 'undefined' && (arrowKeysHeld[0] || arrowKeysHeld[1] || arrowKeysHeld[2] || arrowKeysHeld[3])))
@@ -2166,6 +2295,10 @@ function observe_character_sheet_changes(documentToObserve) {
                   margin-right: 2px;
                   cursor: pointer;
               }
+              [data-floating-ui-portal].hidden,
+              .roll-mod-container.hidden{
+                  visibility:hidden;
+              }
               #avtt-buff-options span.material-symbols-outlined.enabled {
                   opacity: 1;
               }
@@ -2563,6 +2696,60 @@ function observe_character_sheet_changes(documentToObserve) {
             return;
           }
         }
+        const menu = $("ul[role='menu']:has(div:contains('DM')):not(:has([value='trueSelf']))");
+        if (menu.length > 0) {
+          const selfLi = $(`<li class="MuiButtonBase-root MuiMenuItem-root tss-3a46y9-menuItemRoot MuiMenuItem-root tss-3a46y9-menuItemRoot ddb-character-app-1e9xnb1" tabindex="-1" role="menuitem" value="trueSelf">
+                    <div class="MuiListItemIcon-root tss-67466g-listItemIconRoot ddb-character-app-17lvc79">
+                        <svg class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium ddb-character-app-vubbuv" focusable="false" aria-hidden="true" viewBox="0 0 24 24">
+                          <path d="M12 5.9C13.16 5.9 14.1 6.84 14.1 8C14.1 9.16 13.16 10.1 12 10.1C10.84 10.1 9.9 9.16 9.9 8C9.9 6.84 10.84 5.9 12 5.9ZM12 14.9C14.97 14.9 18.1 16.36 18.1 17V18.1H5.9V17C5.9 16.36 9.03 14.9 12 14.9ZM12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4ZM12 13C9.33 13 4 14.34 4 17V20H20V17C20 14.34 14.67 13 12 13Z" fill="currentColor"></path>
+                        </svg>
+                    </div>
+                    <div class="MuiListItemText-root tss-1us1e8t-listItemTextRoot ddb-character-app-1tsvksn">Self</div>
+                    <div class="MuiListItemIcon-root tss-67466g-listItemIconRoot ddb-character-app-17lvc79">
+                    </div>
+                  </li>`);
+          menu.append(selfLi);
+          const storedLastSendTo = localStorage.getItem(`${window.gameId != undefined ? window.gameId : window.myUser}-sendToDefault`);
+          const sendTo = storedLastSendTo != null ? storedLastSendTo : gamelog_send_to_text();
+          const row = menu.find(`li:contains(${sendTo})`);
+          const checkbox = menu.find('[d="M9.00016 16.17L4.83016 12L3.41016 13.41L9.00016 19L21.0002 7.00003L19.5902 5.59003L9.00016 16.17Z"]').closest('svg')
+          row.find('div:last-of-type').append(checkbox);
+          const button = $('[class*="-SendToLabel"]~button');
+          button.empty();
+          const svg = row.find('div:first-of-type>svg')[0];
+          const newHtml = `<span class="MuiButton-icon MuiButton-startIcon MuiButton-iconSizeMedium ddb-character-app-1l6c7y9">
+              ${svg.outerHTML}
+            </span>
+            ${row.text()}
+            <span class="MuiButton-icon MuiButton-endIcon MuiButton-iconSizeMedium ddb-character-app-pt151d">
+              <svg class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium ddb-character-app-vubbuv" focusable="false" aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M7 10L12 15L17 10H7Z" fill="currentColor"></path>
+              </svg>
+            </span>`
+          button.html(newHtml); 
+          menu.off('click.selectSendTo').on('click.selectSendTo', 'li', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            const self = $(this);
+            const button = $('[class*="-SendToLabel"]~button');
+            button.empty();
+            const svg = self.find('div:first-of-type>svg')[0];
+            const newHtml = `<span class="MuiButton-icon MuiButton-startIcon MuiButton-iconSizeMedium ddb-character-app-1l6c7y9">
+              ${svg.outerHTML}
+            </span>
+            ${self.text()}
+            <span class="MuiButton-icon MuiButton-endIcon MuiButton-iconSizeMedium ddb-character-app-pt151d">
+              <svg class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium ddb-character-app-vubbuv" focusable="false" aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M7 10L12 15L17 10H7Z" fill="currentColor"></path>
+              </svg>
+            </span>`
+            button.html(newHtml); 
+            const checkbox = menu.find('[d="M9.00016 16.17L4.83016 12L3.41016 13.41L9.00016 19L21.0002 7.00003L19.5902 5.59003L9.00016 16.17Z"]').closest('svg')
+            self.find('div:last-of-type').append(checkbox);
+            setTimeout(() => {self.closest('[role="presentation"]').find('[class*="MuiBackdrop-invisible"]').click()}, 250);
+          })
+        }
+        
          
 
         if(is_abovevtt_page()){
@@ -2692,7 +2879,8 @@ function observe_character_sheet_changes(documentToObserve) {
               }
               else if (mutationTarget.closest(".ct-subsection--senses").length>0) {
                 send_senses();
-              } 
+                
+              }
             if (typeof mutation.target.data === "string") {
               if (mutation.target.data.match(multiDiceRollCommandRegex)?.[0]) {
                 try {
@@ -2734,7 +2922,7 @@ function observe_non_sheet_changes(documentToObserve) {
           const abovePage = is_abovevtt_page();       
           $('.alertify ~ div.alertify:not(.ajs-hidden):not(:has(~ .alertify)) .ajs-button.ajs-ok').click();        
           if(abovePage || !window.EXPERIMENTAL_SETTINGS?.rpgRoller){
-            let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button, button[class*='-gamelog-button']")
+            let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button, button[class*='-gamelog-button'], div[class*='campaignButtonGroup'][class*='GameLogButton']")
             if(gameLogButton.length == 0){
               gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
             }
@@ -2783,7 +2971,7 @@ function set_window_name_and_image(callback) {
   }
 
   console.debug("set_window_name_and_image");
-  if (!is_characters_builder_page()){
+  if (!is_characters_builder_page() && is_abovevtt_page()){
     window.document.title = `AVTT ${window.document.title.replace(/^AVTT /, '')}`;
   }
   window.PLAYER_NAME = $(".ddbc-character-tidbits__heading [class*=ddb-character-app], [class*='styles_characterName']").first().text();

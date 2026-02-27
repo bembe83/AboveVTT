@@ -11,8 +11,6 @@ function consider_upscaling(target){
 		}
 }
 
-
-
 function handle_basic_form_toggle_click(event){
 	if ($(event.currentTarget).hasClass("rc-switch-checked")) {
 		// it was checked. now it is no longer checked
@@ -374,8 +372,8 @@ function create_full_scene_from_uvtt(data, url, doorType, doorHidden){ //this se
 		'tokens': sceneTokens,
 		'UVTTFile': 1 
 	};
-
 	return sceneData;
+
 }
 
 function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function(){}, copiedSceneData = window.CURRENT_SCENE_DATA) {
@@ -778,7 +776,7 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function
 			}else{
 				$("#scene_selector_toggle").show();
 				$("#tokens").show();
-				window.WIZARDING = false;
+				
 				window.CURRENT_SCENE_DATA = {
 					...window.CURRENT_SCENE_DATA,
 					upsq: $('input[name="upsq"]').val(),
@@ -804,7 +802,7 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function
 
 		$("#scene_selector_toggle").show();
 		$("#tokens").show();
-		window.WIZARDING = false;
+		
 		window.CURRENT_SCENE_DATA = {
 			...window.CURRENT_SCENE_DATA,
 			fpsq: "5",
@@ -818,7 +816,7 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function
 
 	let grid_10 = function() {
 
-			window.WIZARDING = false;
+			
 			let subdivided = $('input[name="grid_subdivided"]').val() == 1;
 			$("#scene_selector_toggle").show();
 			$("#tokens").show();
@@ -837,7 +835,7 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function
 	}
 
 	let grid_15 = function() {
-		window.WIZARDING = false;
+		
 		let subdivided = $('input[name="grid_subdivided"]').val() == 1;
 		$("#scene_selector_toggle").show();
 		$("#tokens").show();
@@ -857,7 +855,7 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function
 
 
 	let grid_20 = function() {
-		window.WIZARDING = false;
+		
 		let subdivided = $('input[name="grid_subdivided"]').val() == 1;
 		$("#scene_selector_toggle").show();
 		$("#tokens").show();
@@ -878,7 +876,7 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid=function
 	cancel.click(function() {
 		$('[id="aligner1"]').remove();
 		$('[id="aligner2"]').remove();
-		window.WIZARDING = false;
+		
 		window.ScenesHandler.scenes[window.ScenesHandler.current_scene_id] = copiedSceneData;
 		window.ScenesHandler.scene = copiedSceneData;
 		window.CURRENT_SCENE_DATA = copiedSceneData;
@@ -1212,6 +1210,7 @@ function edit_scene_dialog(scene_id) {
 	
 		const {hpps, vpps, offsetx, offsety, grid_color, grid_line_width, grid_subdivided, grid} = await get_edit_form_data()
 		// redraw grid with new information
+		window.CURRENT_SCENE_DATA.grid = grid;
 		if(grid === "1" && window.CURRENT_SCENE_DATA.scale_check){
 			let conversion = window.CURRENT_SCENE_DATA.scale_factor * window.CURRENT_SCENE_DATA.conversion
 			redraw_grid(parseFloat(hpps*conversion), parseFloat(vpps*conversion), offsetx*conversion, offsety*conversion, grid_color, grid_line_width, grid_subdivided )
@@ -1333,12 +1332,12 @@ function edit_scene_dialog(scene_id) {
 	let darknessValue = scene.darkness_filter || 0;
 	let darknessFilterRange = $(`<input name="darkness_filter" class="darkness-filter-range" type="range" value="${darknessValue}" min="0" max="100" step="1"/>`);
 	let darknessNumberInput = $(`<input name='darkness_filter_number' class='styled-number-input' type='number' min='0' max='100' value='${darknessValue}'/>`)
-	
+
 	darknessFilterRange.on('input change', function(){
 		$("#darkness_layer").toggleClass("smooth-transition", true);
 		let darknessFilterRangeValue = parseInt(darknessFilterRange.val());
    	 	let darknessPercent = 100 - darknessFilterRangeValue;
-   	 	if(window.CURRENT_SCENE_DATA.id == window.ScenesHandler.scenes[scene_id].id) {
+   	 	if(window.CURRENT_SCENE_DATA.id == scene.id) {
 	   	 	$('#VTT').css('--darkness-filter', darknessPercent + "%");
    		}
    		setTimeout(function(){
@@ -1352,7 +1351,7 @@ function edit_scene_dialog(scene_id) {
 		darknessFilterRange.val(darknessNumberInput.val());
 		let darknessFilterRangeValue = parseInt(darknessFilterRange.val());
    	 	let darknessPercent = 100 - darknessFilterRangeValue;
-   	 	if(window.CURRENT_SCENE_DATA.id == window.ScenesHandler.scenes[scene_id].id) {
+		if (window.CURRENT_SCENE_DATA.id == scene.id) {
 	   	 	$('#VTT').css('--darkness-filter', darknessPercent + "%");
    		}
    		setTimeout(function(){
@@ -1360,10 +1359,7 @@ function edit_scene_dialog(scene_id) {
    		}, 400);  		
 	});
 
-	darknessFilterRange.on('mouseup', function(){
-   	 	let darknessFilterRangeValue = parseInt(darknessFilterRange.val());
-   	 	scene.darkness_filter = darknessFilterRangeValue;
-	});
+
 
 	form.append(form_row('darknessFilter',
 						'Line of Sight/Darkness Opacity',
@@ -1403,18 +1399,35 @@ function edit_scene_dialog(scene_id) {
 		if ($(event.currentTarget).hasClass("rc-switch-checked")) {
 			// it was checked. now it is no longer checked
 			$(event.currentTarget).removeClass("rc-switch-checked");
-			if(window.ScenesHandler.current_scene_id == scene_id){
+			if (window.CURRENT_SCENE_DATA.id == scene.id){
 				window.CURRENT_SCENE_DATA.snap = "0";	
 			}	
 		} else {
 			// it was not checked. now it is checked
 			$(event.currentTarget).removeClass("rc-switch-unknown");
 			$(event.currentTarget).addClass("rc-switch-checked");
-			if(window.ScenesHandler.current_scene_id == scene_id){
+			if (window.CURRENT_SCENE_DATA.id == scene.id){
 				window.CURRENT_SCENE_DATA.snap = "1";
 			}	
 		}
-	})));
+	}))); 
+	form.append(form_row('alphaNumGrid', 'Alphanumeric Grid Labels', form_toggle("alphaNumGrid", null, false, function (event) {
+		if ($(event.currentTarget).hasClass("rc-switch-checked")) {
+			$(event.currentTarget).removeClass("rc-switch-checked");
+			if (window.CURRENT_SCENE_DATA.id == scene.id) {
+				window.CURRENT_SCENE_DATA.alphaNumGrid = "0";
+			}
+		} else {
+			$(event.currentTarget).removeClass("rc-switch-unknown");
+			$(event.currentTarget).addClass("rc-switch-checked");
+			if (window.CURRENT_SCENE_DATA.id == scene.id) {
+				window.CURRENT_SCENE_DATA.alphaNumGrid = "1";
+			}
+		}
+		redraw_alphanum_grid();
+	}))); 
+	form.find('#alphaNumGrid_row').attr('title', 'When enabled adds alphanumeric grid labels to the scene.')
+
 	form.find('#snapToGrid_row').attr('title', 'When enabled snaps the tokens to the grid. Otherwise tokens are able to be placed freely. Hold ctrl to when moving a token to temporarily override this.')
 
 
@@ -1485,7 +1498,8 @@ function edit_scene_dialog(scene_id) {
 	form.append(playlistRow);
 
 	const weatherSelect = $(`<select id='weatherSceneSelect'><option value='0'>None</option></select>`)
-	for(const [weatherType, weatherName] of Object.entries(getWeatherTypes())){
+	for(const [weatherType, weatherData] of Object.entries(getWeatherTypes())){
+		const weatherName = typeof weatherData === 'string' ? weatherData : weatherData.type;
 		weatherSelect.append($(`<option value='${weatherType}'>${weatherName}</option>`));
 	
 	}
@@ -1501,6 +1515,56 @@ function edit_scene_dialog(scene_id) {
 	const weatherRow = form_row('weatherRow', 'Select Weather Overlay', weatherSelect)
 	weatherRow.attr('title', `Applies a weather overlay to the scene. The weather overlay will persist until changed by the DM.`)
 	form.append(weatherRow);
+
+	const getWeatherDefaults = function(weatherType) {
+		const weatherTypes = getWeatherTypes();
+		const weatherData = weatherTypes[weatherType];
+		return weatherData || { min: 0, default: 120, max: 240 };
+	};
+
+	const currentWeatherDefaults = getWeatherDefaults(weatherValue);
+	const weatherIntensity = scene.weatherIntensity !== undefined ? scene.weatherIntensity : currentWeatherDefaults.default;
+	const intensitySlider = $(`<input type='range' id='weatherIntensitySlider' min='${currentWeatherDefaults.min}' max='${currentWeatherDefaults.max}' value='${weatherIntensity}' style='width: 100%;'/>`)
+	const initialPercentage = Math.round((weatherIntensity - currentWeatherDefaults.min) / (currentWeatherDefaults.max - currentWeatherDefaults.min) * 100);
+	const particleCount = $(`<span id='weatherParticleCount'>${initialPercentage}%</span>`)
+	const performanceWarning = $(`<span style='margin-left: 10px;color: #888; font-size: 0.9em; font-style: italic; margin-top: 4px;'>Note: Increasing intensity may negatively impact performance</span>`);
+	const intensityContainer = $(`<div></div>`).append(intensitySlider).append(' ').append(particleCount).append(performanceWarning);
+	const intensityRow = form_row('weatherIntensityRow', 'Weather Intensity', intensityContainer)
+	intensityRow.attr('title', `Adjusts the number of weather particles and their behaviour.`)
+
+	intensitySlider.on('input', function() {
+		const val = $(this).val();
+		const min = parseFloat($(this).attr('min'));
+		const max = parseFloat($(this).attr('max'));
+		const percentage = Math.round((val - min) / (max - min) * 100);
+		particleCount.text(percentage + '%');
+		window.CURRENT_SCENE_DATA.weatherIntensity = val;
+		set_weather();
+	});
+
+	weatherSelect.on('change', function() {
+		const selectedWeather = $(this).val();
+		if (selectedWeather === '0') {
+			intensityRow.hide();
+		} else {
+			const defaults = getWeatherDefaults(selectedWeather);
+			intensitySlider.attr('min', defaults.min);
+			intensitySlider.attr('max', defaults.max);
+			intensitySlider.val(defaults.default);
+			const percentage = Math.round((defaults.default - defaults.min) / (defaults.max - defaults.min) * 100);
+			particleCount.text(percentage + '%');
+			intensityRow.show();
+		}
+		window.CURRENT_SCENE_DATA.weather = selectedWeather;
+		window.CURRENT_SCENE_DATA.weatherIntensity = intensitySlider.val();
+		set_weather();
+	});
+
+	if (weatherValue === 0 || weatherValue === '0') {
+		intensityRow.hide();
+	}
+
+	form.append(intensityRow);
 	
 	let initialPosition = form_row('initialPosition',
 			'Initial Position',
@@ -1562,6 +1626,7 @@ function edit_scene_dialog(scene_id) {
 		}
 		scene['playlist'] = playlistSelect.val();
 		scene['weather'] = weatherSelect.val();
+		scene['weatherIntensity'] = $('#weatherIntensitySlider').val();
 
 		const isNew = false;
 		window.ScenesHandler.persist_scene(scene_id, isNew);
@@ -1582,7 +1647,7 @@ function edit_scene_dialog(scene_id) {
 	wizard.click(
 		async function() {
 		
-
+			window.LOADING = true;
 			const formData = await get_edit_form_data();
 			for (key in formData) {
 				scene[key] = formData[key];
@@ -1633,13 +1698,11 @@ function edit_scene_dialog(scene_id) {
 	cancel.click(function() {
 		// redraw or clear grid based on scene data
 		// discarding any changes that have been made to live modification of grid
-		if (scene.id === window.CURRENT_SCENE_DATA.id){
-			if(window.CURRENT_SCENE_DATA.grid === "1"){
-				redraw_grid()
+		if (scene.id === window.CURRENT_SCENE_DATA.id && !window.LOADING){
+			const msg = {
+				data: {...scene}
 			}
-			else{
-				clear_grid()
-			}
+			window.MB.handleScene(msg);
 		}
 		$("#sources-import-main-container").remove();
 		$(".ddb-classes-page-stylesheet").remove();
@@ -1943,7 +2006,7 @@ function default_scene_data() {
 	return defaultData;
 }
 
-function build_scene_data_payload(parentId, fullPath, sceneName = "New Scene", mapUrl = "", existingNameSet = new Set()) {
+async function build_scene_data_payload(parentId, fullPath, sceneName = "New Scene", mapUrl = "", existingNameSet = new Set()) {
 	const sanitizedFullPath = sanitize_folder_path(fullPath || RootFolder.Scenes.path);
 	const baseName = avttScenesSafeDecode(sceneName || "New Scene") || "New Scene";
 	let candidate = baseName;
@@ -1971,6 +2034,17 @@ function build_scene_data_payload(parentId, fullPath, sceneName = "New Scene", m
 	if ([".mp4", ".webm", ".m4v", ".mov", ".avi", ".mkv", ".wmv", ".flv"].some((ext) => lowerMap.includes(ext))) {
 		sceneData.player_map_is_video = "1";
 	}
+	else if (["uvtt", "dd2vtt", "df2vtt"].some((ext) => lowerMap.includes(ext))) {
+		let uvttSceneData = await getUvttData(sceneData.player_map);
+		const newSceneData = await create_full_scene_from_uvtt(uvttSceneData, sceneData.player_map, 0, false);
+		uvttSceneData = {
+			...newSceneData,
+			title: candidate,
+			parentId,
+			folderPath: relativeFolderPath
+		} 
+		return uvttSceneData;
+	}
 
 	return sceneData;
 }
@@ -1981,7 +2055,20 @@ function init_scenes_panel() {
 
 	scenesPanel.updateHeader("Scenes");
 	add_expand_collapse_buttons_to_header(scenesPanel);
-
+	let hideMapFromPlayers = $(`<button class="token-row-button hide-button ${window.AVTT_CAMPAIGN_INFO?.hidePlayersScene == 1 ? 'active' : ''}" title="Hide Scene from Players"><span class="material-icons"><span class="material-symbols-outlined">group_off</span></span></button>`);
+	hideMapFromPlayers.on("click", function (clickEvent) {
+		const data = { ...window.AVTT_CAMPAIGN_INFO };
+		const button = $(clickEvent.currentTarget);
+		button.toggleClass("active");
+		if (button.hasClass("active")) {
+			data.hidePlayersScene = 1
+		} else {
+			delete data.hidePlayersScene;
+		}
+		AboveApi.setCampaignData(data);
+		window.MB.sendMessage("custom/myVTT/campaignData", data);
+	});
+	scenesPanel.header.find('.expand-collapse-wrapper').prepend(hideMapFromPlayers);
 	let searchInput = $(`<input name="scene-search" type="search" style="width:96%;margin:2%" placeholder="search scenes">`);
 	searchInput.off("input").on("input", mydebounce(() => {
 		let textValue = scenesPanel.header.find("input[name='scene-search']").val();
@@ -2031,10 +2118,7 @@ function init_scenes_panel() {
 
 	let headerWrapper = $(`<div class="scenes-panel-add-buttons-wrapper"></div>`);
 	headerWrapper.append(`<span class='reorder-explanation'>Drag items to move them between folders</span>`);
-	headerWrapper.append(searchInput);
-	headerWrapper.append(addFolderButton);
-	headerWrapper.append(addSceneButton);
-	headerWrapper.append(reorderButton);
+	headerWrapper.append(searchInput, addFolderButton, addSceneButton, reorderButton);
 	scenesPanel.header.append(headerWrapper);
 	headerWrapper.find(".reorder-explanation").hide();
 
@@ -2272,7 +2356,7 @@ async function redraw_scene_list(searchTerm) {
 					conditionContainer.on({
 						'mouseover': function (e) {
 							hoverNoteTimer = setTimeout(function () {
-								build_and_display_sidebar_flyout(e.clientY, function (flyout) {
+								build_and_display_sidebar_flyout(e.clientY, async function (flyout) {
 									let noteHover = `<div>
 										<div class="tooltip-header">
 											<div class="tooltip-header-icon">
@@ -2297,47 +2381,13 @@ async function redraw_scene_list(searchTerm) {
 									flyout.addClass('note-flyout');
 									flyout.css('max-height', 'calc(100vH - 50px)')
 									const tooltipHtml = $(noteHover);
-									window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);
+									await window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);
 									add_journal_roll_buttons(tooltipHtml);
 									window.JOURNAL.add_journal_tooltip_targets(tooltipHtml);
 									add_stat_block_hover(tooltipHtml, sceneId);
 									add_aoe_statblock_click(tooltipHtml, sceneId);
 
-									$(tooltipHtml).find('.add-input').each(function () {
-										let numberFound = $(this).attr('data-number');
-										const spellName = $(this).attr('data-spell');
-										const remainingText = $(this).hasClass('each') ? '' : `${spellName} slots remaining`
-										const track_ability = function (key, updatedValue) {
-											if (window.JOURNAL.notes[noteId].abilityTracker === undefined) {
-												window.JOURNAL.notes[noteId].abilityTracker = {};
-											}
-											const asNumber = parseInt(updatedValue);
-											window.JOURNAL.notes[noteId].abilityTracker[key] = asNumber;
-											window.JOURNAL.persist();
-											debounceSendNote(noteId, window.JOURNAL.notes[noteId])
-										}
-										if (window.JOURNAL.notes[noteId].abilityTracker?.[spellName] >= 0) {
-											numberFound = window.JOURNAL.notes[noteId].abilityTracker[spellName]
-										}
-										else {
-											track_ability(spellName, numberFound)
-										}
-
-										let input = createCountTracker(window.JOURNAL.notes[noteId], spellName, numberFound, remainingText, "", track_ability);
-										const playerDisabled = $(this).hasClass('player-disabled');
-										if (!window.DM && playerDisabled) {
-											input.prop('disabled', true);
-										}
-										const partyLootTable = $(this).closest('.party-item-table');
-										if (partyLootTable.hasClass('shop') && numberFound > 0) {
-											$(this).closest('tr').find('td>.item-quantity-take-input').val(1);
-										}
-										else {
-											$(this).closest('tr').find('td>.item-quantity-take-input').val(numberFound);
-										}
-										$(this).find('p').remove();
-										$(this).after(input)
-									})
+									$(tooltipHtml).find('.add-input').each(function(){window.JOURNAL.addTrackedInputs($(this), {noteId})})
 									flyout.append(tooltipHtml);
 									let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
 									sendToGamelogButton.css({ "float": "right" });
@@ -2457,7 +2507,7 @@ async function create_scene_inside(parentId, fullPath = RootFolder.Scenes.path, 
 			.map((scene) => scene.title),
 	);
 
-	const sceneData = build_scene_data_payload(parentId, sanitizedFullPath, sceneName, mapUrl, existingNames);
+	const sceneData = await build_scene_data_payload(parentId, sanitizedFullPath, sceneName, mapUrl, existingNames);
 
 	window.ScenesHandler.scenes.push(sceneData);
 
@@ -2480,16 +2530,6 @@ function avttScenesSafeDecode(value) {
 		return value;
 	}
 }
-
-const AVTT_SCENE_ALLOWED_EXTENSIONS = (() => {
-	const imageTypes = (typeof allowedImageTypes !== "undefined" && Array.isArray(allowedImageTypes))
-		? allowedImageTypes
-		: ["jpeg", "jpg", "png", "gif", "bmp", "webp"];
-	const videoTypes = (typeof allowedVideoTypes !== "undefined" && Array.isArray(allowedVideoTypes))
-		? allowedVideoTypes
-		: ["mp4", "mov", "avi", "mkv", "wmv", "flv", "webm"];
-	return new Set([...imageTypes, ...videoTypes].map((ext) => String(ext).toLowerCase()));
-})();
 
 function avttScenesNormalizeRelativePath(path) {
 	if (typeof path !== "string") {
@@ -2536,6 +2576,7 @@ async function avttScenesFetchFolderListing(relativePath) {
 }
 
 async function avttScenesCollectAssets(folderRelativePath) {
+	const AVTT_SCENE_ALLOWED_EXTENSIONS = new Set([...allowedImageTypes, ...allowedVideoTypes, "uvtt", "dd2vtt", "df2vtt"].map((ext) => String(ext).toLowerCase()));
 	const normalizedBase = avttScenesNormalizeRelativePath(folderRelativePath);
 	if (!normalizedBase) {
 		return { files: [], folders: [] };
@@ -2697,9 +2738,9 @@ async function importAvttSelections(selectedItems, baseParentId, baseFullPath) {
 		};
 	};
 
-	const addSceneForFile = (item, targetContext, sceneNameSource) => {
+	const addSceneForFile = async (item, targetContext, sceneNameSource) => {
 		const nameSet = getSceneNameSet(targetContext.parentId);
-		const sceneData = build_scene_data_payload(
+		const sceneData = await build_scene_data_payload(
 			targetContext.parentId,
 			targetContext.fullPath,
 			sceneNameSource,
@@ -2709,15 +2750,15 @@ async function importAvttSelections(selectedItems, baseParentId, baseFullPath) {
 		pendingScenes.push(sceneData);
 	};
 
-	const processStandaloneFile = (item) => {
+	const processStandaloneFile = async (item) => {
 		if (!item || !item.link) {
 			return;
 		}
 		const relativePath = item.path || avttScenesRelativePathFromLink(item.link);
 		const sceneName = relativePath ? avttScenesDeriveSceneName(relativePath) : avttScenesSafeDecode(item.name || "New Scene");
 		const targetContext = ensureFolderSegments([]);
-		addSceneForFile(item, targetContext, sceneName);
-	};
+		await addSceneForFile(item, targetContext, sceneName);
+	};	
 
 	const processFolderSelection = async (folderItem) => {
 		const folderPathRaw = (folderItem && folderItem.path) || avttScenesRelativePathFromLink(folderItem?.link);
@@ -2766,7 +2807,7 @@ async function importAvttSelections(selectedItems, baseParentId, baseFullPath) {
 			const targetContext = segments.length > 0 ? ensureFolderSegments(segments) : rootContext;
 			const sceneName = avttScenesDeriveSceneName(relativePath);
 			const sceneLink = `above-bucket-not-a-url/${window.PATREON_ID}/${relativePath}`;
-			addSceneForFile({ link: sceneLink }, targetContext, sceneName);
+			await addSceneForFile({ link: sceneLink }, targetContext, sceneName);
 		}
 	};
 
@@ -2777,7 +2818,7 @@ async function importAvttSelections(selectedItems, baseParentId, baseFullPath) {
 		if (item.isFolder || item.type === avttFilePickerTypes.FOLDER) {
 			await processFolderSelection(item);
 		} else {
-			processStandaloneFile(item);
+			await processStandaloneFile(item);
 		}
 	}
 
@@ -2864,8 +2905,11 @@ function register_scene_row_context_menu() {
 				};
 				return { items: menuItems };
 			}
-
-			if (rowItem.canEdit() ) {
+			const selectedClicked = rowHtml.closest('.sidebar-list-item-row').hasClass('selected')
+			if (!selectedClicked) {
+				$('#scenes-panel .selected').removeClass('selected');
+			}
+			if (!selectedClicked && rowItem.canEdit() ) {
 				menuItems["edit"] = {
 					name: "Edit",
 					callback: function(itemKey, opt, originalEvent) {
@@ -2874,22 +2918,94 @@ function register_scene_row_context_menu() {
 					}
 				};
 			}
-			if(rowItem.isTypeScene()){
+			if (rowItem.isTypeScene()){
 				menuItems["duplicate"] = {
 					name: "Duplicate",
 					callback: function(itemKey, opt, originalEvent) {
-						let itemToEdit = find_sidebar_list_item(opt.$trigger);
-						duplicate_scene(itemToEdit.id);
+						const selectedItems = $('#scenes-panel .selected');
+						build_import_loading_indicator('Duplicating Scenes');
+						if (!selectedItems.length) {
+							let itemToEdit = find_sidebar_list_item(opt.$trigger);
+							duplicate_scene(itemToEdit.id);
+						} else {
+							const listItemArray = [];
+							for (let i = 0; i < selectedItems.length; i++) {
+								let selectedRow = $(selectedItems[i]);
+								let selectedItem = find_sidebar_list_item(selectedRow);
+								if (selectedItem.isTypeScene())
+									listItemArray.push(selectedItem);
+							}
+							window.toDuplicateScenes = {
+								current: 0,
+								total: listItemArray.length
+							}
+							for (let index = 0; index < listItemArray.length; index++) {
+								const itemToEdit = listItemArray[index];
+								duplicate_scene(itemToEdit.id, true);
+							}
+						}
 					}
 				};
 				menuItems["export"] = {
 					name: "Export",
-					callback: function(itemKey, opt, originalEvent) {
-						let itemToEdit = find_sidebar_list_item(opt.$trigger);
-						export_scene_context(itemToEdit.id)
+					callback: async function(itemKey, opt, originalEvent) {
+
+						const selectedItems = $('#scenes-panel .selected');
+
+						if (!selectedItems.length) {
+							let itemToEdit = find_sidebar_list_item(opt.$trigger);
+							export_scene_context(itemToEdit.id)
+						} else {
+
+							build_import_loading_indicator('Preparing Scenes Export File');
+							const listItemArray = [];
+							for (let i = 0; i < selectedItems.length; i++) {
+								let selectedRow = $(selectedItems[i]);s
+								let selectedItem = find_sidebar_list_item(selectedRow);
+								if (selectedItem.isTypeScene())
+									listItemArray.push(selectedItem);
+							}
+							let DataFile = {
+								version: 2,
+								scenes: [],
+								tokencustomizations: [],
+								notes: {},
+								journalchapters: [],
+								soundpads: {}
+							};
+							for (let index = 0; index < listItemArray.length; index++) {
+								
+								let itemToEdit = listItemArray[index];
+								let scene = await AboveApi.getScene(itemToEdit.id);
+								let currentSceneData = {
+									...scene.data
+								}
+								let tokensObject = {}
+								for (let token in scene.data.tokens) {
+									let tokenId = scene.data.tokens[token].id;
+									let statBlockID = scene.data.tokens[token].statBlock
+									if (statBlockID != undefined && window.JOURNAL.notes[statBlockID] != undefined) {
+										DataFile.notes[statBlockID] = window.JOURNAL.notes[statBlockID];
+									}
+									if (window.JOURNAL.notes[tokenId] != undefined) {
+										DataFile.notes[tokenId] = window.JOURNAL.notes[tokenId];
+									}
+									tokensObject[tokenId] = scene.data.tokens[token];
+								}
+								if (window.JOURNAL.notes[itemToEdit.id]) {
+									DataFile.notes[itemToEdit.id] = window.JOURNAL.notes[itemToEdit.id];
+								}
+								currentSceneData.tokens = tokensObject;
+								DataFile.scenes.push(currentSceneData)	
+							}
+							let currentdate = new Date();
+							let datetime = `${currentdate.getFullYear()}-${(currentdate.getMonth() + 1)}-${currentdate.getDate()}`
+							download(b64EncodeUnicode(JSON.stringify(DataFile, null, "\t")), `MultiScene-${datetime}.abovevtt`, "text/plain");
+							$(".import-loading-indicator").remove();
+						}
 					}
 				};
-				if (window.JOURNAL.notes[rowItem.id]) {
+				if (!selectedClicked && window.JOURNAL.notes[rowItem.id]) {
 					menuItems["openSceneNote"] = {
 						name: "Open Scene Note",
 						callback: function (itemKey, opt, originalEvent) {
@@ -2899,41 +3015,44 @@ function register_scene_row_context_menu() {
 						}
 					}
 				}
-				menuItems["editSceneNote"] = {
-					name: window.JOURNAL.notes[rowItem.id] ? "Edit Scene Note" : "Create Scene Note",
-					callback: function (itemKey, opt, originalEvent) {
-
-						let self = window.JOURNAL;
-						let item = find_sidebar_list_item(opt.$trigger);
-
-						if (!self.notes[item.id]) {
-							self.notes[item.id] = {
-								title: item.name,
-								text: "",
-								player: false,
-								plain: "",
-								isSceneNote: true,
-							};
-							did_update_scenes();
-						}
-						self.edit_note(item.id, false);
-						
-					}
-				}
-				if (window.JOURNAL.notes[rowItem.id]) {
-					menuItems["deleteSceneNote"] = {
-						name: "Delete Scene Note",
+				if (!selectedClicked){
+					menuItems["editSceneNote"] = {
+						name: window.JOURNAL.notes[rowItem.id] ? "Edit Scene Note" : "Create Scene Note",
 						callback: function (itemKey, opt, originalEvent) {
+
 							let self = window.JOURNAL;
 							let item = find_sidebar_list_item(opt.$trigger);
-							delete self.notes[item.id];
-							self.persist();
-							did_update_scenes();
+
+							if (!self.notes[item.id]) {
+								self.notes[item.id] = {
+									title: item.name,
+									text: "",
+									player: false,
+									plain: "",
+									isSceneNote: true,
+								};
+								did_update_scenes();
+							}
+							self.edit_note(item.id);
+
+						}
+					}
+					if (window.JOURNAL.notes[rowItem.id]) {
+						menuItems["deleteSceneNote"] = {
+							name: "Delete Scene Note",
+							callback: function (itemKey, opt, originalEvent) {
+								let self = window.JOURNAL;
+								let item = find_sidebar_list_item(opt.$trigger);
+								delete self.notes[item.id];
+								self.persist();
+								did_update_scenes();
+							}
 						}
 					}
 				}
+
 			}
-			if(rowItem.isTypeFolder()){
+			if (!selectedClicked && rowItem.isTypeFolder()){
 				menuItems["export"] = {
 					name: "Export",
 					callback: function(itemKey, opt, originalEvent) {
@@ -2951,8 +3070,29 @@ function register_scene_row_context_menu() {
 				menuItems["delete"] = {
 					name: "Delete",
 					callback: function(itemKey, opt, originalEvent) {
-						let itemToDelete = find_sidebar_list_item(opt.$trigger);
-						delete_item(itemToDelete);
+						const listItemArray = [];
+						const selectedItems = $('#scenes-panel .selected');
+
+						if (!selectedItems.length) {
+							let itemToDelete = find_sidebar_list_item(opt.$trigger);
+							delete_item(itemToDelete);
+						} else {
+							const listItemArray = [];
+							for (let i = 0; i < selectedItems.length; i++) {
+								let selectedRow = $(selectedItems[i]);
+								let selectedItem = find_sidebar_list_item(selectedRow);
+								if (selectedItem.canDelete())
+									listItemArray.push(selectedItem);
+
+							}
+							if (confirm(`This will delete ${listItemArray.length} scenes. Are you sure you want to delete all of these scenes?`)) {
+
+								for (let index = 0; index < listItemArray.length; index++) {
+									delete_item(listItemArray[index], false, true);
+								}
+								did_update_scenes();
+							}
+						} 
 					}
 				};
 			}
@@ -2968,7 +3108,7 @@ function register_scene_row_context_menu() {
 	});
 }
 
-async function duplicate_scene(sceneId) {
+async function duplicate_scene(sceneId, skipDidChange) {
 	let scene = await AboveApi.getScene(sceneId);
 
 	const oldSceneId = scene.data.id;
@@ -3000,9 +3140,20 @@ async function duplicate_scene(sceneId) {
 	await AboveApi.migrateScenes(window.gameId, [aboveSceneData]);
 
 	window.ScenesHandler.scenes.push(aboveSceneData);
-	await did_update_scenes();
-	await expand_all_folders_up_to_id(aboveSceneData.id);
-	$(`.scene-item[data-scene-id='${aboveSceneData.id}'] .dm_scenes_button`).click();
+	if (window.toDuplicateScenes){
+		window.toDuplicateScenes.current += 1;
+		if(window.toDuplicateScenes.current >= window.toDuplicateScenes.total){
+			await did_update_scenes();
+			await expand_all_folders_up_to_id(aboveSceneData.id);
+			$(`body>.import-loading-indicator`).remove();
+		}
+	}
+	if (!skipDidChange){
+		await did_update_scenes();
+		await expand_all_folders_up_to_id(aboveSceneData.id);
+		$(`.scene-item[data-scene-id='${aboveSceneData.id}'] .dm_scenes_button`).click();
+		$(`body>.import-loading-indicator`).remove();
+	}
 }
 
 function expand_folders_to_active_scenes() {
@@ -3412,8 +3563,8 @@ function build_UVTT_import_container(){
 	
 
 
-	const doorTypeSelect = $(`<select id='doorTypeSelectUVTT'></select>`);
 	const availableDoors = get_available_doors();
+	const doorTypeSelect = $(`<select id='doorTypeSelectUVTT'></select>`);
 	for(let i in availableDoors){
 		doorTypeSelect.append(`<option value='${i}'>${availableDoors[i]}</option>`)
 	}

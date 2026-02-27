@@ -53,17 +53,16 @@ function build_stat_block_for_copy(listItem, options, open5e = false){
   build_import_loading_indicator('Fetching Statblock Info');
   if (cachedMonsterItem) {
       // we have a cached monster. this data is the best data we have so display that instead of whatever we were given
-      create_token_inside(find_sidebar_list_item_from_path(RootFolder.MyTokens.path), undefined, undefined, undefined, options, build_monster_copy_stat_block(new MonsterStatBlock(cachedMonsterItem.monsterData)));
-      $(".import-loading-indicator").remove();
+    create_token_inside(find_sidebar_list_item_from_path(RootFolder.MyTokens.path), undefined, undefined, undefined, options, build_monster_copy_stat_block(new MonsterStatBlock(cachedMonsterItem.monsterData)));
+    $(".import-loading-indicator").remove();
   } else {
     fetch_and_cache_monsters([monsterId], function (open5e = false) {
-      if(!open5e){
-         create_token_inside(find_sidebar_list_item_from_path(RootFolder.MyTokens.path), undefined, undefined, undefined, options, build_monster_copy_stat_block(new MonsterStatBlock(cached_monster_items[monsterId].monsterData)));
-      }
-      else{
-         create_token_inside(find_sidebar_list_item_from_path(RootFolder.MyTokens.path), undefined, undefined, undefined, options, build_monster_copy_stat_block(new MonsterStatBlock(cached_open5e_items[monsterId].monsterData)));
-   
-      }
+        if(!open5e){
+          create_token_inside(find_sidebar_list_item_from_path(RootFolder.MyTokens.path), undefined, undefined, undefined, options, build_monster_copy_stat_block(new MonsterStatBlock(cached_monster_items[monsterId].monsterData)));
+        }
+        else{
+          create_token_inside(find_sidebar_list_item_from_path(RootFolder.MyTokens.path), undefined, undefined, undefined, options, build_monster_copy_stat_block(new MonsterStatBlock(cached_open5e_items[monsterId].monsterData)));
+        }
       $(".import-loading-indicator").remove();
     }, open5e);
   }  
@@ -77,36 +76,12 @@ async function display_stat_block_in_container(statBlock, container, tokenId, cu
     container.find(".avtt-stat-block-container").remove(); // in case we're re-rendering with better data
     container.append(html);
     if(customStatBlock){
-      window.JOURNAL.translateHtmlAndBlocks(html)
+      await window.JOURNAL.translateHtmlAndBlocks(html);
       add_journal_roll_buttons(html, tokenId);
       window.JOURNAL.add_journal_tooltip_targets(html);
 
       
-      $(container).find('.add-input').each(function(){
-        let numberFound = $(this).attr('data-number');
-        const spellName = $(this).attr('data-spell');
-        const remainingText = $(this).hasClass('each') ? '' : `${spellName} slots remaining`
-
-        if (token.options.abilityTracker?.[spellName]>= 0){
-          numberFound = token.options.abilityTracker[spellName]
-        } else{
-          token.track_ability(spellName, numberFound)
-        }
-        let input = createCountTracker(token, spellName, numberFound, remainingText, "");
-        const playerDisabled = $(this).hasClass('player-disabled');
-        if (!window.DM && playerDisabled) {
-          input.prop('disabled', true);
-        }
-        const partyLootTable = $(this).closest('.party-item-table');
-        if (partyLootTable.hasClass('shop') && numberFound > 0) {
-          $(this).closest('tr').find('td>.item-quantity-take-input').val(1);
-        }
-        else {
-          $(this).closest('tr').find('td>.item-quantity-take-input').val(numberFound);
-        }
-        $(this).find('p').remove();
-        $(this).after(input)
-      })
+      $(container).find('.add-input').each(function(){window.JOURNAL.addTrackedInputs($(this), {token})});
       let imageUrl = parse_img(token.options.imgsrc);
 
       if(token.options.imgsrc.startsWith('above-bucket-not-a-url')){

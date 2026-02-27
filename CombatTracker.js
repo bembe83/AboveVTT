@@ -49,7 +49,7 @@ function init_combat_tracker(){
 	let ct=$("<div id='combat_tracker'/>");
 	ct.css("height","20px"); // IMPORTANT
 	
-	let toggle=$("<button id='combat_button' class='hideable ddbc-tab-options__header-heading' style='display:inline-block'><u>C</u>OMBAT</button>");
+	let toggle = $("<button id='combat_button' data-name='Combat Tracker (C)' class='drawbutton hideable hasTooltip ddbc-tab-options__header-heading' style='display:inline-block'><span class='button-text'><u>C</u>OMBAT</span></button>");
 	toggle.click(function(){
 		if($("#combat_tracker_inside #combat_tracker_title_bar.minimized").length>0) {
 			$("#combat_tracker_title_bar").dblclick();
@@ -109,19 +109,19 @@ function init_combat_tracker(){
 				let id = $(this).parent().parent().parent().attr("data-target");
 				$(`tr[data-target='${id}'] input.hp`).val($(this).val());
 				$(`tr[data-target='${id}'] input.hp`).trigger("change");
-				ct_update_popout();
+				ct_update_popout(true);
 			});	
 			$(childWindows['Combat Tracker'].document).find('input.max_hp').change(function(e) {
 				let id = $(this).parent().parent().parent().attr("data-target");
 				$(`tr[data-target='${id}'] input.max_hp`).val($(this).val());
 				$(`tr[data-target='${id}'] input.max_hp`).trigger("change");
-				ct_update_popout();
+				ct_update_popout(true);
 			});	
 			$(childWindows['Combat Tracker'].document).find('input.init').change(function(){
 				let id = $(this).parent().parent().attr("data-target");
 				$(`tr[data-target='${id}'] input.init`).val($(this).val());
 				$(`tr[data-target='${id}'] input.init`).trigger("change");
-				ct_update_popout();
+				ct_update_popout(true);
 			});
 		}
 	});
@@ -280,11 +280,10 @@ function init_combat_tracker(){
 			console.log('nessuno selezionato');
 			$($("#combat_area tr:not([skipTurn])")[0]).attr('data-current','1');
 			currentTarget = $("#combat_area tr[data-current=1]").attr('data-target');
-
 			if(window.TOKEN_OBJECTS[currentTarget] != undefined){
 				window.TOKEN_OBJECTS[currentTarget].options.current = true;
 				window.TOKEN_OBJECTS[currentTarget].update_and_sync();
-				let combatSettingData = getCombatTrackersettings();
+				let combatSettingData = getCombatTrackerSettings();
 				let group = false;
 				if(window.TOKEN_OBJECTS[currentTarget].options.combatGroupToken){
 					group = Object.values(window.TOKEN_OBJECTS).find(d=> d.options.combatGroup == window.TOKEN_OBJECTS[currentTarget].options.combatGroup && !d.options.combatGroupToken);
@@ -313,7 +312,7 @@ function init_combat_tracker(){
 			current.css('background','');
 			next=$(current.nextAll('tr:not([skipTurn])')[0]);
 			if(next.length==0){
-				const autoInit = getCombatTrackersettings().auto_init;
+				const autoInit = getCombatTrackerSettings().auto_init;
 				if(autoInit == '1'){
 					$('.roll-init-button').click();
 				}
@@ -340,7 +339,7 @@ function init_combat_tracker(){
 				window.TOKEN_OBJECTS[newTarget].options.round = window.ROUND_NUMBER;
 				adjust_reaction_condition(window.TOKEN_OBJECTS[newTarget]);
 				window.TOKEN_OBJECTS[newTarget].place_sync_persist();
-				let combatSettingData = getCombatTrackersettings();
+				let combatSettingData = getCombatTrackerSettings();
 				let group = false;
 				if(window.TOKEN_OBJECTS[newTarget].options.combatGroupToken){
 					group = Object.values(window.TOKEN_OBJECTS).find(d=> d.options.combatGroup == window.TOKEN_OBJECTS[newTarget].options.combatGroup && !d.options.combatGroupToken);
@@ -364,7 +363,6 @@ function init_combat_tracker(){
 			}
 
 		}
-
 		debounceCombatPersist();
 		ct_update_popout();
 		if(window.childWindows['Combat Tracker'] != undefined)
@@ -406,7 +404,7 @@ function init_combat_tracker(){
 				window.TOKEN_OBJECTS[newTarget].options.round = window.ROUND_NUMBER;
 				window.TOKEN_OBJECTS[newTarget].place_sync_persist();
 				window.TOKEN_OBJECTS[newTarget].build_conditions(prev, true);
-				let combatSettingData = getCombatTrackersettings();
+				let combatSettingData = getCombatTrackerSettings();
 				let group = false;
 				if(window.TOKEN_OBJECTS[newTarget].options.combatGroupToken){
 					group = Object.values(window.TOKEN_OBJECTS).find(d=> d.options.combatGroup == window.TOKEN_OBJECTS[newTarget].options.combatGroup && !d.options.combatGroupToken);
@@ -429,7 +427,6 @@ function init_combat_tracker(){
 				}
 			}
 		}
-		
 		debounceCombatPersist();
 		ct_update_popout();
 		if(window.childWindows['Combat Tracker'] != undefined)
@@ -505,7 +502,7 @@ function init_combat_tracker(){
 		frame_z_index_when_click($(this));
 	});
 
-	if(getCombatTrackersettings().carousel == '1'){
+	if(getCombatTrackerSettings().carousel == '1'){
 		init_carousel_combat_tracker()
 	}
 }
@@ -724,9 +721,17 @@ function init_carousel_combat_tracker(){
 
 			#combat_carousel_container #combat_area_carousel{
 			    max-width:100%;
-			    overflow:hidden;
 			}
-
+			#combat_area_carousel .ctTimer {
+				position: absolute;
+				bottom: -20px;
+				left: 50%;
+				transform: translateX(-50%);
+				font-size: 15px;
+				font-weight: bold;
+				text-shadow: -1px -1px 1px #000, 1px 1px 1px #000, -1px 1px 1px #000, 1px -1px 1px #000, 0px 0px 2px #000;
+				color: #fff;
+			}
 			#combat_carousel_container .openEye path:not([fill*="none"]), 
 			#combat_carousel_container .closedEye path:not([fill*="none"]), 
 			#combat_carousel_container .hideSVG path:not([fill*="none"]), 
@@ -821,25 +826,24 @@ function update_carousel_combat_tracker(){
 
 
 
-function getCombatTrackersettings(){
-	let combatSettingData = {};
-	if(localStorage.getItem(`abovevtt-combat-tracker-settings-${window.DM}`) == null){
-		combatSettingData = {
-			tie_breaker: 0,
-			scroll_to_next: 0,
-			select_next: 0,
-			auto_init: 0,
-			remove_init: 0,
-			carousel: 0,
-			autoGroup: 0
-		}
-	}else{
-		combatSettingData = $.parseJSON(localStorage.getItem(`abovevtt-combat-tracker-settings-${window.DM}`));
-	}
-	return combatSettingData;
+function getCombatTrackerSettings(){
+	return {
+		tie_breaker: 0,
+		scroll_to_next: 0,
+		select_next: 0,
+		auto_init: 0,
+		remove_init: 0,
+		carousel: 0,
+		autoGroup: 0,
+		next_turn_indicator: 0,
+		always_add_hidden: 0,
+		timer: 0,
+		...$.parseJSON(localStorage.getItem(`abovevtt-combat-tracker-settings-${window.gameId}-${window.DM}`)),
+		...$.parseJSON(localStorage.getItem(`abovevtt-combat-tracker-settings-${window.DM}`))	
+	};
 }
 function openCombatTrackerSettings(){
-	let combatSettingData = getCombatTrackersettings();		
+	let combatSettingData = getCombatTrackerSettings();		
 
 	function form_row(name, title, inputOverride=null, imageValidation=false) {
 		const row = $(`<div style='width:100%;' id='${name}_row'/>`);
@@ -877,6 +881,7 @@ function openCombatTrackerSettings(){
 		return toggle
 	}
 
+	const globalSettings = ['tie_breaker', 'scroll_to_next', 'select_next', 'next_turn_indicator', 'ct_selected_token']
 
 	$("#edit_dialog").remove();
 
@@ -898,8 +903,9 @@ function openCombatTrackerSettings(){
 
 	const form = $("<form id='edit_scene_form'/>");
 	form.on('submit', function(e) { e.preventDefault(); });
-
-
+	const globalDiv= $(`<div class='combat-settings-header'><h7>Global ${window.DM ? 'DM' : 'Player'} Settings</h7></div>`)
+	const campaignDiv = $(`<div class='combat-settings-header'><h7>Campaign ${window.DM ? 'DM' : 'Player'} Settings</h7></div>`)
+	form.append(globalDiv, campaignDiv);
 
 	let tieBreakerToggle = form_toggle('tie_breaker', 'Adds the dex score as a decimal to tie break initiative', combatSettingData['tie_breaker'] == '1', function(e){
 		handle_basic_form_toggle_click(e)
@@ -907,39 +913,39 @@ function openCombatTrackerSettings(){
 	let tieBreakerRow = form_row(`tie_breaker`, `Add Tie Breaker to Initiative Rolls`, tieBreakerToggle)
 
 	if(window.DM){
-		form.append(tieBreakerRow);
+		globalDiv.append(tieBreakerRow);
 	}
 
 	let scrollToNextToggle = form_toggle('scroll_to_next', 'Scroll to Token on Next/Prev', combatSettingData['scroll_to_next'] == '1', function(e){
 		handle_basic_form_toggle_click(e)
 	});
 	let scrollToNextRow = form_row(`scroll_to_next`, `Auto Center Token on Next/Prev`, scrollToNextToggle)
-	form.append(scrollToNextRow);
+	globalDiv.append(scrollToNextRow);
 
 	let autoSelectNextToggle = form_toggle('select_next', 'Select Token on Next/Prev', combatSettingData['select_next'] == '1', function(e){
 		handle_basic_form_toggle_click(e)
 	});
 	let autoSelectNextRow = form_row(`select_next`, `Select Token on Next/Prev`, autoSelectNextToggle)
-	form.append(autoSelectNextRow);
+	globalDiv.append(autoSelectNextRow);
 
 	let autoRollInitAtTopToggle = form_toggle('auto_init', `${window.DM ? 'Auto Roll Monster Init at Top of Round' : 'Auto Roll Initiative at Top of Round'}`, combatSettingData['auto_init'] == '1', function(e){
 		handle_basic_form_toggle_click(e)
 	});
 	let autoRollInitAtTopRow = form_row(`auto_init`, `${window.DM ? 'Auto Roll Monster Init at Top of Round' : 'Auto Roll Initiative at Top of Round'}`, autoRollInitAtTopToggle)
-	form.append(autoRollInitAtTopRow);
+	campaignDiv.append(autoRollInitAtTopRow);
 
 	let removeInitToggle = form_toggle('remove_init', `When enabled instead of using a tokens saved initiative when removed and added back to combat it will be rerolled.`, combatSettingData['remove_init'] == '1', function(e){
 		handle_basic_form_toggle_click(e)
 	});
 	let removeInitRow = form_row(`remove_init`, `Ignore token's saved init on add to combat`, removeInitToggle)
 	if(window.DM)
-		form.append(removeInitRow);
+		campaignDiv.append(removeInitRow);
 
 	let highlightSelectedTokensToggle = form_toggle('ct_selected_token', `Adds a selected highlight to tokens in the combat tracker`, combatSettingData['ct_selected_token'] == '1', function(e){
 		handle_basic_form_toggle_click(e)
 	});
 	let highlightSelectedTokensRow = form_row(`ct_selected_token`, `${window.DM ? 'Highlight Selected Token Image' : 'Highlight Selected Token Image'}`, highlightSelectedTokensToggle)
-	form.append(highlightSelectedTokensRow);
+	globalDiv.append(highlightSelectedTokensRow);
 
 	let carouselToggle = form_toggle('carousel', `Always displays some combat data as a carousel`, combatSettingData['carousel'] == '1', function(e){
 		handle_basic_form_toggle_click(e);
@@ -951,15 +957,36 @@ function openCombatTrackerSettings(){
 		}
 	});
 	let carouselRow = form_row(`carousel`, `${window.DM ? 'Display Combat Tracker Carousel' : 'Always displays some combat data as a carousel'}`, carouselToggle)
-	form.append(carouselRow);
+	campaignDiv.append(carouselRow);
 
 	if(window.DM){
 		let autoGroupToggle = form_toggle('autoGroup', `Auto Group Tokens by stat block when using the 'Add to Combat Tracker' button. Players will be added individually. You can still create custom groups using the add a group button.`, combatSettingData['autoGroup'] == '1', function(e){
 			handle_basic_form_toggle_click(e);
 		});
 		let autoGroupRow = form_row(`autoGroup`, `Auto Group Tokens by Stat Block`, autoGroupToggle)
-		form.append(autoGroupRow);
+		campaignDiv.append(autoGroupRow);
+
+		let hiddenGroupToggle = form_toggle('always_add_hidden', `Always add tokens not controlled by players to combat tracker as hidden.`, combatSettingData['always_add_hidden'] == '1', function (e) {
+			handle_basic_form_toggle_click(e);
+		});
+		let hiddenGroupRow = form_row(`always_add_hidden`, `Add tokens not controlled by players to combat as hidden`, hiddenGroupToggle)
+		campaignDiv.append(hiddenGroupRow);
+
+		let timerGroupRow = form_row('timer',
+			'Turn Timer Duration (mm:ss)',
+			$(`<input name='timer' placeholder='mm:ss' value='${combatSettingData['timer'] || ''}'/></div>`)
+		)
+		campaignDiv.append(timerGroupRow);
 	}
+
+	if(!window.DM) {
+		let endTurnIndicatorToggle = form_toggle('next_turn_indicator', `If enabled, a visual and audio cue will play when you are up next in initiative`, combatSettingData['next_turn_indicator'] == '1', function(e){
+			handle_basic_form_toggle_click(e)
+		});
+		let endTurnIndicatorRow = form_row(`next_turn_indicator`, `Next Turn Indicator`, endTurnIndicatorToggle)
+		globalDiv.append(endTurnIndicatorRow);
+	}
+
 
 
 
@@ -971,18 +998,45 @@ function openCombatTrackerSettings(){
 		
 	})
 	const submitButton = $("<button type='button'>Save</button>");
+	
 	submitButton.click(async function() {
 		let settings = {};
 		const formData = await get_edit_form_data();
-		for (key in formData) {
-			settings[key] = formData[key];
+		const globalCombatSettings = {};
+		
+		for (key in formData) {		
+			if(globalSettings.includes(key))
+				globalCombatSettings[key] = formData[key];
+			else
+				settings[key] = formData[key];
+		}
+		if(window.DM){
+			if (settings['timer'] && convertMmSsToMs(settings['timer']) > 0) {
+				const duration = convertMmSsToMs(settings['timer']);
+				const startTime = Date.now();
+				create_combat_tracker_timer(duration, startTime);
+				window.MB.sendMessage("custom/myVTT/createTimer", {
+					type: "combatTracker",
+					duration,
+					startTime
+				});
+			} else {
+				$('.ctTimer').remove();
+				if (combatTrackerTimerId) {
+					clearInterval(combatTrackerTimerId);
+					combatTrackerTimerId = null;
+				}
+				window.MB.sendMessage("custom/myVTT/createTimer", {
+					type: "combatTracker",
+					remove: true
+				});
+			}
 		}
 
-
-				
-		localStorage.setItem(`abovevtt-combat-tracker-settings-${window.DM}`, JSON.stringify(settings))
-
-
+		
+		localStorage.setItem(`abovevtt-combat-tracker-settings-${window.gameId}-${window.DM}`, JSON.stringify(settings))	
+		localStorage.setItem(`abovevtt-combat-tracker-settings-${window.DM}`, JSON.stringify(globalCombatSettings))
+		
 
 		$("#sources-import-main-container").remove();
 		$("#scene_selector").removeAttr("disabled");
@@ -998,6 +1052,53 @@ function openCombatTrackerSettings(){
 	
 	container.animate({
 		opacity: '1.0'
+	}, 1000);
+}
+let combatTrackerTimerId;
+let prevCtTimerTokenId;
+function create_combat_tracker_timer(duration = 60000, startTime = Date.now()) {
+	const currTurnId = $('#combat_area tr[data-current="1"]').attr('data-target');
+	if (prevCtTimerTokenId && prevCtTimerTokenId == currTurnId)
+		return;
+	$('.ctTimer').remove();
+	if (combatTrackerTimerId){
+		clearInterval(combatTrackerTimerId);
+		combatTrackerTimerId = null;
+	}
+	const elapsed = Date.now() - startTime;
+	const remaining = duration - elapsed;
+	const startTimeString = convertMsToMmSs(remaining);
+	const timerBox = $(`<div class='ctTimer' data-start='${startTime}'><span class='timerBar'>${startTimeString}</span></div>`);
+	const timerBox2 = timerBox.clone();
+
+	prevCtTimerTokenId = currTurnId;
+	const currentTurnContainer = $('#combat_area_carousel [data-current="1"]');
+	const combatRoundBar = $('#round_number_label');
+	currentTurnContainer.append(timerBox);
+	combatRoundBar.append(timerBox2);
+	combatTrackerTimerId = setInterval(function () {
+		const currentTurnContainer = $('#combat_area_carousel [data-current="1"]');
+		const combatRoundBar = $('#round_number_label');
+		const elapsed = Date.now() - startTime;
+		const remaining = duration - elapsed;
+		const timerBars = currentTurnContainer.find('.timerBar').add(combatRoundBar.find('.timerBar'));
+		if (remaining <= 0) {
+			clearInterval(combatTrackerTimerId);
+			combatTrackerTimerId = null;
+			timerBars.css('color', 'red');
+		} else {
+			const timerExists = currentTurnContainer.find(`.ctTimer[data-start="${startTime}"]`).length > 0;
+			const timer2Exists = combatRoundBar.find(`.ctTimer[data-start="${startTime}"]`).length > 0;
+			if (!timerExists) {
+				currentTurnContainer.append(timerBox);
+			}
+			if(!timer2Exists){
+				combatRoundBar.append(timerBox2);
+			}
+			const timeRemainingString = convertMsToMmSs(remaining);
+			timerBars.text(timeRemainingString);
+		}
+		ct_update_popout(true);
 	}, 1000);
 }
 function ct_reorder(persist=true) {
@@ -1020,6 +1121,19 @@ function ct_reorder(persist=true) {
 
 	$("#combat_area>tr[skipTurn]").css('display', '');		
 	ct_update_popout();
+	if(!window.DM){
+		if (window.CtTimer) {
+			create_combat_tracker_timer(window.CtTimer.duration, window.CtTimer.startTime);
+			delete window.CtTimer;
+		} else {
+			$('.ctTimer').remove();
+			if (combatTrackerTimerId) {
+				clearInterval(combatTrackerTimerId);
+				combatTrackerTimerId = null;
+			}
+		}
+	}
+
 	if(persist)
 		debounceCombatPersist();
 }
@@ -1050,12 +1164,13 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 		token.build_conditions(entry, true);
 	}
 	if (typeof(token.options.ct_show) == 'undefined'){
-		if(token.options.hidden) {
+		const addHidden = getCombatTrackerSettings().always_add_hidden;
+		const shouldHide = token.options.hidden ||
+			(addHidden && addHidden != 0 && !token.isPlayer() && !token.options.share_vision && !token.options.player_owned)
+		if (shouldHide) {
 			token.options.ct_show = false;
-	
 			window.all_token_objects[token.options.id].options.ct_show = false;
 			window.all_token_objects[token.options.id].update_and_sync();
-			
 		}
 		else {		
 			if(typeof window.all_token_objects[token.options.id].options.ct_show != 'undefined') {
@@ -1306,7 +1421,7 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 			  	$(`#combat_area tr[data-target='${target}'] .findSVG`).remove();
 	           	let findSVG=$('<svg class="findSVG" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 11c1.33 0 4 .67 4 2v.16c-.97 1.12-2.4 1.84-4 1.84s-3.03-.72-4-1.84V13c0-1.33 2.67-2 4-2zm0-1c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm6 .2C18 6.57 15.35 4 12 4s-6 2.57-6 6.2c0 2.34 1.95 5.44 6 9.14 4.05-3.7 6-6.8 6-9.14zM12 2c4.2 0 8 3.22 8 8.2 0 3.32-2.67 7.25-8 11.8-5.33-4.55-8-8.48-8-11.8C4 5.22 7.8 2 12 2z"/></svg>');	
 	            $(`#combat_area tr[data-target='${target}'] .findTokenCombatButton`).append(findSVG);
-	            ct_update_popout();
+				ct_update_popout(true);
 			}
 		});
 
@@ -1471,7 +1586,8 @@ function ct_current_turn() {
 
 function ct_persist(){
 	let data= [];
-	$('#combat_area tr').each( function () {			
+	const turnRows = $('#combat_area tr');
+	turnRows.each( function () {			
 		let optionsClone = $.extend(true, {}, window.all_token_objects[$(this).attr("data-target")].options);
 		optionsClone.alternativeImages = [];
 		optionsClone.ct_show = $(this).find('.hideFromPlayerCombatButton svg.closedEye[style*="block"]').length == 0;
@@ -1482,14 +1598,27 @@ function ct_persist(){
 			'options': optionsClone
 		});		  
 	});
-
+	const trackerSettings = getCombatTrackerSettings(); 
+	if (turnRows.length > 0 && trackerSettings.timer && convertMmSsToMs(trackerSettings.timer) > 0){
+		const startTime = Date.now();
+		const duration = convertMmSsToMs(trackerSettings.timer);
+		create_combat_tracker_timer(duration, startTime);
+		data.push({ 'timer': { duration, startTime}})
+	}else{
+		$('.ctTimer').remove();
+		if (combatTrackerTimerId) {
+			clearInterval(combatTrackerTimerId);
+			combatTrackerTimerId = null;
+		}	
+		ct_update_popout();
+	}
 	data.push({'data-target': 'round',
 				'round_number':window.ROUND_NUMBER});
         
 	window.MB.sendMessage("custom/myVTT/CT",data);
 }
 
-function ct_update_popout(){
+function ct_update_popout(skipCarousel = false){
 	if(childWindows['Combat Tracker']){
 		$(childWindows['Combat Tracker'].document).find("body").empty("");
 		updatePopoutWindow("Combat Tracker", $("#combat_tracker_inside"));
@@ -1510,19 +1639,19 @@ function ct_update_popout(){
 				let id = $(this).parent().parent().parent().attr("data-target");
 				$(`tr[data-target='${id}'] input.hp`).val($(this).val());
 				$(`tr[data-target='${id}'] input.hp`).trigger("change");
-				ct_update_popout();
+				ct_update_popout(true);
 			});	
 			$(childWindows['Combat Tracker'].document).find('input.max_hp').change(function(e) {
 				let id = $(this).parent().parent().parent().attr("data-target");
 				$(`tr[data-target='${id}'] input.max_hp`).val($(this).val());
 				$(`tr[data-target='${id}'] input.max_hp`).trigger("change");
-				ct_update_popout();
+				ct_update_popout(true);
 			});	
 			$(childWindows['Combat Tracker'].document).find('input.init').change(function(){
 				let id = $(this).parent().parent().attr("data-target");
 				$(`tr[data-target='${id}'] input.init`).val($(this).val());
 				$(`tr[data-target='${id}'] input.init`).trigger("change");
-				ct_update_popout();
+				ct_update_popout(true);
 			});
 		}
 		
@@ -1531,8 +1660,8 @@ function ct_update_popout(){
 		}
 		
 	}
-
-	update_carousel_combat_tracker();
+	if(!skipCarousel)
+		update_carousel_combat_tracker();
 	
 
 }
@@ -1543,12 +1672,12 @@ function ct_load(data=null){
 	
 	window.expandedGroupIds = [];
 	$(`.findTokenCombatButton.expandgroup:not(.collapsed)`).each(function(){
-  	window.expandedGroupIds.push($(this).closest('tr').attr('data-group'))
-  })	
+		window.expandedGroupIds.push($(this).closest('tr').attr('data-group'))
+	})	
 
 	$("#combat_area").empty();
 	update_peer_communication_with_combat_tracker_data(data);
-
+	const trackerSettings = getCombatTrackerSettings();
 	if(!data.loading){	
 		$("#combat_area tr[data-current]").removeAttr("data-current");
 		for(let i=0;i<data.length;i++){
@@ -1556,7 +1685,7 @@ function ct_load(data=null){
 				if(window.ROUND_NUMBER != data[i]['round_number']){
 					window.ROUND_NUMBER = data[i]['round_number'];
 					document.getElementById('round_number').value = window.ROUND_NUMBER;
-					const autoInit = getCombatTrackersettings().auto_init;
+					const autoInit = trackerSettings.auto_init;
 					const tokenInCombat = $(`#combat_area tr[data-target='${window.pcs.find(d => d.sheet.includes(window.PLAYER_SHEET)).sheet}']`).length > 0;
 					if(autoInit == '1' && !window.DM && tokenInCombat == true){
 						$('.roll-init-button').click();
@@ -1589,17 +1718,15 @@ function ct_load(data=null){
 						window.TOKEN_OBJECTS[data[i]['data-target']].tempHp = window.all_token_objects[data[i]['data-target']].tempHp;
 					}
 				}
-
-				
-				if(data[i]['current']){
+		
+				if(data[i]['current']){				
 					$("#combat_area tr[data-target='"+data[i]['data-target']+"']").attr("data-current","1");
 					if(window.TOKEN_OBJECTS[data[i]['data-target']] != undefined){
-						let combatSettingData = getCombatTrackersettings();
 						let group = false;
 						if(window.TOKEN_OBJECTS[data[i]['data-target']].options.combatGroupToken){
 							group = Object.values(window.TOKEN_OBJECTS).find(d=> d.options.combatGroup == window.TOKEN_OBJECTS[data[i]['data-target']].options.combatGroup && !d.options.combatGroupToken);
 						}
-						if(combatSettingData['scroll_to_next'] == '1'){
+						if(trackerSettings['scroll_to_next'] == '1'){
 							if(group){
 								window.TOKEN_OBJECTS[group.options.id].highlight();
 							}
@@ -1607,7 +1734,7 @@ function ct_load(data=null){
 								window.TOKEN_OBJECTS[data[i]['data-target']].highlight();
 							}				
 						}	
-						if(combatSettingData['select_next'] == '1'){
+						if(trackerSettings['select_next'] == '1'){
 							if(group){
 								$(`#tokens .token[data-id='${group.options.id}']`).click();
 							}
@@ -1664,7 +1791,6 @@ function ct_load(data=null){
 					$("#endplayerturn").prop('disabled', true);
 				}
 			}
-
 		}
 		else{
 			for (tokenID in window.TOKEN_OBJECTS){
@@ -1678,7 +1804,14 @@ function ct_load(data=null){
 			}
 		}
 	}
-
+	if (Array.isArray(data)) {
+		const timer = data.filter(d => d.timer != undefined)?.[0]?.timer;
+		if (timer != undefined) {
+			const { startTime, duration } = timer;
+			window.CtTimer = timer;
+		}
+	}
+	
 //load in local data on first load after 0.80
 	let itemkey="CombatTracker"+find_game_id();
 	data=$.parseJSON(localStorage.getItem(itemkey));

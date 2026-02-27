@@ -4833,6 +4833,7 @@ async function launchFilePicker(selectFunction = false, fileTypes = [], secondar
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
+                overscroll-behavior: auto;
             }
             #avtt-column-headers .avtt-sortable-header {
                 cursor: pointer;
@@ -5041,6 +5042,7 @@ async function launchFilePicker(selectFunction = false, fileTypes = [], secondar
                 overflow: hidden;
                 text-overflow: ellipsis;    
                 white-space: nowrap;
+                overscroll-behavior: auto;
             }
             #file-listing-section tr span.material-symbols-outlined{
                 flex-shrink:0;
@@ -7207,11 +7209,11 @@ function refreshFiles(
                   top: (ui.position.top - (size / 2))
                 };
                 $('.avtt-drop-target').toggleClass('avtt-drop-target', false);
-              } else if (droppedOn.closest('#myTokensFolder').length > 0 || droppedOn.closest('#scenes-panel').length > 0)  {
+              } else if (droppedOn.closest('#myTokensFolder').length > 0 || droppedOn.closest('#scenes-panel').length > 0 || droppedOn.closest('#journal-panel'))  {
                 const closestFolder = droppedOn.closest('.folder.list-item-identifier')
                 $('.avtt-drop-target').toggleClass('avtt-drop-target', false);
                 if (closestFolder.is('#scenesFolder') || droppedOn.is('.sidebar-panel-body'))
-                  droppedOn.closest('.sidebar-panel-body').toggleClass('avtt-drop-target', true);
+                  droppedOn.closest('.sidebar-panel-content').toggleClass('avtt-drop-target', true);
                 else
                   closestFolder.toggleClass('avtt-drop-target', true);
               }
@@ -7279,6 +7281,18 @@ function refreshFiles(
                     console.error("Failed to import from AVTT File Picker selection", error);
                     alert(error?.message || "Failed to import selection from AVTT. See console for details.");
                   }
+                }
+              }
+              else if(droppedOn.closest('#journal-panel').length>0){
+                const paths = window.getAvttFilePickerPaths();
+                try {
+                  const targetFolder = droppedOn.closest('.folder[data-id]');
+                  const targetFolderId = targetFolder.length > 0 ? targetFolder.attr('data-id') : null;
+                  
+                  window.JOURNAL.importFilesAndFolders(paths, targetFolderId);
+                } catch (error) {
+                  console.error("Failed to import from AVTT File Picker selection to Journal", error);
+                  alert(error?.message || "Failed to import selection from AVTT to Journal. See console for details.");
                 }
               }
               else if (droppedOn.closest('#sounds-panel').length > 0){
@@ -7932,7 +7946,7 @@ function getFileFromS3Delay(ms) {
   });
 }
 
-function cacheGetFileFromS3Url(cacheKey, sanitizedKey, fileURL) {
+function cacheGetFileFromS3Url(cacheKey, fileURL) {
   if (!cacheKey || !fileURL) {
     return;
   }
@@ -7944,12 +7958,6 @@ function cacheGetFileFromS3Url(cacheKey, sanitizedKey, fileURL) {
     url: fileURL,
     expire: expireAt,
   };
-  if (sanitizedKey && sanitizedKey !== cacheKey) {
-    window.avtt_file_urls[sanitizedKey] = {
-      url: fileURL,
-      expire: expireAt,
-    };
-  }
 }
 
 async function processGetFileFromS3Queue() {
@@ -8074,7 +8082,7 @@ async function processGetFileFromS3Queue() {
         const url = result?.url;
         if (url) {
           for (const item of entry.items) {
-            cacheGetFileFromS3Url(item.cacheKey, item.sanitizedKey, url);
+            cacheGetFileFromS3Url(item.cacheKey, url);
             item.resolve(url);
             unresolvedItems.delete(item);
           }
@@ -8218,7 +8226,7 @@ async function fetchFileFromS3WithRetry(originalName, cacheKey, sanitizedKey) {
       if (!fileURL) {
         throw new Error("File not found on S3");
       }
-      cacheGetFileFromS3Url(cacheKey, sanitizedKey, fileURL);
+      cacheGetFileFromS3Url(cacheKey, fileURL);
       return fileURL;
     } catch (error) {
       lastError = error;
@@ -8246,12 +8254,12 @@ async function getFileFromS3(fileName, highPriority=false) {
   if (!window.avtt_file_urls) {
     window.avtt_file_urls = {};
   } 
-  const cachedValue = window.avtt_file_urls[cacheKey] || (sanitizedKey ? window.avtt_file_urls[sanitizedKey] : undefined);
+  const cachedValue = window.avtt_file_urls[cacheKey] || undefined;
   if (cachedValue?.expire > Date.now()){
     return cachedValue.url;
   }
 
-  if (getFileFromS3Pending.has(cacheKey)) {
+  if (getFileFromS3Pending.has(cacheKey)) { 
 
     if (highPriority) {
       const i = getFileFromS3Queue.findIndex(item => item.cacheKey === cacheKey);
