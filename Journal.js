@@ -10,7 +10,6 @@ cached_journal_items = {};
 
 const AVTT_JOURNAL_CHUNK_SIZE = 100000;
 const AVTT_JOURNAL_CHUNK_STRATEGY = "chunked-json";
-
 function avttPromisifyIdbRequest(request) {
 	if (!request) {
 		return Promise.reject(new Error("Missing IDB request"));
@@ -336,13 +335,12 @@ class JournalManager{
 		});
 	}
 	
-	
-	
-	sync(){
-		let self=this;
-		const isAnyParentShared = function(chapter){
+
+	sync = mydebounce(() => {
+		let self = this;
+		const isAnyParentShared = function (chapter) {
 			let parentShared = false;
-			while (parentShared == false && chapter?.parentID != undefined){
+			while (parentShared == false && chapter?.parentID != undefined) {
 				const parentId = chapter.parentID;
 				chapter = self.chapters.find(d => d.id == parentId);
 				if (chapter?.shareWithPlayer)
@@ -350,25 +348,25 @@ class JournalManager{
 			}
 			return parentShared;
 		}
-		if(window.DM){
-			window.MB.sendMessage('custom/myVTT/JournalChapters',{
+		if (window.DM) {
+			window.MB.sendMessage('custom/myVTT/JournalChapters', {
 				chapters: self.chapters
 			});
 			let sendNotes = [];
-			
 
-			for(let i in self.notes){
+
+			for (let i in self.notes) {
 				const parentFolder = self.chapters.find(d => d.notes.includes(i));
-				if (self.notes[i].player || parentFolder?.shareWithPlayer || isAnyParentShared(parentFolder)){
+				if (self.notes[i].player || parentFolder?.shareWithPlayer || isAnyParentShared(parentFolder)) {
 					self.notes[i].id = i;
 					sendNotes.push(self.notes[i])
 				}
 			}
 
 			self.sendNotes(sendNotes)
-			
+
 		}
-	}
+	}, 5000);
 	sendNotes(sendNotes){
 
 		let self=this;
@@ -643,7 +641,7 @@ class JournalManager{
 
 			
 			filteredChapters.forEach(chapter => {
-				chapter.notes.forEach(note_id => {
+				chapter.notes.forEach(note_id => { 
 					if(!relevantNotes[note_id]){
 						relevantNotes[note_id] = self.notes[note_id];
 					}
@@ -656,14 +654,14 @@ class JournalManager{
 
 		for(let i=0; i<self.chapters.length;i++){
 			// Check if the chapter is in relevantChapters - if not, don't render it or any children of
-			if(relevantChapters.find(d => d.id == self.chapters[i].id)){
-		
-				if(!self.chapters[i].id){
-					self.chapters[i].id = uuid();
+			const currChapter = self.chapters[i];
+			if(relevantChapters.find(d => d.id == currChapter.id)){
+				if(!currChapter.id){
+					currChapter.id = uuid();
 				}
 				// A chapter title can be clicked to expand/collapse the chapter notes
 				let section_chapter=$(`
-					<div data-index='${i}' data-id='${self.chapters[i].id}' class='sidebar-list-item-row list-item-identifier folder ${self.chapters[i]?.collapsed ? 'collapsed' : ''}'></div>
+					<div data-index='${i}' data-id='${currChapter.id}' class='sidebar-list-item-row list-item-identifier folder ${currChapter?.collapsed ? 'collapsed' : ''}'></div>
 				`);
 
 				// Create a sortale list of notes
@@ -729,13 +727,13 @@ class JournalManager{
 								self.chapters.splice(new_index, 0, self.chapters.splice(old_index, 1)[0]);
 							}
 							else{
-								const old_index = self.chapters[i].notes.findIndex(function(note) {
+								const old_index = currChapter.notes.findIndex(function(note) {
 									return note == ui.item.attr('data-id')
 								});
 								// Find the new index of the dragged element
 								const new_index = ui.item.index();
 								// Move the dragged element to the new index
-								self.chapters[i].notes.splice(new_index, 0, self.chapters[i].notes.splice(old_index, 1)[0]);
+								currChapter.notes.splice(new_index, 0, currChapter.notes.splice(old_index, 1)[0]);
 							}
 							self.persist();
 							window.MB.sendMessage('custom/myVTT/JournalChapters',{
@@ -750,15 +748,15 @@ class JournalManager{
 					
 				let row_chapter_title=$("<div class='row-chapter'></div>");
 				
-				let prependIcon = (self.chapters[i].shareWithPlayer && window.DM) ? $(`<span class="material-symbols-outlined" style='font-size:12px; margin-right: 5px;'>share</span>`) : '';
+				let prependIcon = (currChapter.shareWithPlayer && window.DM) ? $(`<span class="material-symbols-outlined" style='font-size:12px; margin-right: 5px;'>share</span>`) : '';
 					
-				let chapter_title=$(`<div class='journal-chapter-title' title='${self.chapters[i].title}'/>`);
-				chapter_title.text(self.chapters[i].title);
+				let chapter_title=$(`<div class='journal-chapter-title' title='${currChapter.title}'/>`);
+				chapter_title.text(currChapter.title);
 
 				// If the user clicks the chapter title, expand/collapse the chapter notes
 				chapter_title.click(function(){
 					section_chapter.toggleClass('collapsed');
-					self.chapters[i].collapsed = !self.chapters[i].collapsed;
+					currChapter.collapsed = !currChapter.collapsed;
 					self.persist();
 				});
 				
@@ -781,7 +779,7 @@ class JournalManager{
 								player: false,
 								plain: ""
 							};
-							self.chapters[i].notes.push(new_noteid);
+							currChapter.notes.push(new_noteid);
 							window.MB.sendMessage('custom/myVTT/JournalChapters',{
 								chapters: self.chapters
 							});
@@ -813,6 +811,114 @@ class JournalManager{
 
 					input_add_note.focus();
 				});
+			
+
+				const dropboxOptions = dropBoxOptions(function (links) {
+					for (let j = 0; j < links.length; j++) {
+						const link = links[j].link;
+						const new_note_title = links[j].name;
+						const new_noteid = uuid();
+						self.notes[new_noteid] = {
+							title: new_note_title,
+							text: `<p><span class=\"journal-site-embed\">${link}</span><p>`,
+							player: false,
+							plain: `${link}`
+						};
+						currChapter.notes.push(new_noteid);
+					}
+					self.persist();
+					self.build_journal(searchText);
+				}, true, ['images', 'video', 'audio', 'document', 'text']);
+				const dropboxButton = createCustomDropboxChooser('', dropboxOptions);
+				dropboxButton.addClass('token-row-button');
+				
+
+				const avttFilePickerButton = createCustomAvttChooser('', async function (files) {
+					try {
+						if (!currChapter.id) {
+							currChapter.id = uuid();
+						}
+						
+						const processFilesAndFolders = async (fileList, parentChapterId) => {
+							const createdNoteIds = [];
+							
+							for (let j = 0; j < fileList.length; j++) {
+								const new_note_title = fileList[j].name;
+								
+								if(fileList[j].type == 'FOLDER'){
+									const newFolderID = uuid();
+									const newFolder = {
+										title: new_note_title,
+										collapsed: false,
+										notes: [],
+										parentID: parentChapterId,
+										id: newFolderID
+									};
+									self.chapters.push(newFolder);
+
+									try {
+										const folderContents = await self.avttJournalCollectAssets(fileList[j].path);
+										if(folderContents && folderContents.length > 0) {
+											await processFilesAndFolders(folderContents, newFolderID);
+										}
+									} catch (error) {
+										console.warn('Failed to load folder contents', fileList[j].path, error);
+									}
+									continue;
+								}
+								
+
+								const link = fileList[j].link;
+								const new_noteid = uuid();
+								self.notes[new_noteid] = {
+									title: new_note_title,
+									text: `<p><span class=\"journal-site-embed\">${link}</span><p>`,
+									player: false,
+									plain: `${link}`
+								};
+								createdNoteIds.push(new_noteid);
+							}
+							
+							const parentChapter = self.chapters.find(ch => ch.id === parentChapterId);
+							if(parentChapter) {
+								parentChapter.notes.push(...createdNoteIds);
+							}
+							
+							return createdNoteIds;
+						};
+						
+						await processFilesAndFolders(files, currChapter.id);
+						
+						self.persist();
+						self.build_journal(searchText);
+					} catch (error) {
+						console.error("Failed to import from AVTT File Picker selection", error);
+						alert(error?.message || "Failed to import selection from AVTT. See console for details.");
+					}
+				});
+				avttFilePickerButton.addClass('token-row-button');
+
+				const onedriveButton = createCustomOnedriveChooser('', function (links) {
+					for (let j = 0; j < links.length; j++) {
+						const link = links[j].link;
+						const new_note_title = links[j].name;
+						const new_noteid = uuid();
+						self.notes[new_noteid] = {
+							title: new_note_title,
+							text: `<p><span class=\"journal-site-embed\">${link}</span><p>`,
+							player: false,
+							plain: `${link}`
+						};
+						currChapter.notes.push(new_noteid);
+					}
+					self.persist();
+					self.build_journal(searchText);
+				}, 'multiple', ['files'])
+				onedriveButton.addClass('token-row-button');
+				
+				let addJournalMenu = $(`<div class='addTokenMenu'></div>`)
+				addJournalMenu.append(add_note_btn, dropboxButton, avttFilePickerButton, onedriveButton);
+				
 				let add_fold_btn=$("<button class='token-row-button'><span class='material-icons'>create_new_folder</span></button>");
 				add_fold_btn.click(function(){
 
@@ -865,7 +971,7 @@ class JournalManager{
 							
 							visibility_row.append(visibility_toggle)
 
-							visibility_toggle.prop("checked",(self.chapters[i]?.shareWithPlayer instanceof Array && self.chapters[i]?.shareWithPlayer.includes(`${window.playerUsers[j].userId}`)));
+							visibility_toggle.prop("checked",(currChapter?.shareWithPlayer instanceof Array && currChapter?.shareWithPlayer.includes(`${window.playerUsers[j].userId}`)));
 							
 							visibility_toggle.change(function(){
 								let sharedUsers = toggle_container.find(`input:checked:not([name='allPlayers'])`).toArray().map(d => d.name);
@@ -878,7 +984,7 @@ class JournalManager{
 						}
 					}
 
-					visibility_toggle.prop("checked",self.chapters[i].shareWithPlayer == true);
+					visibility_toggle.prop("checked",currChapter.shareWithPlayer == true);
 						
 					if(visibility_toggle.is(":checked"))
 						toggle_container.find(`input:not([name='allPlayers'])`).prop('disabled', true);
@@ -897,18 +1003,18 @@ class JournalManager{
 				
 				row_chapter_title.append(folderIcon, prependIcon, chapter_title);	
 				if(window.DM) {
-					row_chapter_title.append(add_note_btn, add_fold_btn, share_fold_btn);
+					row_chapter_title.append(addJournalMenu,add_fold_btn, share_fold_btn);
 				}	
 
 				let containsPlayerNotes = false;
-				for(let n=0; n<self.chapters[i].notes.length;n++){
-					let note_id=self.chapters[i].notes[n];
+				for(let n=0; n<currChapter.notes.length;n++){
+					let note_id=currChapter.notes[n];
 					if(self.notes[note_id]?.player == true || (self.notes[note_id]?.player instanceof Array && self.notes[note_id].player?.includes(`${window.myUser}`))){
 						containsPlayerNotes = true;
 						break;
 					} 
 				}
-				const sharedFolder = (self.chapters[i].shareWithPlayer == true || (self.chapters[i].shareWithPlayer instanceof Array && self.chapters[i].shareWithPlayer.includes(`${window.myUser}`)));
+				const sharedFolder = (currChapter.shareWithPlayer == true || (currChapter.shareWithPlayer instanceof Array && currChapter.shareWithPlayer.includes(`${window.myUser}`)));
 				section_chapter.toggleClass('shared-folder', sharedFolder);
 				if(window.DM || containsPlayerNotes || sharedFolder) {
 					section_chapter.append(row_chapter_title);
@@ -919,15 +1025,15 @@ class JournalManager{
 
 				let sharedParentFolder = false;
 
-				if(!self.chapters[i].parentID){
+				if(!currChapter.parentID){
 					chapter_list.append(section_chapter);
 				}
 				else{		
-					let parentFolder = chapter_list.find(`.folder[data-id='${self.chapters[i].parentID}']`);
-					let parentID = self.chapters[i]?.parentID
+					let parentFolder = chapter_list.find(`.folder[data-id='${currChapter.parentID}']`);
+					let parentID = currChapter?.parentID
 					sharedParentFolder = parentFolder.closest('.shared-folder').length>0;
-					if(self.chapters[i].id == self.chapters.filter(d => d.id == parentID)[0].parentID){
-						delete self.chapters[i].parentID
+					if(currChapter.id == self.chapters.filter(d => d.id == parentID)[0].parentID){
+						delete currChapter.parentID
 					}
 					if(parentFolder.length == 0){
 						self.chapters.splice(self.chapters.length-1, 0, self.chapters.splice(i, 1)[0]);
@@ -935,8 +1041,8 @@ class JournalManager{
 						continue;
 					}	
 					let containsPlayerNotes = false;
-					for(let n=0; n<self.chapters[i].notes.length;n++){
-						let note_id=self.chapters[i].notes[n];
+					for(let n=0; n<currChapter.notes.length;n++){
+						let note_id=currChapter.notes[n];
 						if(self.notes[note_id]?.player == true || (self.notes[note_id]?.player instanceof Array && self.notes[note_id]?.player.includes(`${window.myUser}`))){
 							containsPlayerNotes = true;
 						} 
@@ -958,15 +1064,15 @@ class JournalManager{
 				journalPanel.body.append(chapter_list);
 
 
-				for(let n=0; n<self.chapters[i].notes.length;n++){
+				for(let n=0; n<currChapter.notes.length;n++){
 
-					let note_id=self.chapters[i].notes[n];
+					let note_id=currChapter.notes[n];
 					
 					// Check if the note is in relevantNotes - if not, don't render it
 					if(! (note_id in self.notes && note_id in relevantNotes ))
 						continue;
 						
-					if( (! window.DM) && (!sharedParentFolder) && (self.notes[note_id]?.player == false || (self.notes[note_id]?.player instanceof Array && !self.notes[note_id]?.player.includes(`${window.myUser}`))) && !(self.chapters[i]?.shareWithPlayer == true || (self.chapters[i]?.shareWithPlayer instanceof Array && self.chapters[i]?.shareWithPlayer.includes(`${window.myUser}`))))
+					if( (! window.DM) && (!sharedParentFolder) && (self.notes[note_id]?.player == false || (self.notes[note_id]?.player instanceof Array && !self.notes[note_id]?.player.includes(`${window.myUser}`))) && !(currChapter?.shareWithPlayer == true || (currChapter?.shareWithPlayer instanceof Array && currChapter?.shareWithPlayer.includes(`${window.myUser}`))))
 						continue;
 					
 					let prependIcon = (self.notes[note_id].player && window.DM) ? $(`<span class="material-symbols-outlined" style='font-size:12px'>share</span>`) : '';
@@ -1235,18 +1341,18 @@ class JournalManager{
 
 		            let menuItems = {};
 
-		           	let i = window.JOURNAL.chapters.findIndex(d=>d.id==$(element).closest('[data-id]').attr('data-id'))
-							
+					let i = self.chapters.findIndex(d=>d.id==$(element).closest('[data-id]').attr('data-id'))
+					const currChapter = self.chapters[i];
 
 		            menuItems["rename"] = {
 		                name: "Rename",
 		                callback: function(itemKey, opt, originalEvent) {
-		                    let input_chapter_title=$(`<input type='text' class='input-add-chapter' value='${self.chapters[i].title}'>`);
+		                    let input_chapter_title=$(`<input type='text' class='input-add-chapter' value='${currChapter.title}'>`);
 	
 							input_chapter_title.keypress(function(e){
 								
 								if (e.which == 13 && input_chapter_title.val() !== "") {
-									self.chapters[i].title = input_chapter_title.val();
+									currChapter.title = input_chapter_title.val();
 									window.MB.sendMessage('custom/myVTT/JournalChapters',{
 										chapters: self.chapters
 									});
@@ -1300,9 +1406,10 @@ class JournalManager{
 
 
 	                            for(let i = 0; i<self.chapters.length; i++){
-	                                if(self.chapters[i].parentID == chapterId){
-	                                   exportNoteChapters(self.chapters[i].id, chaptertoExport);
-	                                   chaptertoExport.push(self.chapters[i]);
+									const currChapter = self.chapters[i];
+	                                if(currChapter.parentID == chapterId){
+	                                   exportNoteChapters(currChapter.id, chaptertoExport);
+	                                   chaptertoExport.push(currChapter);
 	                                }
 	                            }
 	                        };
@@ -1336,12 +1443,12 @@ class JournalManager{
 	                    callback: function(itemKey, opt, originalEvent) {
                         	if(confirm("Delete this chapter and all the contained notes?")){
                         		
-                        		for(let k=0;k<self.chapters[i].notes.length;k++){
-									let nid=self.chapters[i].notes[k];
+                        		for(let k=0;k<currChapter.notes.length;k++){
+									let nid=currChapter.notes[k];
 									delete self.notes[nid];
 								}
 								
-								self.chapters = self.chapters.filter(d => d.id != self.chapters[i].id)
+								self.chapters = self.chapters.filter(d => d.id != currChapter.id)
 								
 								$(element).closest('.folder').find('.folder').each(function(){
 									let folderId = $(this).attr('data-id');
@@ -1382,8 +1489,9 @@ class JournalManager{
 		            let menuItems = {};
 
 		           	let note_id = $(element).closest('[data-id]').attr('data-id');
-					let i = window.JOURNAL.chapters.findIndex(d=>d.id==$(element).closest('.folder[data-id]').attr('data-id'))
-					let note_index =window.JOURNAL.chapters[i].notes.indexOf(note_id)
+					let i = self.chapters.findIndex(d=>d.id==$(element).closest('.folder[data-id]').attr('data-id'));
+					const currChapter = self.chapters[i];
+					let note_index = currChapter.notes.indexOf(note_id)
 							
 
 		            menuItems["rename"] = {
@@ -1482,7 +1590,7 @@ class JournalManager{
 	                    callback: function(itemKey, opt, originalEvent) {
                         	if(confirm("Delete this note?")){
                         		console.log("deleting note_index"+note_index);
-                        		self.chapters[i].notes.splice(note_index,1);
+                        		currChapter.notes.splice(note_index,1);
                         		delete self.notes[note_id];
                         		self.build_journal(searchText);
                         		self.persist();
@@ -1504,6 +1612,74 @@ class JournalManager{
 		    });
 		}
 	}
+
+	addTrackedInputs(target, id = {noteId: undefined, token: undefined}){
+		let numberFound = target.attr('data-number');
+		const spellName = target.attr('data-spell');
+		const remainingText = target.hasClass('each') ? '' : `${spellName} slots remaining`
+		const {noteId, token} = id;
+
+		const track_ability = function (key, updatedValue) {
+			if(noteId != undefined){
+				if (window.JOURNAL.notes[noteId].abilityTracker === undefined) {
+					window.JOURNAL.notes[noteId].abilityTracker = {};
+				}
+				const asNumber = parseInt(updatedValue);
+				window.JOURNAL.notes[noteId].abilityTracker[key] = asNumber;
+				window.JOURNAL.persist();
+				debounceSendNote(noteId, window.JOURNAL.notes[noteId])
+			}
+			else if(token != undefined){
+				if (token.options.abilityTracker?.[spellName] >= 0) {
+					numberFound = token.options.abilityTracker[spellName]
+				} else {
+					token.track_ability(spellName, numberFound)
+				}
+				
+			}
+		}
+		if (noteId && window.JOURNAL.notes[noteId].abilityTracker?.[spellName] >= 0) {
+			numberFound = window.JOURNAL.notes[noteId].abilityTracker[spellName]
+		}
+		else if(token && token.options.abilityTracker?.[spellName] >= 0){
+			numberFound = token.options.abilityTracker[spellName]
+		}
+		else if(token){
+			token.track_ability(spellName, numberFound)
+		}
+		else {
+			track_ability(spellName, numberFound)
+		}
+		const trackerTarget = token || window.JOURNAL.notes[noteId];
+		const trackFunction = noteId ? track_ability : undefined;
+		let input = createCountTracker(trackerTarget, spellName, numberFound, remainingText, "", trackFunction);
+		const playerDisabled = target.hasClass('player-disabled');
+		if (!window.DM && playerDisabled) {
+			input.prop('disabled', true);
+		}
+		const partyLootTable = target.closest('.party-item-table');
+		if (partyLootTable.length > 0) {
+			if (partyLootTable.hasClass('shop') && numberFound > 0) {
+				target.closest('tr').find('td>.item-quantity-take-input').val(1);
+			}
+			else {
+				target.closest('tr').find('td>.item-quantity-take-input').val(numberFound);
+			}
+		}
+		target.find('p').remove();
+		target.after(input)
+
+		const parentLink = input.closest('a');
+		if (parentLink.length > 0) {
+			parentLink.on('click', function (e) {
+				if (e.target === input[0]) {
+					e.preventDefault();
+					e.stopPropagation();
+				}
+			});
+		};
+	}
+
 	
 	positionNotePins(id, note_text){
 		let pins = $(note_text).find(`.note-pin`);
@@ -1583,85 +1759,72 @@ class JournalManager{
 			$(this).on({
 					'mouseover': function(e){
 						hoverNoteTimer = setTimeout(function () {
-			            	build_and_display_sidebar_flyout(e.clientY, function (flyout) {
+			            	build_and_display_sidebar_flyout(e.clientY, async function (flyout) {
 					            flyout.addClass("prevent-sidebar-modal-close"); // clicking inside the tooltip should not close the sidebar modal that opened it
 					            flyout.addClass('note-flyout');
 					            const tooltipHtml = $(noteHover);
-								window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);	
+								await window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);
 								add_journal_roll_buttons(tooltipHtml);
 								window.JOURNAL.add_journal_tooltip_targets(tooltipHtml);
 								add_stat_block_hover(tooltipHtml);
 								add_aoe_statblock_click(tooltipHtml);
 
-								$(tooltipHtml).find('.add-input').each(function(){
-								    let numberFound = $(this).attr('data-number');
-								    const spellName = $(this).attr('data-spell');
-								    const remainingText = $(this).hasClass('each') ? '' : `${spellName} slots remaining`
-								    const track_ability = function(key, updatedValue){	    	
-										if (window.JOURNAL.notes[noteId].abilityTracker === undefined) {
-											window.JOURNAL.notes[noteId].abilityTracker = {};
-										}
-										const asNumber = parseInt(updatedValue); 
-										window.JOURNAL.notes[noteId].abilityTracker[key] = asNumber;
-										window.JOURNAL.persist();
-										debounceSendNote(noteId, window.JOURNAL.notes[noteId])
-							    	}
-								    if (window.JOURNAL.notes[noteId].abilityTracker?.[spellName]>= 0){
-							    		numberFound = window.JOURNAL.notes[noteId].abilityTracker[spellName]
-							    	} 
-							    	else{
-								    	track_ability(spellName, numberFound)
-								    }
+								$(tooltipHtml).find('.add-input').each(function(){window.JOURNAL.addTrackedInputs($(this), {noteId})})
+								flyout.append(tooltipHtml);
+								let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
+								sendToGamelogButton.css({ "float": "right" });
+								sendToGamelogButton.on("click", function (ce) {
+									ce.stopPropagation();
+									ce.preventDefault();
 
-								    let input = createCountTracker(window.JOURNAL.notes[noteId], spellName, numberFound, remainingText, "", track_ability);
-								    $(this).find('p').remove();
-								    $(this).after(input)
-							    })
-					            flyout.append(tooltipHtml);
-					            let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
-					            sendToGamelogButton.css({ "float": "right" });
-					            sendToGamelogButton.on("click", function(ce) {
-					                ce.stopPropagation();
-					                ce.preventDefault();
-									
-					                send_html_to_gamelog(noteHover);
-					            });
-					            let flyoutLeft = e.clientX+20
-					            if(flyoutLeft + 400 > window.innerWidth){
-					            	flyoutLeft = window.innerWidth - 420
-					            }
-					            flyout.css({
-					            	left: flyoutLeft,
-					            	width: '400px'
-					            })
+									send_html_to_gamelog(noteHover);
+								});
+								let flyoutLeft = e.clientX + 20
+								if (flyoutLeft + 400 > window.innerWidth) {
+									flyoutLeft = window.innerWidth - 420
+								}
+								flyout.css({
+									left: flyoutLeft,
+									width: '400px'
+								})
+								let flyoutTop = e.clientY;
+								let flyoutHeight = flyout.height() + 25;
+								let bottom = (e.clientY + flyoutHeight);
 
-					            const buttonFooter = $("<div></div>");
-					            buttonFooter.css({
-					                height: "40px",
-					                width: "100%",
-					                position: "relative",
-					                background: "#fff"
-					            });
-					            window.JOURNAL.block_send_to_buttons(flyout);
-					            flyout.append(buttonFooter);
-					            buttonFooter.append(sendToGamelogButton);
-					            flyout.find("a").attr("target","_blank");
-					      		flyout.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function(event){
+								if (bottom > window.innerHeight) {
+									flyoutTop = flyoutTop - (bottom - window.innerHeight) - 25;
+								}
+								flyout.css('top', flyoutTop);
+
+								const buttonFooter = $("<div></div>");
+								buttonFooter.css({
+									height: "40px",
+									width: "100%",
+									position: "relative",
+									background: "#fff"
+								});
+								window.JOURNAL.block_send_to_buttons(flyout);
+								flyout.append(buttonFooter);
+								buttonFooter.append(sendToGamelogButton);
+								flyout.find("a").attr("target", "_blank");
+								flyout.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function (event) {
 									event.preventDefault();
 									render_source_chapter_in_iframe(event.target.href);
 								});
+
+
+								flyout.hover(function (hoverEvent) {
+									if (hoverEvent.type === "mouseenter") {
+										clearTimeout(removeToolTipTimer);
+										removeToolTipTimer = undefined;
+									} else {
+										remove_tooltip(500);
+									}
+								});
+
+								flyout.css("background-color", "#fff");
 								
 
-					            flyout.hover(function (hoverEvent) {
-					                if (hoverEvent.type === "mouseenter") {
-					                    clearTimeout(removeToolTipTimer);
-					                    removeToolTipTimer = undefined;
-					                } else {
-					                    remove_tooltip(500);
-					                }
-					            });
-
-					            flyout.css("background-color", "#fff");
 					        });
 			        	}, 500);		
 					
@@ -1782,110 +1945,83 @@ class JournalManager{
 		}
 		note_text.append(self.notes[id].text); // valid tags are controlled by tinyMCE.init()
 		
-		this.translateHtmlAndBlocks(note_text, id);	
-		add_journal_roll_buttons(note_text);
-		this.add_journal_tooltip_targets(note_text);
-		this.block_send_to_buttons(note_text);
-		add_stat_block_hover(note_text);
-		add_aoe_statblock_click(note_text);
-		$(note_text).find('.add-input').each(function(){
-		    let numberFound = $(this).attr('data-number');
-		    const spellName = $(this).attr('data-spell');
-		    const remainingText = $(this).hasClass('each') ? '' : `${spellName} slots remaining`
-		    const track_ability = function(key, updatedValue){	    	
-				if (self.notes[id].abilityTracker === undefined) {
-					self.notes[id].abilityTracker = {};
-				}
-				const asNumber = parseInt(updatedValue); 
-				self.notes[id].abilityTracker[key] = asNumber;
-				window.JOURNAL.persist();
-				debounceSendNote(id, self.notes[id])
-	    	}
-		    if (self.notes[id].abilityTracker?.[spellName]>= 0){
-	    		numberFound = self.notes[id].abilityTracker[spellName]
-	    	} 
-	    	else{
-		    	track_ability(spellName, numberFound)
-		    }
+		this.translateHtmlAndBlocks(note_text, id).then(() => {
+			add_journal_roll_buttons(note_text);
+			this.add_journal_tooltip_targets(note_text);
+			this.block_send_to_buttons(note_text);
+			add_stat_block_hover(note_text);
+			add_aoe_statblock_click(note_text);
+			$(note_text).find('.add-input').each(function(){window.JOURNAL.addTrackedInputs($(this), {noteId: id})})
 
-		    let input = createCountTracker(self.notes[id], spellName, numberFound, remainingText, "", track_ability);
-		    $(this).find('p').remove();
-		    $(this).after(input)
-	    })
-		$(note_text).find('img[data-src*="above-bucket-not-a-url"]').each(async (index, image) => {
-			const src = await getAvttStorageUrl(image.getAttribute('data-src'), true);
-			image.src = src;
-			image.href = src;
-		})
-		if(!noteAlreadyOpen){
-			note.append(note_text);
-		}
-		note.find("a").attr("target","_blank");
-		if(!noteAlreadyOpen){
-			note.dialog({
-				draggable: true,
-				width: 860,
-				height: 600,
-				position:{
-				   my: "center",
-				   at: "center-200",
-				   of: window
-				},
-				close: function( event, ui ) {
-					$(this).remove();
+			if (!noteAlreadyOpen) {
+				note.append(note_text);
+			}
+			note.find("a").attr("target", "_blank");
+			if (!noteAlreadyOpen) {
+				note.dialog({
+					draggable: true,
+					width: 860,
+					height: 600,
+					position: {
+						my: "center",
+						at: "center-200",
+						of: window
+					},
+					close: function (event, ui) {
+						$(this).remove();
 					}
-				});	
-			$("[role='dialog']").draggable({
-				containment: "#windowContainment",
-				start: function () {
-					$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-					$("#sheet").append($('<div class="iframeResizeCover"></div>'));
-				},
-				stop: function () {
-					$('.iframeResizeCover').remove();			
-				}
-			});
-			$("[role='dialog']").resizable({
-				start: function () {
-					$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-					$("#sheet").append($('<div class="iframeResizeCover"></div>'));
-				},
-				stop: function () {
-					$('.iframeResizeCover').remove();			
-				}
-			});
+				});
+				$("[role='dialog']").draggable({
+					containment: "#windowContainment",
+					start: function () {
+						$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
+					},
+					stop: function () {
+						$('.iframeResizeCover').remove();
+					}
+				});
+				$("[role='dialog']").resizable({
+					start: function () {
+						$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
+					},
+					stop: function () {
+						$('.iframeResizeCover').remove();
+					}
+				});
 
-			note.parent().mousedown(function() {
-				frame_z_index_when_click($(this));
-			});		
-			let btn_popout=$(`<div class="popout-button journal-button"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"></path><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"></path></svg></div>"`);
-			note.parent().append(btn_popout);
-			btn_popout.click(function(){	
-				let uiId = $(this).siblings(".note").attr("id");
-				let journal_text = $(`#${uiId}.note .note-text`)
-				let title = self.notes[id]?.title?.trim() || $("#resizeDragMon .avtt-stat-block-container .mon-stat-block__name-link").text();
-				popoutWindow(title, note, journal_text.width(), journal_text.height());
-				removeFromPopoutWindow(title, ".visibility-container");
-				removeFromPopoutWindow(title, ".ui-resizable-handle");
-				$(window.childWindows[title].document).find("head").append(`<style id='noteStyles'>
+				note.parent().mousedown(function () {
+					frame_z_index_when_click($(this));
+				});
+				let btn_popout = $(`<div class="popout-button journal-button"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"></path><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"></path></svg></div>"`);
+				note.parent().append(btn_popout);
+				btn_popout.click(function () {
+					let uiId = $(this).siblings(".note").attr("id");
+					let journal_text = $(`#${uiId}.note .note-text`)
+					let title = self.notes[id]?.title?.trim() || $("#resizeDragMon .avtt-stat-block-container .mon-stat-block__name-link").text();
+					popoutWindow(title, note, journal_text.width(), journal_text.height());
+					removeFromPopoutWindow(title, ".visibility-container");
+					removeFromPopoutWindow(title, ".ui-resizable-handle");
+					$(window.childWindows[title].document).find("head").append(`<style id='noteStyles'>
 					body div.note[id^="ui-id"]{
 						height: 100% !important;
 					    max-height: 100% !important;
 					    overflow: auto !important;
 					}
 				</stlye>`);
-				if(!window.DM)
-					$(window.childWindows[title].document).find("body").addClass('body-rpgcharacter-sheet');
-				
-				$(this).siblings(".ui-dialog-titlebar").children(".ui-dialog-titlebar-close").click();
-			});
-			note.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function(event){
-				event.preventDefault();
-				render_source_chapter_in_iframe(event.target.href);
-			});
-			note.parent().css('height', '600px');
-		}
-		this.positionNotePins(id, note_text);
+					if (!window.DM)
+						$(window.childWindows[title].document).find("body").addClass('body-rpgcharacter-sheet');
+
+					$(this).siblings(".ui-dialog-titlebar").children(".ui-dialog-titlebar-close").click();
+				});
+				note.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function (event) {
+					event.preventDefault();
+					render_source_chapter_in_iframe(event.target.href);
+				});
+				note.parent().css('height', '600px');
+			}
+			this.positionNotePins(id, note_text);
+		});	
+		
 	}
 	add_journal_tooltip_targets(target){
 		$(target).find('.tooltip-hover').each(function(){
@@ -1929,61 +2065,71 @@ class JournalManager{
 					$(self).on({
 						'mouseover': function(e){
 							hoverNoteTimer = setTimeout(function () {
-				            	build_and_display_sidebar_flyout(e.clientY, function (flyout) {
+								build_and_display_sidebar_flyout(e.clientY, async function (flyout) {
 						            flyout.addClass("prevent-sidebar-modal-close"); // clicking inside the tooltip should not close the sidebar modal that opened it
 						            flyout.addClass('note-flyout');
 						            $(self).toggleClass('loading-tooltip', false);
 						            const tooltipHtml = $(noteHover);
-									window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);	
+									await window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);
 									add_journal_roll_buttons(tooltipHtml);
 									window.JOURNAL.add_journal_tooltip_targets(tooltipHtml);
 									add_stat_block_hover(tooltipHtml);
 									add_aoe_statblock_click(tooltipHtml);
-						            flyout.append(tooltipHtml);
-						            let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
-						            sendToGamelogButton.css({ "float": "right" });
-						            sendToGamelogButton.on("click", function(ce) {
-						                ce.stopPropagation();
-						                ce.preventDefault();
-										
-						                send_html_to_gamelog(noteHover);
-						            });
-						            let flyoutLeft = e.clientX+20
-						            if(flyoutLeft + 400 > window.innerWidth){
-						            	flyoutLeft = window.innerWidth - 420
-						            }
-						            flyout.css({
-						            	left: flyoutLeft,
-						            	width: '400px'
-						            })
+									flyout.append(tooltipHtml);
+									let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
+									sendToGamelogButton.css({ "float": "right" });
+									sendToGamelogButton.on("click", function (ce) {
+										ce.stopPropagation();
+										ce.preventDefault();
 
-						            const buttonFooter = $("<div></div>");
-						            buttonFooter.css({
-						                height: "40px",
-						                width: "100%",
-						                position: "relative",
-						                background: "#fff"
-						            });
-						            window.JOURNAL.block_send_to_buttons(flyout);
-						            flyout.append(buttonFooter);
-						            buttonFooter.append(sendToGamelogButton);
-						            flyout.find("a").attr("target","_blank");
-						      		flyout.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function(event){
+										send_html_to_gamelog(noteHover);
+									});
+									let flyoutLeft = e.clientX + 20
+									if (flyoutLeft + 400 > window.innerWidth) {
+										flyoutLeft = window.innerWidth - 420
+									}
+									flyout.css({
+										left: flyoutLeft,
+										width: '400px'
+									})
+									let flyoutTop = e.clientY;
+									let flyoutHeight = flyout.height() + 25;
+									let bottom = (e.clientY + flyoutHeight);
+
+									if (bottom > window.innerHeight) {
+										flyoutTop = flyoutTop - (bottom - window.innerHeight) - 25;
+									}
+									flyout.css('top', flyoutTop);
+
+									const buttonFooter = $("<div></div>");
+									buttonFooter.css({
+										height: "40px",
+										width: "100%",
+										position: "relative",
+										background: "#fff"
+									});
+									window.JOURNAL.block_send_to_buttons(flyout);
+									flyout.append(buttonFooter);
+									buttonFooter.append(sendToGamelogButton);
+									flyout.find("a").attr("target", "_blank");
+									flyout.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function (event) {
 										event.preventDefault();
 										render_source_chapter_in_iframe(event.target.href);
 									});
-									
 
-						            flyout.hover(function (hoverEvent) {
-						                if (hoverEvent.type === "mouseenter") {
-						                    clearTimeout(removeToolTipTimer);
-						                    removeToolTipTimer = undefined;
-						                } else {
-						                    remove_tooltip(500);
-						                }
-						            });
 
-						            flyout.css("background-color", "#fff");
+									flyout.hover(function (hoverEvent) {
+										if (hoverEvent.type === "mouseenter") {
+											clearTimeout(removeToolTipTimer);
+											removeToolTipTimer = undefined;
+										} else {
+											remove_tooltip(500);
+										}
+									});
+
+									flyout.css("background-color", "#fff");
+										
+
 						        });
 				        	}, 500);		
 						
@@ -2069,7 +2215,7 @@ class JournalManager{
 	    }
 	}
 	block_send_to_buttons(target){
-		const blocks = target.find('img:not(.mon-stat-block__separator-img), .text--quote-box, .rules-text, .block-torn-paper, .read-aloud-text')
+		const blocks = target.find('img:not(.mon-stat-block__separator-img), .text--quote-box, .rules-text, .block-torn-paper, .read-aloud-text, .dmScreenChunk')
 
 		const sendToGamelogButton = $('<button class="block-send-to-game-log"><span class="material-symbols-outlined">login</span></button>')
 		const container = $(`<div class='note-text' style='position:relative; width:'></div>`)
@@ -2078,7 +2224,7 @@ class JournalManager{
 
 	    const whisper_container=$("<div class='whisper-container'/>");
 
-        for(let i=0; i<window.playerUsers; i++){
+        for(let i=0; i<window.playerUsers.length; i++){
 			if(whisper_container.find(`input[name='${window.playerUsers[i].userId}']`).length == 0){
 				const randomId = uuid();
 				let whisper_toggle=$(`<input type='checkbox' name='${window.playerUsers[i].userId}'/>`);
@@ -2144,7 +2290,7 @@ class JournalManager{
        	
    		blocks.wrap(function(){
 			if(this instanceof HTMLImageElement){
-				container.css('width', 'fit-content');
+				container.css('min-width', 'fit-content');
 				$(this).attr('href', $(this).attr('src'));
 			}
 
@@ -2186,9 +2332,140 @@ class JournalManager{
         });
 	}
 
+	/**
+	 * Import files and folders from AVTT file picker into journal
+	 * Recursively processes folders and creates chapters with notes
+	 * @param {Array} files - Array of file/folder objects from AVTT file picker
+	 * @param {string} parentChapterId - Optional parent chapter ID, defaults to current chapter
+	 */
+	importFilesAndFolders = async function (files, parentChapterId = null) {
+		const self = this;
 
+		let targetParentId = parentChapterId;
+		if (!targetParentId) {
+			const importedFilesChapter = {
+				title: 'Imported Files',
+				collapsed: false,
+				notes: [],
+				id: uuid()
+			};
+			self.chapters.push(importedFilesChapter);
+			targetParentId = importedFilesChapter.id;
+		}
 
-    async translateHtmlAndBlocks(target, displayNoteId) {
+		const processFilesAndFolders = async (fileList, parentId) => {
+			const createdNoteIds = [];
+
+			for (let j = 0; j < fileList.length; j++) {
+				const file = fileList[j];
+				const new_note_title = file.name;
+
+				if (file.type === 'FOLDER') {
+					const newFolderID = uuid();
+					const newFolder = {
+						title: new_note_title,
+						collapsed: false,
+						notes: [],
+						parentID: parentId,
+						id: newFolderID
+					};
+					self.chapters.push(newFolder);
+
+					try {
+						const folderContents = await self.avttJournalCollectAssets(file.path);
+						if (folderContents && folderContents.length > 0) {
+							await processFilesAndFolders(folderContents, newFolderID);
+						}
+					} catch (error) {
+						console.warn('Failed to load folder contents', file.path, error);
+					}
+					continue;
+				}
+
+				const link = file.link;
+				const new_noteid = uuid();
+				self.notes[new_noteid] = {
+					title: new_note_title,
+					text: `<p><span class=\"journal-site-embed\">${link}</span><p>`,
+					player: false,
+					plain: `${link}`
+				};
+				createdNoteIds.push(new_noteid);
+			}
+
+			// Add all created note IDs to parent chapter
+			const parentChapter = self.chapters.find(ch => ch.id === parentId);
+			if (parentChapter) {
+				parentChapter.notes.push(...createdNoteIds);
+			}
+
+			return createdNoteIds;
+		};
+
+		await processFilesAndFolders(files, targetParentId);
+
+		self.persist();
+		self.build_journal();
+	}
+	avttJournalCollectAssets = async function (folderRelativePath) {
+		const normalizedBase = avttNormalizeRelativePath(folderRelativePath);
+		if (!normalizedBase) {
+			return [];
+		}
+		const immediateChildren = [];
+		let entries;
+		try {
+			entries = await avttGetFolderListingCached(normalizedBase);
+		} catch (error) {
+			console.warn('Failed to load AVTT journal folder listing', normalizedBase, error);
+			return [];
+		}
+		if (!Array.isArray(entries)) {
+			return [];
+		}
+		for (const entry of entries) {
+			const keyValue = typeof entry === 'string' ? entry : entry?.Key || entry?.key || '';
+			if (!keyValue) {
+				continue;
+			}
+			let relativeKey = keyValue;
+			if (typeof avttExtractRelativeKey === 'function') {
+				relativeKey = avttExtractRelativeKey(keyValue);
+			} else {
+				const prefix = `${window.PATREON_ID}/`;
+				relativeKey = keyValue.startsWith(prefix) ? keyValue.slice(prefix.length) : keyValue;
+			}
+			if (!relativeKey || !relativeKey.startsWith(normalizedBase)) {
+				continue;
+			}
+			const isFolder = relativeKey.endsWith('/');
+			const remainingPath = relativeKey.slice(normalizedBase.length).replace(/^\//, '').replace(/\/+$/, '');
+			if (!remainingPath) {
+				continue;
+			}
+			if (remainingPath.includes('/')) {
+				continue;
+			}
+			const link = `above-bucket-not-a-url/${window.PATREON_ID}/${relativeKey}`;
+			let displayName = "";
+			if (isFolder) {
+				const trimmed = relativeKey.replace(/\/+$/, "");
+				const folderName = trimmed.split("/").filter(Boolean).pop() || trimmed;
+				displayName = decodeURIComponent(folderName);
+			} else {
+				const fileName = relativeKey.split("/").filter(Boolean).pop() || relativeKey;
+				displayName = decodeURIComponent(fileName.replace(/\.[^.]+$/, ""));
+			}
+			immediateChildren.push({
+				link,
+				name: displayName,
+				path: relativeKey,
+				type: (isFolder ? "FOLDER" : "")
+			});
+		}
+		return immediateChildren;
+	}
+	async translateHtmlAndBlocks(target, displayNoteId, isStatBlock=true) {
     	let pastedButtons = target.find('.avtt-roll-button, [data-rolltype="recharge"], .integrated-dice__container, span[data-dicenotation]');
     	target.find('>style:first-of-type, >style#contentStyles').remove();
 		
@@ -2204,17 +2481,15 @@ class JournalManager{
 
 		const trackerSpans = target.find('.note-tracker');
 		for(let i=0; i<trackerSpans.length; i++){
-			$(trackerSpans[i]).replaceWith(`[track]${$(trackerSpans[i]).text()}[/track]`);
+			const currentSpan = $(trackerSpans[i]);
+			const trackText = `[track]${trackerSpans[i].innerHTML}[/track]`
+			currentSpan.html(trackText);
 		}
 		const embededIframes = target.find('iframe');
 		for(let i=0; i<embededIframes.length; i++){
-			embededIframes[i].setAttribute('allowfullscreen', '');
-			embededIframes[i].setAttribute('webkitallowfullscreen', '');
-			embededIframes[i].setAttribute('mozallowfullscreen', '');
-			embededIframes[i].src = `${window.EXTENSION_PATH}iframe.html?src=${encodeURIComponent(embededIframes[i].src)}`;
+			if(!embededIframes[i].src.startsWith(window.EXTENSION_PATH))
+				embededIframes[i].src = `${window.EXTENSION_PATH}iframe.html?src=${encodeURIComponent(embededIframes[i].src)}`;
 		}
-
-
 
 
 
@@ -2222,7 +2497,9 @@ class JournalManager{
 
     	let data = $(target).clone().html();
 
-
+		//remove DDB tags if loading from DDB data eg. on the DM Screen
+		data = data.replace(/\[rule\]|\[\/rule\]/gi, '');
+		data = data.replace(/\[condition\]|\[\/condition\]/gi, '');
 
 
         data = data.replace(/\[pin(.*?)\]([\s\S]+?)\[\/pin\]/gi, function(m, m1, m2){
@@ -2254,7 +2531,8 @@ class JournalManager{
         lines = lines.map((line, li) => {
             let input = line;
 
-            input = general_statblock_formating(input);
+			if(isStatBlock == true)
+            	input = general_statblock_formating(input);
         
             // Find cover rules
             input = input.replace(
@@ -2344,7 +2622,7 @@ class JournalManager{
             if (
                 spellcasting >= 0 &&
                 spellcasting < li &&
-                (input.match('At will:') ||
+                (input.match(/At will:/gi) ||
                     input.match(/Cantrips \(at will\):/gi) ||
                     input.match(/(\d+\/day( each)?|\d+\w+ level \(\d slots?\))\:/gi))
             ) {
@@ -2359,7 +2637,7 @@ class JournalManager{
                 	if(parts[i][p].match(/^((\s+?)?(<a|<span))/gi) && $(parts[i][p])?.is('a, span[data-spell]'))
                 		continue;
                 	parts[i][p] = parts[i][p].replace(/<(\/)?em>|<(\/)?b>|<(\/)?strong>/gi, '')
-                	let spellName = (parts[i][p].startsWith('<a')) ? $(parts[i][p]).text() : parts[i][p].replace(/<\/?p[a-zA-z'"0-9\s]+?>/g, '').replace(/\s?\[spell\]\s?|\s?\[\/spell\]\s?/g, '').replace('[/spell]', '').replace(/\s|&nbsp;/g, '');
+                	let spellName = (parts[i][p].match(/^<a|ignore-abovevtt-formating/gi)) ? $(parts[i][p]).text() : parts[i][p].replace(/<\/?p[a-zA-z'"0-9\s]+?>/g, '').replace(/\s?\[spell\]\s?|\s?\[\/spell\]\s?/g, '').replace('[/spell]', '').	replace(/\s|&nbsp;/g, '');
 
                    	if( !(parts[i][p].startsWith('<') || parts[i][p].startsWith('[spell]')) && parts[i][p] && typeof parts[i][p] === 'string') {
                         parts[i][p] = parts[i][p].split('<')[0]
@@ -2452,10 +2730,28 @@ class JournalManager{
                 return `<a class="tooltip-hover source-tooltip" href="${sourceUrl}" aria-haspopup="true" target="_blank">${source}</a>`
             })
 
-            input = input.replace(/\[track\]([a-zA-Z\s]+)([\d]+)\[\/track\]/g, function(m, m1, m2){
-                return `<span>${m1}</span><span class="add-input each" data-number="${m2}" data-spell="${m1}"></span>`
+            input = input.replace(/\[track\](.*?[a-zA-Z\s]+.*?[\d]+.*?)\[\/track\]/g, function(m, m1){
+				const currentSpan = $(`<div>${m1}</div>`);
+				currentSpan.find('a.ignore-abovevtt-formating, .ignore-abovevtt-formating:has(a)').removeClass('ignore-abovevtt-formating');
+				const trackText = currentSpan.text().replace(/([a-zA-Z\s]+)([\d]+)/gi, function(m, m1, m2){
+					return `<span>${m1}</span><span class="add-input each" data-number="${m2}" data-spell="${m1}"></span>`
+				})
+				const children = currentSpan.find('*');
+				if (children.length>0) {
+					currentSpan.contents().each(function () {
+						if (this.nodeType === 3) { // Text node
+							$(this).remove();
+						}
+					});
+					children.last().empty()
+					children.last().append(trackText);
+				}
+				else{
+					currentSpan.empty();
+					currentSpan.append(trackText);
+				}
+				return currentSpan[0].innerHTML;
             })		
-			
  
             input = input.replace(/\&nbsp\;/g, ' ');
             // Replace quotes to entity
@@ -2471,27 +2767,35 @@ class JournalManager{
 		let $newHTML = $(newHtml);
 		
 		
-		const aboveSrc = $newHTML.find(`[src*='above-bucket'], [href*='above-bucket']`);
+		const aboveSrc = $newHTML.find(`[src*='above-bucket']:not([src*='?src=above-bucket']), [href*='above-bucket']`);
 		for (let i = 0; i < aboveSrc.length; i++) {
 			const currTarget = aboveSrc[i];
-			const src = currTarget.src;
-			const href = currTarget.href;
-
+			const src = decodeURI(currTarget.src).replaceAll("’", "'");
+			const href = decodeURI(currTarget.href).replaceAll("’", "'");
 			if (src?.match(/.*?above-bucket-not-a-url\/(.*?)/gi)) {
 				let url = src.replace(/.*?above-bucket-not-a-url\/(.*?)/gi, '$1')
-				url = await getAvttStorageUrl(url);
-				$(currTarget).attr('src', url);
+				url = await getAvttStorageUrl(url, true);
+				if ($(currTarget).is('source') && $(currTarget).parent().is('video')) {
+					const parentVideo = $(currTarget).parent('video');
+					parentVideo.attr('src', url);
+					$(currTarget).remove();
+				}
+				else{
+					$(currTarget).attr('src', url);
+				}
+				
+				
 			}
 			else if (href?.match(/.*?above-bucket-not-a-url\/(.*?)/gi)) {
 				let url = href.replace(/.*?above-bucket-not-a-url\/(.*?)/gi, '$1')
-				url = await getAvttStorageUrl(url);
+				url = await getAvttStorageUrl(decodeURI(url), true);
 				$(currTarget).attr('href', url);
 			}
 		}
 
 		const iframes = $newHTML.find('.journal-site-embed')
 		for (let i = 0; i < iframes.length; i++) {
-			let url = $(iframes[i]).text();
+			let url = $(iframes[i]).text().replaceAll("’", "'");
 			if (url?.includes('dropbox.com')) {
 				url = url.replace('dl=0', 'raw=1')
 			}
@@ -2501,9 +2805,9 @@ class JournalManager{
 				url = url.replace("youtube.com", "youtube-nocookie.com");
 				url = url.replace(/watch\?v=(.*)/gi, 'embed/$1');
 			} else if (url?.startsWith('above-bucket-not-a-url')) {
-				url = await getAvttStorageUrl(url);
+				url = await getAvttStorageUrl(url, true);
 			}
-			encodeURI(url);
+			
 			const newFrame = $(`<iframe class='journal-site-embed'
 						src='${window.EXTENSION_PATH}iframe.html?src=${encodeURIComponent(url)}'
 						allowfullscreen
@@ -2511,12 +2815,236 @@ class JournalManager{
 						mozallowfullscreen></iframe>`)
 			$(iframes[i]).replaceWith(newFrame);
 		}
+		const avttIframes = $newHTML.find('iframe[src*="src=above-bucket-not-a-url"]');
+		for (let i = 0; i < avttIframes.length; i++) {
+			const currSrc = avttIframes[i].src.replaceAll("’", "'");
+			const urlParams = new URLSearchParams(currSrc.split('?')[1]);
+			const origSrc = urlParams.get('src');
+			const src = await getAvttStorageUrl(origSrc, true);
+			avttIframes[i].src = `${window.EXTENSION_PATH}iframe.html?src=${encodeURIComponent(src)}`;
+		}
+		const avttImages = $newHTML.find('img[data-src*="above-bucket-not-a-url"]')
+
+		for(let i = 0; i < avttImages.length; i++){
+			const dataSrc = avttImages[i].getAttribute('data-src').replaceAll("’", "'")
+			const src = await getAvttStorageUrl(dataSrc, true);
+			avttImages[i].src = src;
+			avttImages[i].href = src;
+		}
 	    $newHTML.find('.ignore-abovevtt-formating').each(function(index){
 			$(this).empty().append(ignoreFormatting[index].innerHTML);
 	    })
 
 
         $(target).html($newHTML);
+
+		const partyLootTable = $(target).find('.party-item-table');
+		for (let i = 0; i < partyLootTable.length; i++) {
+			const currTable = $(partyLootTable[i]);
+			const rows = currTable.find('tbody tr');
+			rows.each(function () {
+				
+				const link = $(this).find('.item-link-cell a');
+				const targetLink = link.length>0 ? link.attr('href') :
+									$(this).find('.item-link-cell')?.text();
+
+				const idNameMatch = targetLink?.match(/https.*\/(\d*?)\-(.*)?$/i);
+			
+				const itemId = link.length > 0 
+								? targetLink?.match(/\/(\d*?)\-.*?$/i)?.[1] 
+								: idNameMatch?.[1];
+
+				const name = link.length > 0
+								? link.text()
+									: idNameMatch?.[2].replace(/\-/g, ' ').replace(/\d+$/gi, '').trim();
+									
+				const quantityCell = $(this).find('.item-quantity-cell');
+				const quantity = parseInt($(this).find('.item-quantity-cell').text());
+				const itemAddCell = $(this).find('.item-add-cell');
+				if(!itemId){
+					$(this).find('.item-link-cell').html(targetLink);	
+					const currencies = ['cp','sp','ep','gp','pp'];
+					const data ={};
+					
+					for(const currency of currencies){
+						const currencyExists = targetLink?.toLowerCase()?.match(new RegExp(`([+-]?\\d+)([\\s]+)?${currency}([\\s,]?|$)`, 'i'))
+						if(currencyExists){
+							const amount = parseInt(currencyExists[1]);	
+							data[currency] = amount;
+						}
+					}
+					const descriptionCell = $(this).find('.item-description-cell');
+					
+					
+
+					
+					if(Object.keys(data).length == 0){
+						const descriptionText = descriptionCell.text();
+						const delimiters = /(notes:|cost:|weight:)/gi;
+						const splitDescription = descriptionText.split(delimiters).map(s => s.trim()).filter(s => s.length > 0);
+						const costIndex = splitDescription.findIndex(e => e.toLowerCase() == 'cost:');
+						const cost = (costIndex >= 0 && splitDescription.length > costIndex + 1) ? splitDescription[costIndex + 1] : null;
+						const weightIndex = splitDescription.findIndex(e => e.toLowerCase() == 'weight:');
+						const weight = (weightIndex >= 0 && splitDescription.length > weightIndex + 1) ? splitDescription[weightIndex + 1] : null;
+						const notesIndex = splitDescription.findIndex(e => e.toLowerCase() == 'notes:');
+						const notes = (notesIndex >= 0 && splitDescription.length > notesIndex + 1) ? splitDescription[notesIndex + 1] : null;		
+						
+						splitDescription.splice(Math.min(costIndex >= 0 ? costIndex : Infinity, weightIndex >= 0 ? weightIndex : Infinity, notesIndex >= 0 ? notesIndex : Infinity), splitDescription.length);
+						const description = splitDescription.join(' ').trim();
+						
+						const customItem = {
+							name: targetLink,
+							description,
+							cost,
+							weight,
+							notes
+						};
+						const button = $(`<button class="item-add-button ignore-abovevtt-formating" data-custom-item='${JSON.stringify(customItem)}' title="Add ${targetLink} to Party Loot">+</button>`);
+						itemAddCell.empty().append(button);
+					}
+					else {
+						descriptionCell.html('');
+						
+						const button = $(`<button class="item-add-button ignore-abovevtt-formating" data-currency='${JSON.stringify(data)}' title="Add ${targetLink} to Party Loot">+</button>`);
+						itemAddCell.empty().append(button);
+					}
+			
+				}
+				
+				if (itemId && window.ITEMS_CACHE) {
+					const itemData = find_items_in_cache_by_id_and_name([{ id:itemId, name }]);
+					if (itemData.length>0) {
+						const descriptionCell = $(this).find('.item-description-cell');
+						descriptionCell.html(itemData[0].description);
+						if(link.length == 0){
+							const itemLink = $(`<a href="${targetLink?.match(/https.*\/\d*?\-.*?$/i)?.[0]}" class='tooltip-hover no-border ignore-abovevtt-formating'>${itemData[0].name}</a>`);
+							$(this).find('.item-link-cell').empty().append(itemLink);
+						}
+						
+						
+						const button = $(`<button class="item-add-button ignore-abovevtt-formating" data-quantity="${quantity}" data-id="${itemId}" title="Add ${itemData[0].name} to Party Loot">+</button>`);
+						itemAddCell.empty().append(button);
+					}
+				}
+				quantityCell.html(`<span class="add-input player-disabled each" data-number="${quantity}" data-spell="${targetLink}"></span>`);
+				itemAddCell.append(`<input type="number" class="item-quantity-take-input" min="0" max="${quantity}" value="${quantity}" style="width: 50px; margin-left: 5px;" />`);
+			});
+		}
+		if (partyLootTable.length > 0){
+			if(partyLootTable.hasClass('shop')){
+				const ppSVG = `<span aria-label="Platinum" class="ct-currency-button__currency-item-preview"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="ddbc-svg  ddbc-ability-icon"><path d="m9.95662 3.30735c.16878-.19532.41258-.30735.66898-.30735h2.7488c.2564 0 .5002.11203.669.30735l5.7367 6.63816c.1418.16409.2199.37469.2199.59269v2.9236c0 .218-.0781.4286-.2199.5927l-5.7367 6.6382c-.1688.1953-.4126.3073-.669.3073h-2.7488c-.2564 0-.5002-.112-.66899-.3073l-5.73668-6.6382c-.14178-.1641-.21993-.3747-.21993-.5927v-2.9236c0-.218.07815-.4286.21993-.59269z" fill="#b5b5b5"></path><path d="m10.8356 18.1585-5.08818-5.8151c-.1595-.1823-.24742-.4162-.24742-.6585v1c0 .2423.08792.4762.24742.6585l5.08818 5.8151c.1899.217.4642.3415.7526.3415h.8236c.2884 0 .5627-.1245.7526-.3415l5.0882-5.8151c.1595-.1823.2474-.4162.2474-.6585v-1c0 .2423-.0879.4762-.2474.6585l-5.0882 5.8151c-.1899.217-.4642.3415-.7526.3415h-.8236c-.2884 0-.5627-.1245-.7526-.3415z" fill="#a3a3a3"></path><path clip-rule="evenodd" d="m11.5882 4.5c-.2884 0-.5627.12448-.7526.34149l-5.08818 5.81511c-.1595.1823-.24742.4163-.24742.6585v1.3698c0 .2422.08792.4762.24742.6585l5.08818 5.8151c.1899.217.4642.3415.7526.3415h.8236c.2884 0 .5627-.1245.7526-.3415l5.0882-5.8151c.1595-.1823.2474-.4163.2474-.6585v-1.3698c0-.2423-.0879-.4762-.2474-.6585l-5.0882-5.8151c-.1899-.21702-.4642-.3415-.7526-.3415zm-1.1344-2.5c-.2884 0-.56272.12448-.75261.34149l-6.45377 7.37574c-.1595.18229-.24742.41627-.24742.65847v3.2486c0 .2422.08792.4762.24742.6585l6.45377 7.3757c.18989.217.46421.3415.75261.3415h3.0924c.2884 0 .5627-.1245.7526-.3415l6.4538-7.3757c.1595-.1823.2474-.4163.2474-.6585v-3.2486c0-.2422-.0879-.47618-.2474-.65847l-6.4538-7.37573c-.1899-.21702-.4642-.3415-.7526-.3415z" fill="#949494" fill-rule="evenodd"></path><path d="m10.2929 9.12132c-.39053-.39052-.39053-1.02369 0-1.41421l1.2463-1.41422c.3905-.39052 1.0237-.39052 1.4142 0l3.6679 4.29291c.3905.3905.3905 1.0237 0 1.4142l-1.4142 1.4142c-.3905.3905-1.0237.3905-1.4142 0z" fill="#dcdcdc"></path><path d="m8.34764 10.2442c.42128-.36072 1.05967-.31674 1.42589.0983l1.25207 1.3511c.3662.415.3216 1.0439-.0997 1.4046-.4213.3608-1.05969.3168-1.4259-.0982l-1.25207-1.3511c-.36621-.415-.32157-1.0439.09971-1.4047z" fill="#ccc"></path><path d="m11.9999 2.47315c.3413-.26295 1.5-.37315 2 .02685l4 4.5c.3662.37344.3216.93932-.0997 1.26394s-1.0597.28505-1.4259-.08838c0 0-2.74-3.30604-3.5744-3.98415-.3682-.29925-.7065-.1553-.9997-.45432-.2932-.29901-.2416-1.00098.0997-1.26394z" fill="#ccc"></path><circle cx="18.6001" cy="9.25" fill="#b5b5b5" r="1"></circle></svg></span>`;
+				const gpSVG = `<span aria-label="Gold" class="ct-currency-button__currency-item-preview"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="ddbc-svg  ddbc-ability-icon"><path d="m4 4.5c0-.27615.22385-.5.5-.5h15c.2761 0 .5.22385.5.5v1c0 .27615-.2239.5-.5.5 0 0-2 2.32653-2 6 0 3.6735 2 6 2 6 .2761 0 .5.2239.5.5v1c0 .2761-.2239.5-.5.5h-15c-.27615 0-.5-.2239-.5-.5v-1c0-.2761.22385-.5.5-.5 0 0 2-1.8673 2-6 0-4.13265-2-6-2-6-.27615 0-.5-.22385-.5-.5z" fill="#dd970e"></path><path d="m9.99993 12c0-.6216-.03345-1.2128-.09414-1.7735l4.11311 1.0283c-.002.04-.0039.0802-.0056.1205l-4.07254 2.0363c.03844-.4517.05917-.9222.05917-1.4116z" fill="#eca825"></path><path d="m9.79321 14.6034 4.21509-2.1076c.0516 1.5192.3351 2.8657.7046 4.0042h-5.36158c.17845-.5819.33016-1.214.44189-1.8966z" fill="#eca825"></path><path d="m14.0189 11.2548-4.11311-1.0283c-.10897-1.00676-.30575-1.91549-.55447-2.7265h5.36158c-.3492 1.07581-.6215 2.3373-.694 3.7548z" fill="#ffb72c"></path><path d="m6.26343 5.5h11.54557c-.1777.29323-.3708.64106-.5624 1.0399-.0702.14609-.1404.29953-.2097.4601h-9.99142c-.10248-.24281-.20889-.47037-.31689-.68278-.15543-.30571-.31301-.57786-.46516-.81722z" fill="#eca825"></path><path clip-rule="evenodd" d="m17.8089 5.5h-11.54556c.15215.23936.30973.51151.46516.81722.66607 1.31004 1.2715 3.19617 1.2715 5.68278 0 2.4866-.60543 4.3727-1.2715 5.6828-.15543.3057-.31301.5778-.46516.8172h11.54556c-.1777-.2932-.3708-.6411-.5624-1.0399-.6216-1.2941-1.2465-3.1649-1.2465-5.4601 0-2.29517.6249-4.166 1.2465-5.4601.1916-.39884.3847-.74667.5624-1.0399zm2.6911 12.5s-2-2.3265-2-6c0-3.67347 2-6 2-6 .2761 0 .5-.22385.5-.5v-2c0-.27615-.2239-.5-.5-.5h-17c-.27615 0-.5.22385-.5.5v2c0 .27615.22385.5.5.5 0 0 2 1.86735 2 6 0 4.1327-2 6-2 6-.27615 0-.5.2239-.5.5v2c0 .2761.22385.5.5.5h17c.2761 0 .5-.2239.5-.5v-2c0-.2761-.2239-.5-.5-.5z" fill="#c78727" fill-rule="evenodd"></path><path d="m8 4.25c0-.41421.33579-.75.75-.75h11c.4142 0 .75.33579.75.75s-.3358.75-.75.75h-11c-.41421 0-.75-.33579-.75-.75z" fill="#ffb72c"></path><circle cx="6.75" cy="4.25" fill="#eca825" r=".75"></circle></svg></span>`;
+				const epSVG = `<span aria-label="Electrum" class="ct-currency-button__currency-item-preview"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="ddbc-svg  ddbc-ability-icon"><path clip-rule="evenodd" d="m7.32745 3c-.42911 0-.84556.13554-1.16546.42156-1.20722 1.07938-4.16199 4.17139-4.16199 8.57844 0 4.407 2.95477 7.4991 4.16199 8.5784.3199.2861.73635.4216 1.16547.4216h9.34504c.4292 0 .8456-.1355 1.1655-.4216 1.2072-1.0793 4.162-4.1714 4.162-8.5784 0-4.40704-2.9548-7.49906-4.162-8.57844-.3199-.28602-.7363-.42156-1.1655-.42156zm4.67255 14.25c.6904 0 1.25-.5596 1.25-1.25s-.5596-1.25-1.25-1.25-1.25.5596-1.25 1.25.5596 1.25 1.25 1.25z" fill="#8a9eac" fill-rule="evenodd"></path><path d="m7.03711 16.9284c.34586.3796.84504.5716 1.35854.5716h7.20875c.5134 0 1.0126-.192 1.3585-.5716 1.0485-1.1506 2.3552-3.0498 2.5198-5.4284.0114.1644.0173.3311.0173.5 0 2.6125-1.4162 4.6983-2.5371 5.9284-.3459.3796-.845.5716-1.3585.5716h-7.20875c-.5135 0-1.01268-.192-1.35854-.5716-1.12095-1.2301-2.53711-3.3159-2.53711-5.9284 0-.1689.00592-.3356.01729-.5.16458 2.3786 1.47133 4.2778 2.51982 5.4284z" fill="#6d7f8c"></path><path d="m14.7246 16.375c-.1829 1.3414-1.333 2.375-2.7246 2.375s-2.54175-1.0336-2.72465-2.375c-.01671.1226-.02535.2478-.02535.375 0 1.5188 1.2312 2.75 2.75 2.75s2.75-1.2312 2.75-2.75c0-.1272-.0086-.2524-.0254-.375z" fill="#6d7f8c"></path><path clip-rule="evenodd" d="m14.75 16c0 1.5188-1.2312 2.75-2.75 2.75s-2.75-1.2312-2.75-2.75 1.2312-2.75 2.75-2.75 2.75 1.2312 2.75 2.75zm-2.75 1.25c.6904 0 1.25-.5596 1.25-1.25s-.5596-1.25-1.25-1.25-1.25.5596-1.25 1.25.5596 1.25 1.25 1.25z" fill="#7c8d99" fill-rule="evenodd"></path><circle cx="12" cy="16" fill="#8697a3" fill-opacity=".5" r="1.25"></circle><path clip-rule="evenodd" d="m8.39565 5.5c-.5135 0-1.01268.19203-1.35854.57159-1.12095 1.23016-2.53711 3.31587-2.53711 5.92841 0 2.6125 1.41616 4.6983 2.53711 5.9284.34586.3796.84504.5716 1.35854.5716h7.20875c.5135 0 1.0126-.192 1.3585-.5716 1.1209-1.2301 2.5371-3.3159 2.5371-5.9284 0-2.61254-1.4162-4.69825-2.5371-5.92841-.3459-.37956-.8451-.57159-1.3585-.57159zm-1.0682-2.5c-.42911 0-.84556.13554-1.16546.42156-1.20722 1.07938-4.16199 4.17139-4.16199 8.57844 0 4.407 2.95477 7.4991 4.16199 8.5784.3199.2861.73635.4216 1.16547.4216h9.34504c.4292 0 .8456-.1355 1.1655-.4216 1.2072-1.0793 4.162-4.1714 4.162-8.5784 0-4.40704-2.9548-7.49906-4.162-8.57844-.3199-.28602-.7363-.42156-1.1655-.42156z" fill="#7c8d99" fill-rule="evenodd"></path><path d="m9.75003 9.13768c.23943.5003.03173 1.10552-.46392 1.35192l-1.62912.8597c-.49566.2463-1.09156.0404-1.33099-.4599s-.03173-1.10555.46392-1.35187l1.62912-.85971c.49566-.24633 1.09156-.04044 1.33099.45986z" fill="#7c8d99"></path><path d="m10 8c0-1.10457.8954-2 2-2h3c1.6569 0 3 1.34315 3 3v1c0 1.1046-.8954 2-2 2h-4c-1.1046 0-2-.8954-2-2z" fill="#9fb3c0"></path><path clip-rule="evenodd" d="m11.8507 3.53389c-.4997.02746-.8798.4106-.8489.85577.0308.44514.4608.78374.9604.75632l.0092-.00049.0303-.00157c.027-.00137.0673-.00336.1193-.00575.1039-.0048.6517.00093.6517.00093l1.3785-.02395s1.0448.01588 1.4768.05451c.2164.01934.3931.04327.5261.07005.1131.02275.1591.04034.1591.04034.8407.47238 1.3364 1.1415 1.969 2.07148.3071.45151.5537.87024.7234 1.17593.0846.15247.1495.27584.1927.35991.0216.04201.0377.07413.0481.09509l.0113.02287.0023.00484c.1974.40967.7304.60007 1.1904.42444.4601-.1757.6733-.65045.4761-1.0604l-.0008-.00162-.0014-.0028-.0044-.00908-.0156-.03164c-.0133-.02693-.0326-.06533-.0576-.1139-.0499-.0971-.1225-.23511-.216-.40351-.1865-.33604-.4578-.797-.7981-1.29727-.6596-.96959-1.3422-1.92667-2.5695-2.61007-.2296-.12785-.4955-.197-.7095-.24006-.2307-.04644-.4866-.07863-.7446-.10169-.5167-.04619-1.6535-.06257-1.6535-.06257s-1.0706.0119-1.4533.02517c-.1918.00665-.5643-.0051-.6749 0-.0553.00255-.0988.00469-.1288.00622l-.0347.00179z" fill="#9fb3c0" fill-rule="evenodd"></path><circle cx="9.75" cy="4.25" fill="#8a9eac" r=".75"></circle></svg></span>`;
+				const spSVG = `<span aria-label="Silver" class="ct-currency-button__currency-item-preview"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="ddbc-svg  ddbc-ability-icon"><path clip-rule="evenodd" d="m2.49372 21c-.3779 0-.61528-.4138-.42875-.7473l9.50623-16.99932c.189-.33784.6686-.33784.8576 0l9.5062 16.99932c.1866.3335-.0508.7473-.4287.7473zm9.50628-5c.6904 0 1.25-.5596 1.25-1.25s-.5596-1.25-1.25-1.25-1.25.5596-1.25 1.25.5596 1.25 1.25 1.25z" fill="#a59e98" fill-rule="evenodd"></path><path clip-rule="evenodd" d="m2.06497 20.2527c-.18653.3335.05085.7473.42875.7473h19.01258c.3779 0 .6153-.4138.4287-.7473l-9.5062-16.99932c-.189-.33784-.6686-.33784-.8576 0zm10.15323-12.30742c-.0954-.17063-.341-.17063-.4364 0l-5.69332 10.18092c-.09319.1666.02727.372.21819.372h11.38663c.191 0 .3114-.2054.2182-.372z" fill="#99938d" fill-rule="evenodd"></path><path d="m12 17.25c1.3807 0 2.5-1.1193 2.5-2.5 0-.1714-.0173-.3388-.0501-.5005.1919.3752.3001.8002.3001 1.2505 0 1.5188-1.2312 2.75-2.75 2.75s-2.75-1.2312-2.75-2.75c0-.4503.10824-.8753.30011-1.2505-.03286.1617-.05011.3291-.05011.5005 0 1.3807 1.1193 2.5 2.5 2.5z" fill="#857d76"></path><circle cx="12" cy="14.75" fill="#a59e98" fill-opacity=".5" r="1.25"></circle><path d="m11.7819 7.94529c.0954-.17064.341-.17064.4364 0l5.6933 10.18091c.0932.1666-.0273.372-.2182.372h-.133l-5.3421-9.55291c-.0954-.17064-.341-.17064-.4364 0l-5.34216 9.55291h-.13298c-.19093 0-.31139-.2054-.2182-.372z" fill="#b5ada7"></path><path d="m11.6724 11.3586c-.2371-.4211.1496-1.88397.5707-2.12106.1389-.07818.7171.84136.9542 1.26246l.5249 1.1414c.2371.4211.0879.9547-.3331 1.1918-.4211.2371-.9547.0879-1.1918-.3332z" fill="#b5ada7"></path><path d="m11.4292 5.62102c-.2371-.42109.1496-1.88394.5707-2.12103.1389-.07818.7172.84137.9542 1.26246l3.0664 5.44615c.2371.4211.0879.9546-.3332 1.1917s-.9547.0879-1.1917-.3332z" fill="#cec6bf"></path></svg></span>`;
+				const cpSVG = `<span aria-label="Copper" class="ct-currency-button__currency-item-preview"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="ddbc-svg  ddbc-ability-icon"><path clip-rule="evenodd" d="m6.41421 3c-.26521 0-.51957.10536-.7071.29289l-2.41422 2.41422c-.18753.18753-.29289.44189-.29289.7071v11.17159c0 .2652.10536.5196.29289.7071l2.41422 2.4142c.18753.1875.44189.2929.7071.2929h11.17159c.2652 0 .5196-.1054.7071-.2929l2.4142-2.4142c.1875-.1875.2929-.4419.2929-.7071v-11.17159c0-.26521-.1054-.51957-.2929-.7071l-2.4142-2.41422c-.1875-.18753-.4419-.29289-.7071-.29289zm5.58579 10.5c.8284 0 1.5-.6716 1.5-1.5s-.6716-1.5-1.5-1.5-1.5.6716-1.5 1.5.6716 1.5 1.5 1.5z" fill="#ab6e57" fill-rule="evenodd"></path><path d="m10 9c0-1.10457.8954-2 2-2h4c1.1046 0 2 .89543 2 2v1c0 1.1046-.8954 2-2 2h-1c0-1.6569-1.3431-3-3-3-.7684 0-1.4692.28885-2 .76389z" fill="#c2866f"></path><path d="m17.7071 7.94975-.6568-.65686c-.1876-.18753-.4419-.29289-.7072-.29289h-8.68625c-.26521 0-.51957.10536-.7071.29289l-.65686.65686c-.18753.18753-.29289.44189-.29289.7071v-1c0-.26521.10536-.51957.29289-.7071l.65686-.65686c.18753-.18753.44189-.29289.7071-.29289h8.68625c.2653 0 .5196.10536.7072.29289l.6568.65686c.1875.18753.2929.44189.2929.7071v1c0-.26521-.1054-.51957-.2929-.7071z" fill="#9f6854"></path><path d="m14.9585 12.5c-.238 1.4189-1.472 2.5-2.9585 2.5s-2.72048-1.0811-2.95852-2.5c-.02728.1626-.04148.3296-.04148.5 0 1.6569 1.3431 3 3 3s3-1.3431 3-3c0-.1704-.0142-.3374-.0415-.5z" fill="#9f6854"></path><g fill="#c2866f"><path clip-rule="evenodd" d="m15 12c0 1.6569-1.3431 3-3 3s-3-1.3431-3-3 1.3431-3 3-3 3 1.3431 3 3zm-3 1.5c.8284 0 1.5-.6716 1.5-1.5s-.6716-1.5-1.5-1.5-1.5.6716-1.5 1.5.6716 1.5 1.5 1.5z" fill-rule="evenodd"></path><circle cx="12" cy="12" fill-opacity=".5" r="1.5"></circle><path clip-rule="evenodd" d="m6.29289 6.94975c-.18753.18753-.29289.44189-.29289.7071v8.68625c0 .2653.10536.5196.29289.7072l.65686.6568c.18753.1875.44189.2929.7071.2929h8.68625c.2653 0 .5196-.1054.7072-.2929l.6568-.6568c.1875-.1876.2929-.4419.2929-.7072v-8.68625c0-.26521-.1054-.51957-.2929-.7071l-.6568-.65686c-.1876-.18753-.4419-.29289-.7072-.29289h-8.68625c-.26521 0-.51957.10536-.7071.29289zm.12132-3.94975c-.26521 0-.51957.10536-.7071.29289l-2.41422 2.41422c-.18753.18753-.29289.44189-.29289.7071v11.17159c0 .2652.10536.5196.29289.7071l2.41422 2.4142c.18753.1875.44189.2929.7071.2929h11.17159c.2652 0 .5196-.1054.7071-.2929l2.4142-2.4142c.1875-.1875.2929-.4419.2929-.7071v-11.17159c0-.26521-.1054-.51957-.2929-.7071l-2.4142-2.41422c-.1875-.18753-.4419-.29289-.7071-.29289z" fill-rule="evenodd"></path></g><path clip-rule="evenodd" d="m10.125 4.5c0-.48325.3918-.875.875-.875h6.0858c.4973 0 .9742.19754 1.3258.54917l1.4142 1.41422c.3517.35163.5492.82854.5492 1.32582v3.58579c0 .4832-.3918.875-.875.875s-.875-.3918-.875-.875v-3.58579c0-.03315-.0132-.06494-.0366-.08838l-1.4142-1.41422c-.0235-.02344-.0553-.03661-.0884-.03661h-6.0858c-.4832 0-.875-.39175-.875-.875z" fill="#e6a58c" fill-rule="evenodd"></path><circle cx="8.375" cy="4.47501" fill="#e5a48c" r=".875"></circle></svg></span>`;
+				const partyCurrency = window.PARTY_INVENTORY_DATA?.currency ? window.PARTY_INVENTORY_DATA.currency : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
+				const currencyString = `Party Currency: ${partyCurrency.pp != 0 ? `${partyCurrency.pp}${ppSVG} ` : ''}${partyCurrency.gp != 0 ? `${partyCurrency.gp}${gpSVG} ` : ''}${partyCurrency.ep != 0 ? `${partyCurrency.ep}${epSVG} ` : ''}${partyCurrency.sp != 0 ? `${partyCurrency.sp}${spSVG} ` : ''}${partyCurrency.cp != 0 ? `${partyCurrency.cp}${cpSVG} ` : ''}`;
+				const currencyHeader = $(`<div class='party-currency ignore-abovevtt-formating' style="margin-bottom: 10px; font-weight: bold;">${currencyString}</div>`);
+				partyLootTable.before(currencyHeader);
+			}
+			
+
+			const addAllButton = $(`<button class="item-add-all-button ignore-abovevtt-formating" title="Add All Items to Party Loot">Add All</button>`);
+			partyLootTable.find('>thead>tr>th:last-of-type').append(addAllButton);
+
+			$(target).off('click.addPartyLootItem').on('click.addPartyLootItem', '.item-add-button', function (e) {
+				e.preventDefault();
+				e.stopPropagation();
+				const quantityInput = $(this).closest('tr').find('td.item-quantity-cell>input');
+				const takeInput = $(this).closest('tr').find('td>input.item-quantity-take-input');
+				const currQuantity = parseInt(quantityInput.val());
+				const quantity = parseInt(takeInput.val());
+				if (isNaN(quantity) || quantity <= 0) {
+					return;
+				}
+				const newQuantity = currQuantity - quantity;
+				quantityInput.val(newQuantity);
+				quantityInput.trigger('change');
+				if (quantity > newQuantity){
+					takeInput.val(newQuantity);
+				}
+				const costCell = $(this).closest('tr').find('td.item-cost-cell');
+				
+				if(costCell.length > 0){
+					const costData = {};
+					const currencies = ['cp', 'sp', 'ep', 'gp', 'pp'];
+					const costText = costCell.text().toLowerCase();
+					for (const currency of currencies) {
+						const currencyExists = costText.match(new RegExp(`([+-]?\\d+)([\\s]+)?${currency}([\\s,]?|$)`, 'i'))
+						if (currencyExists) {
+							const amount = parseInt(currencyExists[1]);
+							costData[currency] = -amount * quantity;
+						}
+					}
+					window.partyInventoryQueue.addToQueue({
+						type: 'currency',
+						data: costData,
+					});
+				}
+					
+				takeInput.attr('max', Math.max(0, newQuantity));
+				const currencyMatch = $(this).data('currency');
+				if(currencyMatch){
+					const currencyData = currencyMatch;	
+					for(let i = 1; i<=quantity; i++){
+						window.partyInventoryQueue.addToQueue({
+							type: 'currency',
+							data: currencyData,
+						});
+					}
+					return;
+				}
+				const customItemMatch = $(this).data('custom-item');
+				if(customItemMatch){
+					const customItemData = customItemMatch;
+					customItemData.quantity = quantity;
+					window.partyInventoryQueue.addToQueue({
+						type: 'customItem',
+						data: customItemData
+					});
+					return;
+				}
+				const id = $(this).data('id');
+				const name = $(this).closest('tr').find('.item-link-cell a').text();
+				
+				const itemData = find_items_in_cache_by_id_and_name([{id, name}]);
+				
+				console.log(`[PartyLoot] Adding ${quantity} of item ${name} to queue`);
+				
+				if (quantity > 10){
+	
+					let remaining = quantity;
+					while(remaining > 0) {
+						const batchSize = Math.min(10, remaining);
+						window.partyInventoryQueue.addToQueue({
+							type: 'items',
+							data: [{
+								...itemData[0],
+								quantity: batchSize
+							}]
+						});
+						console.log(`[PartyLoot] Queued batch of ${batchSize} items`);
+						remaining -= batchSize;
+					}
+				} else {
+					itemData[0].quantity = quantity;
+					window.partyInventoryQueue.addToQueue({
+						type: 'items',
+						data: itemData
+					});
+					console.log(`[PartyLoot] Queued single batch of ${quantity} items`);
+				}
+			});
+			$(target).off('click.addAllPartyLootItem').on('click.addAllPartyLootItem', '.item-add-all-button', function (e) {
+				e.preventDefault();
+				e.stopPropagation();
+				const table = $(this).closest('table');
+				table.find('.item-add-button').each(function(index){
+					$(this).click();					
+				});
+			});
+		}
+
     }
 	
 	note_visibility(id,visibility){
@@ -2537,7 +3065,25 @@ class JournalManager{
 			$(this).closest(".note")?.dialog("close");
 		});
 	}
-
+	update_party_available_currency(){
+		const partyLootTable = $('.note-text .party-item-table');
+		if (partyLootTable.length > 0) {
+			if (partyLootTable.hasClass('shop')) {
+				const ppSVG = `<span aria-label="Platinum" class="ct-currency-button__currency-item-preview"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="ddbc-svg  ddbc-ability-icon"><path d="m9.95662 3.30735c.16878-.19532.41258-.30735.66898-.30735h2.7488c.2564 0 .5002.11203.669.30735l5.7367 6.63816c.1418.16409.2199.37469.2199.59269v2.9236c0 .218-.0781.4286-.2199.5927l-5.7367 6.6382c-.1688.1953-.4126.3073-.669.3073h-2.7488c-.2564 0-.5002-.112-.66899-.3073l-5.73668-6.6382c-.14178-.1641-.21993-.3747-.21993-.5927v-2.9236c0-.218.07815-.4286.21993-.59269z" fill="#b5b5b5"></path><path d="m10.8356 18.1585-5.08818-5.8151c-.1595-.1823-.24742-.4162-.24742-.6585v1c0 .2423.08792.4762.24742.6585l5.08818 5.8151c.1899.217.4642.3415.7526.3415h.8236c.2884 0 .5627-.1245.7526-.3415l5.0882-5.8151c.1595-.1823.2474-.4162.2474-.6585v-1c0 .2423-.0879.4762-.2474.6585l-5.0882 5.8151c-.1899.217-.4642.3415-.7526.3415h-.8236c-.2884 0-.5627-.1245-.7526-.3415z" fill="#a3a3a3"></path><path clip-rule="evenodd" d="m11.5882 4.5c-.2884 0-.5627.12448-.7526.34149l-5.08818 5.81511c-.1595.1823-.24742.4163-.24742.6585v1.3698c0 .2422.08792.4762.24742.6585l5.08818 5.8151c.1899.217.4642.3415.7526.3415h.8236c.2884 0 .5627-.1245.7526-.3415l5.0882-5.8151c.1595-.1823.2474-.4163.2474-.6585v-1.3698c0-.2423-.0879-.4762-.2474-.6585l-5.0882-5.8151c-.1899-.21702-.4642-.3415-.7526-.3415zm-1.1344-2.5c-.2884 0-.56272.12448-.75261.34149l-6.45377 7.37574c-.1595.18229-.24742.41627-.24742.65847v3.2486c0 .2422.08792.4762.24742.6585l6.45377 7.3757c.18989.217.46421.3415.75261.3415h3.0924c.2884 0 .5627-.1245.7526-.3415l6.4538-7.3757c.1595-.1823.2474-.4163.2474-.6585v-3.2486c0-.2422-.0879-.47618-.2474-.65847l-6.4538-7.37573c-.1899-.21702-.4642-.3415-.7526-.3415z" fill="#949494" fill-rule="evenodd"></path><path d="m10.2929 9.12132c-.39053-.39052-.39053-1.02369 0-1.41421l1.2463-1.41422c.3905-.39052 1.0237-.39052 1.4142 0l3.6679 4.29291c.3905.3905.3905 1.0237 0 1.4142l-1.4142 1.4142c-.3905.3905-1.0237.3905-1.4142 0z" fill="#dcdcdc"></path><path d="m8.34764 10.2442c.42128-.36072 1.05967-.31674 1.42589.0983l1.25207 1.3511c.3662.415.3216 1.0439-.0997 1.4046-.4213.3608-1.05969.3168-1.4259-.0982l-1.25207-1.3511c-.36621-.415-.32157-1.0439.09971-1.4047z" fill="#ccc"></path><path d="m11.9999 2.47315c.3413-.26295 1.5-.37315 2 .02685l4 4.5c.3662.37344.3216.93932-.0997 1.26394s-1.0597.28505-1.4259-.08838c0 0-2.74-3.30604-3.5744-3.98415-.3682-.29925-.7065-.1553-.9997-.45432-.2932-.29901-.2416-1.00098.0997-1.26394z" fill="#ccc"></path><circle cx="18.6001" cy="9.25" fill="#b5b5b5" r="1"></circle></svg></span>`;
+				const gpSVG = `<span aria-label="Gold" class="ct-currency-button__currency-item-preview"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="ddbc-svg  ddbc-ability-icon"><path d="m4 4.5c0-.27615.22385-.5.5-.5h15c.2761 0 .5.22385.5.5v1c0 .27615-.2239.5-.5.5 0 0-2 2.32653-2 6 0 3.6735 2 6 2 6 .2761 0 .5.2239.5.5v1c0 .2761-.2239.5-.5.5h-15c-.27615 0-.5-.2239-.5-.5v-1c0-.2761.22385-.5.5-.5 0 0 2-1.8673 2-6 0-4.13265-2-6-2-6-.27615 0-.5-.22385-.5-.5z" fill="#dd970e"></path><path d="m9.99993 12c0-.6216-.03345-1.2128-.09414-1.7735l4.11311 1.0283c-.002.04-.0039.0802-.0056.1205l-4.07254 2.0363c.03844-.4517.05917-.9222.05917-1.4116z" fill="#eca825"></path><path d="m9.79321 14.6034 4.21509-2.1076c.0516 1.5192.3351 2.8657.7046 4.0042h-5.36158c.17845-.5819.33016-1.214.44189-1.8966z" fill="#eca825"></path><path d="m14.0189 11.2548-4.11311-1.0283c-.10897-1.00676-.30575-1.91549-.55447-2.7265h5.36158c-.3492 1.07581-.6215 2.3373-.694 3.7548z" fill="#ffb72c"></path><path d="m6.26343 5.5h11.54557c-.1777.29323-.3708.64106-.5624 1.0399-.0702.14609-.1404.29953-.2097.4601h-9.99142c-.10248-.24281-.20889-.47037-.31689-.68278-.15543-.30571-.31301-.57786-.46516-.81722z" fill="#eca825"></path><path clip-rule="evenodd" d="m17.8089 5.5h-11.54556c.15215.23936.30973.51151.46516.81722.66607 1.31004 1.2715 3.19617 1.2715 5.68278 0 2.4866-.60543 4.3727-1.2715 5.6828-.15543.3057-.31301.5778-.46516.8172h11.54556c-.1777-.2932-.3708-.6411-.5624-1.0399-.6216-1.2941-1.2465-3.1649-1.2465-5.4601 0-2.29517.6249-4.166 1.2465-5.4601.1916-.39884.3847-.74667.5624-1.0399zm2.6911 12.5s-2-2.3265-2-6c0-3.67347 2-6 2-6 .2761 0 .5-.22385.5-.5v-2c0-.27615-.2239-.5-.5-.5h-17c-.27615 0-.5.22385-.5.5v2c0 .27615.22385.5.5.5 0 0 2 1.86735 2 6 0 4.1327-2 6-2 6-.27615 0-.5.2239-.5.5v2c0 .2761.22385.5.5.5h17c.2761 0 .5-.2239.5-.5v-2c0-.2761-.2239-.5-.5-.5z" fill="#c78727" fill-rule="evenodd"></path><path d="m8 4.25c0-.41421.33579-.75.75-.75h11c.4142 0 .75.33579.75.75s-.3358.75-.75.75h-11c-.41421 0-.75-.33579-.75-.75z" fill="#ffb72c"></path><circle cx="6.75" cy="4.25" fill="#eca825" r=".75"></circle></svg></span>`;
+				const epSVG = `<span aria-label="Electrum" class="ct-currency-button__currency-item-preview"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="ddbc-svg  ddbc-ability-icon"><path clip-rule="evenodd" d="m7.32745 3c-.42911 0-.84556.13554-1.16546.42156-1.20722 1.07938-4.16199 4.17139-4.16199 8.57844 0 4.407 2.95477 7.4991 4.16199 8.5784.3199.2861.73635.4216 1.16547.4216h9.34504c.4292 0 .8456-.1355 1.1655-.4216 1.2072-1.0793 4.162-4.1714 4.162-8.5784 0-4.40704-2.9548-7.49906-4.162-8.57844-.3199-.28602-.7363-.42156-1.1655-.42156zm4.67255 14.25c.6904 0 1.25-.5596 1.25-1.25s-.5596-1.25-1.25-1.25-1.25.5596-1.25 1.25.5596 1.25 1.25 1.25z" fill="#8a9eac" fill-rule="evenodd"></path><path d="m7.03711 16.9284c.34586.3796.84504.5716 1.35854.5716h7.20875c.5134 0 1.0126-.192 1.3585-.5716 1.0485-1.1506 2.3552-3.0498 2.5198-5.4284.0114.1644.0173.3311.0173.5 0 2.6125-1.4162 4.6983-2.5371 5.9284-.3459.3796-.845.5716-1.3585.5716h-7.20875c-.5135 0-1.01268-.192-1.35854-.5716-1.12095-1.2301-2.53711-3.3159-2.53711-5.9284 0-.1689.00592-.3356.01729-.5.16458 2.3786 1.47133 4.2778 2.51982 5.4284z" fill="#6d7f8c"></path><path d="m14.7246 16.375c-.1829 1.3414-1.333 2.375-2.7246 2.375s-2.54175-1.0336-2.72465-2.375c-.01671.1226-.02535.2478-.02535.375 0 1.5188 1.2312 2.75 2.75 2.75s2.75-1.2312 2.75-2.75c0-.1272-.0086-.2524-.0254-.375z" fill="#6d7f8c"></path><path clip-rule="evenodd" d="m14.75 16c0 1.5188-1.2312 2.75-2.75 2.75s-2.75-1.2312-2.75-2.75 1.2312-2.75 2.75-2.75 2.75 1.2312 2.75 2.75zm-2.75 1.25c.6904 0 1.25-.5596 1.25-1.25s-.5596-1.25-1.25-1.25-1.25.5596-1.25 1.25.5596 1.25 1.25 1.25z" fill="#7c8d99" fill-rule="evenodd"></path><circle cx="12" cy="16" fill="#8697a3" fill-opacity=".5" r="1.25"></circle><path clip-rule="evenodd" d="m8.39565 5.5c-.5135 0-1.01268.19203-1.35854.57159-1.12095 1.23016-2.53711 3.31587-2.53711 5.92841 0 2.6125 1.41616 4.6983 2.53711 5.9284.34586.3796.84504.5716 1.35854.5716h7.20875c.5135 0 1.0126-.192 1.3585-.5716 1.1209-1.2301 2.5371-3.3159 2.5371-5.9284 0-2.61254-1.4162-4.69825-2.5371-5.92841-.3459-.37956-.8451-.57159-1.3585-.57159zm-1.0682-2.5c-.42911 0-.84556.13554-1.16546.42156-1.20722 1.07938-4.16199 4.17139-4.16199 8.57844 0 4.407 2.95477 7.4991 4.16199 8.5784.3199.2861.73635.4216 1.16547.4216h9.34504c.4292 0 .8456-.1355 1.1655-.4216 1.2072-1.0793 4.162-4.1714 4.162-8.5784 0-4.40704-2.9548-7.49906-4.162-8.57844-.3199-.28602-.7363-.42156-1.1655-.42156z" fill="#7c8d99" fill-rule="evenodd"></path><path d="m9.75003 9.13768c.23943.5003.03173 1.10552-.46392 1.35192l-1.62912.8597c-.49566.2463-1.09156.0404-1.33099-.4599s-.03173-1.10555.46392-1.35187l1.62912-.85971c.49566-.24633 1.09156-.04044 1.33099.45986z" fill="#7c8d99"></path><path d="m10 8c0-1.10457.8954-2 2-2h3c1.6569 0 3 1.34315 3 3v1c0 1.1046-.8954 2-2 2h-4c-1.1046 0-2-.8954-2-2z" fill="#9fb3c0"></path><path clip-rule="evenodd" d="m11.8507 3.53389c-.4997.02746-.8798.4106-.8489.85577.0308.44514.4608.78374.9604.75632l.0092-.00049.0303-.00157c.027-.00137.0673-.00336.1193-.00575.1039-.0048.6517.00093.6517.00093l1.3785-.02395s1.0448.01588 1.4768.05451c.2164.01934.3931.04327.5261.07005.1131.02275.1591.04034.1591.04034.8407.47238 1.3364 1.1415 1.969 2.07148.3071.45151.5537.87024.7234 1.17593.0846.15247.1495.27584.1927.35991.0216.04201.0377.07413.0481.09509l.0113.02287.0023.00484c.1974.40967.7304.60007 1.1904.42444.4601-.1757.6733-.65045.4761-1.0604l-.0008-.00162-.0014-.0028-.0044-.00908-.0156-.03164c-.0133-.02693-.0326-.06533-.0576-.1139-.0499-.0971-.1225-.23511-.216-.40351-.1865-.33604-.4578-.797-.7981-1.29727-.6596-.96959-1.3422-1.92667-2.5695-2.61007-.2296-.12785-.4955-.197-.7095-.24006-.2307-.04644-.4866-.07863-.7446-.10169-.5167-.04619-1.6535-.06257-1.6535-.06257s-1.0706.0119-1.4533.02517c-.1918.00665-.5643-.0051-.6749 0-.0553.00255-.0988.00469-.1288.00622l-.0347.00179z" fill="#9fb3c0" fill-rule="evenodd"></path><circle cx="9.75" cy="4.25" fill="#8a9eac" r=".75"></circle></svg></span>`;
+				const spSVG = `<span aria-label="Silver" class="ct-currency-button__currency-item-preview"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="ddbc-svg  ddbc-ability-icon"><path clip-rule="evenodd" d="m2.49372 21c-.3779 0-.61528-.4138-.42875-.7473l9.50623-16.99932c.189-.33784.6686-.33784.8576 0l9.5062 16.99932c.1866.3335-.0508.7473-.4287.7473zm9.50628-5c.6904 0 1.25-.5596 1.25-1.25s-.5596-1.25-1.25-1.25-1.25.5596-1.25 1.25.5596 1.25 1.25 1.25z" fill="#a59e98" fill-rule="evenodd"></path><path clip-rule="evenodd" d="m2.06497 20.2527c-.18653.3335.05085.7473.42875.7473h19.01258c.3779 0 .6153-.4138.4287-.7473l-9.5062-16.99932c-.189-.33784-.6686-.33784-.8576 0zm10.15323-12.30742c-.0954-.17063-.341-.17063-.4364 0l-5.69332 10.18092c-.09319.1666.02727.372.21819.372h11.38663c.191 0 .3114-.2054.2182-.372z" fill="#99938d" fill-rule="evenodd"></path><path d="m12 17.25c1.3807 0 2.5-1.1193 2.5-2.5 0-.1714-.0173-.3388-.0501-.5005.1919.3752.3001.8002.3001 1.2505 0 1.5188-1.2312 2.75-2.75 2.75s-2.75-1.2312-2.75-2.75c0-.4503.10824-.8753.30011-1.2505-.03286.1617-.05011.3291-.05011.5005 0 1.3807 1.1193 2.5 2.5 2.5z" fill="#857d76"></path><circle cx="12" cy="14.75" fill="#a59e98" fill-opacity=".5" r="1.25"></circle><path d="m11.7819 7.94529c.0954-.17064.341-.17064.4364 0l5.6933 10.18091c.0932.1666-.0273.372-.2182.372h-.133l-5.3421-9.55291c-.0954-.17064-.341-.17064-.4364 0l-5.34216 9.55291h-.13298c-.19093 0-.31139-.2054-.2182-.372z" fill="#b5ada7"></path><path d="m11.6724 11.3586c-.2371-.4211.1496-1.88397.5707-2.12106.1389-.07818.7171.84136.9542 1.26246l.5249 1.1414c.2371.4211.0879.9547-.3331 1.1918-.4211.2371-.9547.0879-1.1918-.3332z" fill="#b5ada7"></path><path d="m11.4292 5.62102c-.2371-.42109.1496-1.88394.5707-2.12103.1389-.07818.7172.84137.9542 1.26246l3.0664 5.44615c.2371.4211.0879.9546-.3332 1.1917s-.9547.0879-1.1917-.3332z" fill="#cec6bf"></path></svg></span>`;
+				const cpSVG = `<span aria-label="Copper" class="ct-currency-button__currency-item-preview"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="ddbc-svg  ddbc-ability-icon"><path clip-rule="evenodd" d="m6.41421 3c-.26521 0-.51957.10536-.7071.29289l-2.41422 2.41422c-.18753.18753-.29289.44189-.29289.7071v11.17159c0 .2652.10536.5196.29289.7071l2.41422 2.4142c.18753.1875.44189.2929.7071.2929h11.17159c.2652 0 .5196-.1054.7071-.2929l2.4142-2.4142c.1875-.1875.2929-.4419.2929-.7071v-11.17159c0-.26521-.1054-.51957-.2929-.7071l-2.4142-2.41422c-.1875-.18753-.4419-.29289-.7071-.29289zm5.58579 10.5c.8284 0 1.5-.6716 1.5-1.5s-.6716-1.5-1.5-1.5-1.5.6716-1.5 1.5.6716 1.5 1.5 1.5z" fill="#ab6e57" fill-rule="evenodd"></path><path d="m10 9c0-1.10457.8954-2 2-2h4c1.1046 0 2 .89543 2 2v1c0 1.1046-.8954 2-2 2h-1c0-1.6569-1.3431-3-3-3-.7684 0-1.4692.28885-2 .76389z" fill="#c2866f"></path><path d="m17.7071 7.94975-.6568-.65686c-.1876-.18753-.4419-.29289-.7072-.29289h-8.68625c-.26521 0-.51957.10536-.7071.29289l-.65686.65686c-.18753.18753-.29289.44189-.29289.7071v-1c0-.26521.10536-.51957.29289-.7071l.65686-.65686c.18753-.18753.44189-.29289.7071-.29289h8.68625c.2653 0 .5196.10536.7072.29289l.6568.65686c.1875.18753.2929.44189.2929.7071v1c0-.26521-.1054-.51957-.2929-.7071z" fill="#9f6854"></path><path d="m14.9585 12.5c-.238 1.4189-1.472 2.5-2.9585 2.5s-2.72048-1.0811-2.95852-2.5c-.02728.1626-.04148.3296-.04148.5 0 1.6569 1.3431 3 3 3s3-1.3431 3-3c0-.1704-.0142-.3374-.0415-.5z" fill="#9f6854"></path><g fill="#c2866f"><path clip-rule="evenodd" d="m15 12c0 1.6569-1.3431 3-3 3s-3-1.3431-3-3 1.3431-3 3-3 3 1.3431 3 3zm-3 1.5c.8284 0 1.5-.6716 1.5-1.5s-.6716-1.5-1.5-1.5-1.5.6716-1.5 1.5.6716 1.5 1.5 1.5z" fill-rule="evenodd"></path><circle cx="12" cy="12" fill-opacity=".5" r="1.5"></circle><path clip-rule="evenodd" d="m6.29289 6.94975c-.18753.18753-.29289.44189-.29289.7071v8.68625c0 .2653.10536.5196.29289.7072l.65686.6568c.18753.1875.44189.2929.7071.2929h8.68625c.2653 0 .5196-.1054.7072-.2929l.6568-.6568c.1875-.1876.2929-.4419.2929-.7072v-8.68625c0-.26521-.1054-.51957-.2929-.7071l-.6568-.65686c-.1876-.18753-.4419-.29289-.7072-.29289h-8.68625c-.26521 0-.51957.10536-.7071.29289zm.12132-3.94975c-.26521 0-.51957.10536-.7071.29289l-2.41422 2.41422c-.18753.18753-.29289.44189-.29289.7071v11.17159c0 .2652.10536.5196.29289.7071l2.41422 2.4142c.18753.1875.44189.2929.7071.2929h11.17159c.2652 0 .5196-.1054.7071-.2929l2.4142-2.4142c.1875-.1875.2929-.4419.2929-.7071v-11.17159c0-.26521-.1054-.51957-.2929-.7071l-2.4142-2.41422c-.1875-.18753-.4419-.29289-.7071-.29289z" fill-rule="evenodd"></path></g><path clip-rule="evenodd" d="m10.125 4.5c0-.48325.3918-.875.875-.875h6.0858c.4973 0 .9742.19754 1.3258.54917l1.4142 1.41422c.3517.35163.5492.82854.5492 1.32582v3.58579c0 .4832-.3918.875-.875.875s-.875-.3918-.875-.875v-3.58579c0-.03315-.0132-.06494-.0366-.08838l-1.4142-1.41422c-.0235-.02344-.0553-.03661-.0884-.03661h-6.0858c-.4832 0-.875-.39175-.875-.875z" fill="#e6a58c" fill-rule="evenodd"></path><circle cx="8.375" cy="4.47501" fill="#e5a48c" r=".875"></circle></svg></span>`;
+				const partyCurrency = window.PARTY_INVENTORY_DATA?.currency ? window.PARTY_INVENTORY_DATA.currency : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
+				const currencyString = `Party Currency: ${partyCurrency.pp != 0 ? `${partyCurrency.pp}${ppSVG} ` : ''}${partyCurrency.gp != 0 ? `${partyCurrency.gp}${gpSVG} ` : ''}${partyCurrency.ep != 0 ? `${partyCurrency.ep}${epSVG} ` : ''}${partyCurrency.sp != 0 ? `${partyCurrency.sp}${spSVG} ` : ''}${partyCurrency.cp != 0 ? `${partyCurrency.cp}${cpSVG} ` : ''}`;
+				if($('.party-currency').length) {
+					$('.party-currency').remove();
+				}
+				const currencyHeader = $(`<div class='party-currency' style="margin-bottom: 10px; font-weight: bold;">${currencyString}</div>`);
+				partyLootTable.before(currencyHeader);
+			}
+		}
+	}
 	edit_note(id, statBlock = false){
 		$(`div.note[data-id='${id}']`)?.dialog("close");
 		this.close_all_notes();
@@ -2562,7 +3108,7 @@ class JournalManager{
 		$("#site-main").append(note);
 		note.dialog({
 			draggable: true,
-			width: 860,
+			width: 900,
 			height: 600,
 			position: {
 			   my: "center",
@@ -2588,8 +3134,7 @@ class JournalManager{
 		$("[role='dialog']").draggable({
 			containment: "#windowContainment",
 			start: function () {
-				$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-				$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+				$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 			},
 			stop: function () {
 				$('.iframeResizeCover').remove();			
@@ -2597,8 +3142,7 @@ class JournalManager{
 		});
 		$("[role='dialog']").resizable({
 			start: function () {
-				$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-				$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+				$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 			},
 			stop: function () {
 				$('.iframeResizeCover').remove();			
@@ -2638,7 +3182,7 @@ class JournalManager{
 				 background: url('https://media-waterdeep.cursecdn.com/file-attachments/0/579/stat-block-header-bar.svg') center center no-repeat 
 			}
 			.dm-eyes-only{
-				 border: 1px solid #000;
+				 border: 1px solid var(--border-color, #000);
 				 border-radius: 5px;
 				 background: var(--background-color, #f5f5f5);
 				 padding: 0px 5px;
@@ -2653,7 +3197,7 @@ class JournalManager{
 				 top: -10px;
 				 right: 2px;
 				 float:right;
-				 border:1px #000 solid;
+				 border:1px var(--border-color, #000); solid;
 				 border-radius:5px;
 				 background: var(--background-color, #f5f5f5);
 				 font-weight: bold;
@@ -2683,6 +3227,9 @@ class JournalManager{
 			}
 			.ignore-abovevtt-formating{
 				 border: 2px dotted #b100ff;
+			}
+			.dmScreenChunk{
+				border: 2px dotted #880000;	
 			}
 			.ignore-abovevtt-formating.no-border{
 				border: none;
@@ -3151,7 +3698,7 @@ class JournalManager{
 				 margin-bottom: 0;
 				 padding-top: 0 
 			}
-			.stat-block .monster-header {
+			.monster-header {
 				 padding-top: 4px;
 				 letter-spacing: .35px;
 				 font-weight: 500;
@@ -3161,7 +3708,7 @@ class JournalManager{
 				 border-bottom: 2px solid var(--monster-header-underline,#7a3c2f);
 				 font-variant: small-caps; 
 			}
-			.stat-block .monster-header+p {
+			.monster-header+p {
 				 break-before: avoid 
 			}
 			.stat-block .stats {
@@ -3520,7 +4067,8 @@ class JournalManager{
 			menubar: false,
 			end_container_on_empty_block: true,
 			style_formats:  [
-				 { title: 'Headers', items: [
+				{ title: 'Headers', items: [
+				  { title: 'Statblock Header', block: 'p', classes: 'monster-header' },
 			      { title: 'h1', block: 'h1' },
 			      { title: 'h2', block: 'h2' },
 			      { title: 'h3', block: 'h3' },
@@ -3536,7 +4084,8 @@ class JournalManager{
 			      { title: 'Stat Block Paper (1 Column)', block: 'div', wrapper: true, classes: 'Basic-Text-Frame stat-block-background one-column-stat' },
 			      { title: 'Stat Block Paper (2 Column)', block: 'div', wrapper: true, classes: 'Basic-Text-Frame stat-block-background' },
 			      { title: 'For DM Eyes Online', block: 'div', wrapper: true, classes: 'dm-eyes-only' },
-			      { title: 'Add Ability Tracker; Format: "Wild Shape 2"', inline: 'span', wrapper:true, classes: 'note-tracker'},
+				  { title: 'DM Screen Chunk - won\'t be auto split into columns when used with the DM Screen', block: 'div', wrapper: true, classes: 'dmScreenChunk' },
+				  { title: 'Add Ability Tracker; Format: "Wild Shape 2"', inline: 'span', wrapper:true, classes: 'note-tracker'},
 			      { title: 'Ignore AboveVTT auto formating', inline: 'span', wrapper: true, classes: 'ignore-abovevtt-formating' },
 			      { title: 'Embed Site in Journal', inline: 'span', wrapper: true, classes: 'journal-site-embed'}
 			    ] },
@@ -3699,9 +4248,111 @@ class JournalManager{
 <p>4th level (3 slots): greater invisibility, ice storm</p>
 <p>5th level (1 slot): cone of cold</p>`
 			    },
+				{
+					"title": "Treasure / Loot Table",
+					"description": "Add a treasure table with buttons to add to party inventory.",
+					"content": `<style id='contentStyles'>${contentStyles}</style>
+						<table class="party-item-table" style="width: 100%; border-collapse: collapse;" border="1">
+							<thead>
+								<tr>
+									<th style="padding: 8px; text-align: left;">Quantity</th>
+									<th style="padding: 8px; text-align: left;">Item</th>
+									<th style="padding: 8px; text-align: left;">Description</th>
+									<th style="padding: 8px; text-align: left;">Add to Party Inventory</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td class="item-quantity-cell" style="padding: 8px; text-align: left;">2</td>
+									<td class="item-link-cell" style="padding: 8px; text-align: left;"><a class="tooltip-hover no-border ignore-abovevtt-formating" href="https://www.dndbeyond.com/magic-items/8960641-potion-of-healing">Potion of Healing</a></td>
+									<td class="item-description-cell" style="padding: 8px; text-align: left;">Auto Fills</td>
+									<td class="item-add-cell" style="padding: 8px; text-align: left;">Auto Fills</td>
+								</tr>
+								<tr>
+									<td class="item-quantity-cell" style="padding: 8px; text-align: left;">1</td>
+									<td class="item-link-cell" style="padding: 8px; text-align: left;">https://www.dndbeyond.com/magic-items/9228343-alchemy-jug</td>
+									<td class="item-description-cell" style="padding: 8px; text-align: left;">Auto Fills</td>
+									<td class="item-add-cell" style="padding: 8px; text-align: left;">Auto Fills</td>
+								</tr>
+								<tr>
+									<td class="item-quantity-cell" style="padding: 8px; text-align: left;">1</td>
+									<td class="item-link-cell" style="padding: 8px; text-align: left;">250gp, 1000sp, 3000cp</td>
+									<td class="item-description-cell" style="padding: 8px; text-align: left;"><strong>&nbsp;Ignored/Emptied for coins</strong></td>
+									<td class="item-add-cell" style="padding: 8px; text-align: left;">Auto Fills</td>
+								</tr>
+								<tr>
+									<td class="item-quantity-cell" style="padding: 8px; text-align: left;">1</td>
+									<td class="item-link-cell" style="padding: 8px; text-align: left;">Fireball Spell Scroll (4th Level)</td>
+									<td class="item-description-cell" style="padding: 8px; text-align: left;">Fireball at 4th level.&nbsp; Cost: 250 Weight: 0.1 Notes: Dex Save DC 15 <span class="ignore-abovevtt-formating">/r 9d6 Fireball:Fire Damage</span></td>
+									<td class="item-add-cell" style="padding: 8px; text-align: left;">Auto Fills</td>
+								</tr>
+								<tr>
+									<td class="item-quantity-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-link-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-description-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-add-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+								</tr>
+							</tbody>
+						</table>		
+					`
+				},
+				{
+					"title": "Item Shop Table",
+					"description": "Add a treasure table with buttons to add to party inventory.",
+					"content": `<style id='contentStyles'>${contentStyles}</style>
+						<table class="party-item-table shop" style="width: 100%; border-collapse: collapse;" border="1">
+							<thead>
+								<tr>
+									<th style="padding: 8px; text-align: left;">Quantity</th>
+									<th style="padding: 8px; text-align: left;">Item</th>
+									<th style="padding: 8px; text-align: left;">Description</th>
+									<th style="padding: 8px; text-align: left;">Cost</th>
+									<th style="padding: 8px; text-align: left;">Add to Party Inventory</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td class="item-quantity-cell" style="padding: 8px; text-align: left;">2</td>
+									<td class="item-link-cell" style="padding: 8px; text-align: left;"><a class="tooltip-hover no-border ignore-abovevtt-formating" href="https://www.dndbeyond.com/magic-items/8960641-potion-of-healing">Potion of Healing</a></td>
+									<td class="item-description-cell" style="padding: 8px; text-align: left;">Auto Fills</td>
+									<td class="item-cost-cell" style="padding: 8px; text-align: left;">50gp</td>
+									<td class="item-add-cell" style="padding: 8px; text-align: left;">Auto Fills</td>
+								</tr>
+								<tr>
+									<td class="item-quantity-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-link-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-description-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-cost-cell" style="padding: 8px; text-align: left;"></td>
+									<td class="item-add-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+								</tr>
+								<tr>
+									<td class="item-quantity-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-link-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-description-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-cost-cell" style="padding: 8px; text-align: left;"></td>
+									<td class="item-add-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+								</tr>
+								<tr>
+									<td class="item-quantity-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-link-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-description-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-cost-cell" style="padding: 8px; text-align: left;"></td>
+									<td class="item-add-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+								</tr>
+								<tr>
+									<td class="item-quantity-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-link-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-description-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+									<td class="item-cost-cell" style="padding: 8px; text-align: left;"></td>
+									<td class="item-add-cell" style="padding: 8px; text-align: left;">&nbsp;</td>
+								</tr>
+							</tbody>
+						</table>		
+					`
+				},
 			],
 		  	table_grid: false,
-			toolbar: 'undo styleselect template | horizontalrules | bold italic underline strikethrough | alignleft aligncenter alignright justify| outdent indent | bullist numlist | forecolor backcolor | fontsizeselect | link unlink | image media table tableCustom | code',
+			toolbar: 'undo styleselect template | horizontalrules | bold italic underline strikethrough | alignleft aligncenter alignright justify| outdent indent | bullist numlist | forecolor backcolor | fontsizeselect | link unlink | image media filePickers table tableCustom | code',
 			image_class_list: [
 				{title: 'Magnify', value: 'magnify'},
 			],
@@ -3714,6 +4365,37 @@ class JournalManager{
 			],
 			valid_children : '+body[style]',
 			setup: function (editor) { 
+				editor.on("keydown", function (e) {
+					if (e.which == "13" || e.keyCode == "13") {
+						
+						if(!e.shiftKey){
+							const currentNode = editor.selection.getNode();
+							/* Do no copy elements can be 0 size when pasted from elsewhere and can lead to enter not adding a line. Insert <p> element instead.
+							   We also want to run default behaviour on empty lines so it breaks out of containers.*/
+							const doNotCopyElement = ['DIV', 'BLOCKQUOTE'];
+							const skipInsertP = !doNotCopyElement.includes(currentNode.tagName) || 
+												currentNode.textContent.trim() == ""
+
+							if (skipInsertP)
+								return;
+							e.preventDefault();
+
+							editor.insertContent('<p id="temp_new_p"></p>')
+							
+							
+							setTimeout(() => {
+								let newP = editor.dom.get('temp_new_p');
+								if (newP) {
+									editor.focus();
+									editor.selection.setCursorLocation(newP, 0);
+									editor.dom.setAttrib(newP, 'id', null);
+								}
+							}, 0)
+							
+						}
+						
+					}
+				});
 				editor.addButton('horizontalrules', {
 					  type: 'splitbutton',
 				      text: '',
@@ -3734,9 +4416,180 @@ class JournalManager{
 				        ],
 				      onclick: (e) => {e.preventDefault(); e.stopPropagation(); editor.insertContent(`<img class="mon-stat-block__separator-img" alt="" src="https://www.dndbeyond.com/file-attachments/0/579/stat-block-header-bar.svg"/>`)},
 				    });
+
+				editor.addButton('filePickers', {
+					type: 'splitbutton',
+					text: '',
+					icon: 'upload',
+					tooltip: 'Upload/Select File From File Picker',
+					menu: [
+						{
+							text: "Azmoria's AboveVTT File Picker",
+							onclick: (e) => { 
+								e.preventDefault();
+								e.stopPropagation(); 
+								launchFilePicker(async function (files) {
+									try {
+										for (let i = 0; i < files.length; i++) {
+											const fileType = files[i].type;
+											const link = files[i].link;
+
+											if (fileType === avttFilePickerTypes.IMAGE) {
+												tinymce.activeEditor.insertContent(`<img class="magnify" alt="" data-src="${link}" />`);
+											} else if (fileType === avttFilePickerTypes.VIDEO) {
+												tinymce.activeEditor.insertContent(`<video controls="controls" width="100%" height="auto"><source src="${link}" /></video>`);
+											} else if (fileType === avttFilePickerTypes.AUDIO) {
+												tinymce.activeEditor.insertContent(`<audio controls src="${link}"></audio>`);
+											} else {
+												tinymce.activeEditor.insertContent(`<iframe width='100%' height='400' src='${window.EXTENSION_PATH}iframe.html?src=${link}'
+												allowfullscreen
+												webkitallowfullscreen
+												mozallowfullscreen></iframe>`);
+											}
+										}
+									} catch (error) {
+										console.error("Failed to import from AVTT File Picker selection", error);
+										alert(error?.message || "Failed to import selection from AVTT. See console for details.");
+									}
+								}, undefined,
+								async function (files) {
+									try {
+										for (let i = 0; i < files.length; i++) {
+											const link = files[i].link;
+											tinymce.activeEditor.insertContent(`<span class="journal-site-embed">${link}</span>`);
+										}
+									}
+									catch (error) {
+										console.error("Failed to import from AVTT File Picker selection", error);
+										alert(error?.message || "Failed to import selection from AVTT. See console for details.");
+									}
+								});
+							},
+						},
+						{
+							text: "Dropbox - Insert Image/Video/Audio",
+							onclick: (e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								const dropboxOptions = dropBoxOptions(function (links) {
+									for (let i = 0; i < links.length; i++) {
+										const link = parse_img(links[i].link);
+										const extension = links[i].link.split('?')[0].match(/.*\.(.*)?$/i)?.[1];
+										if (allowedImageTypes.includes(extension)) {
+											tinymce.activeEditor.insertContent(`<img class="magnify" alt="" src='${link}' />`);
+										} else if (allowedVideoTypes.includes(extension)) {
+											tinymce.activeEditor.insertContent(`<video controls="controls" width="100%" height="auto"><source src="${link}"/></video>`);
+										} else if (allowedAudioTypes.includes(extension)) {
+											tinymce.activeEditor.insertContent(`<audio controls src="${link}"></audio>`);
+										}
+									}
+								}, true, ['images','video','audio'], false);
+								Dropbox.choose(dropboxOptions)
+							},
+						},
+						{
+							text: "Dropbox - Site Embed",
+							onclick: (e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								const dropboxOptions = dropBoxOptions(function (links) {
+									for (let i = 0; i < links.length; i++) {
+										const link = links[i].link;
+										tinymce.activeEditor.insertContent(`<span class="journal-site-embed">${link}</span>`);
+									}
+								}, false, ['images', 'video', 'audio', 'document', 'text'], false);
+								Dropbox.choose(dropboxOptions)
+							},
+						},
+						{
+							text: "OneDrive - Insert Image",
+							onclick: (e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								launchPicker(e, function (links) {
+									for (let i = 0; i < links.length; i++) {
+										const link = parse_img(links[i].link);
+										tinymce.activeEditor.insertContent(`<img class="magnify" alt="" src='${link}' />`);
+									}
+								}, 'multiple', ['photo', '.webp']);
+							},
+						},
+						{
+							text: "OneDrive - Site Embed",
+							onclick: (e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								launchPicker(e, function (links) {
+									for (let i = 0; i < links.length; i++) {
+										const link = links[i].link;
+										tinymce.activeEditor.insertContent(`<span class="journal-site-embed">${link}</span>`);
+									}
+								}, 'single', ['files']);
+							},
+						}
+					],
+					onclick: (e) => { 
+						e.preventDefault();
+						e.stopPropagation();
+						launchFilePicker(async function (files) {
+							try {
+								for (let i = 0; i < files.length; i++) {
+									const fileType = files[i].type;
+									const link = files[i].link;
+
+									if (fileType === avttFilePickerTypes.IMAGE) {
+										tinymce.activeEditor.insertContent(`<img class="magnify" alt="" data-src="${link}" />`);
+									} else if (fileType === avttFilePickerTypes.VIDEO) {
+										tinymce.activeEditor.insertContent(`<video controls="controls" width="100%" height="auto"><source src="${link}" /></video>`);
+									} else if (fileType === avttFilePickerTypes.AUDIO) {
+										tinymce.activeEditor.insertContent(`<audio controls src="${link}"></audio>`);
+									} else {
+										tinymce.activeEditor.insertContent(`<iframe width='100%' height='400' src='${window.EXTENSION_PATH}iframe.html?src=${link}'
+												allowfullscreen
+												webkitallowfullscreen
+												mozallowfullscreen></iframe>`);
+									}
+								}
+							} catch (error) {
+								console.error("Failed to import from AVTT File Picker selection", error);
+								alert(error?.message || "Failed to import selection from AVTT. See console for details.");
+							}
+						}, undefined,
+							async function (files) {
+								try {
+									for (let i = 0; i < files.length; i++) {
+										const link = files[i].link;
+										tinymce.activeEditor.insertContent(`<span class="journal-site-embed">${link}</span>`);
+									}
+								}
+								catch (error) {
+									console.error("Failed to import from AVTT File Picker selection", error);
+									alert(error?.message || "Failed to import selection from AVTT. See console for details.");
+								}
+							});
+						},
+				});
+				editor.addCommand('setAvttImageSrc', function (e) {
+					const body = e.target.contentDocument?.body != undefined ? $(e.target.contentDocument.body) : $(e.target);
+					const avttImages = body.find('img[data-src*="above-bucket-not-a-url"]:not([src^="above-bucket-not-a-url"])');
+					avttImages.each(async (index, image) => {
+						const src = await getAvttStorageUrl(image.getAttribute('data-src'), true);
+						image.src = src;
+					})
+					const avttImages2 = body.find('img[src^="above-bucket-not-a-url"]');
+					avttImages2.each(async (index, image) => {
+						const origSrc = image.getAttribute('src');
+						const src = await getAvttStorageUrl(origSrc, true);
+						image.setAttribute('data-src', origSrc)
+						image.src = src;
+					})
+
+					if (editor.isDirty()) {
+						debounceNoteSave(e, editor);
+					}
+				});
 				editor.on('init', function (e) {
 					const body = $(e.target.contentDocument.body);
-					const avttImages = body.find('img[data-src*="above-bucket-not-a-url"]');
 					const backgroundColor = $(':root').css('--background-color'); // support azmoria's dark mode without requiring inverse filters
 					const fontColor = $(':root').css('--font-color');
 					if(backgroundColor && fontColor){
@@ -3748,10 +4601,7 @@ class JournalManager{
 						});
 					}
 
-					avttImages.each(async (index, image) => {
-						const src = await getAvttStorageUrl(image.getAttribute('data-src'), true);
-						image.src = src;
-					})
+					editor.execCommand('setAvttImageSrc', e);
 				});
 
 				editor.on('NodeChange', async function (e) {
@@ -3778,22 +4628,7 @@ class JournalManager{
 				    return;
 				});
 				editor.on('change keyup', async function(e){
-					const body = $(e.target);
-					const avttImages = body.find('img[data-src*="above-bucket-not-a-url"]:not([src])');
-					avttImages.each(async (index, image) => {
-						const src = await getAvttStorageUrl(image.getAttribute('data-src'), true);
-						image.src = src;
-					})
-					const avttImages2 = body.find('img[src^="above-bucket-not-a-url"]');
-					avttImages2.each(async (index, image) => {
-						const origSrc = image.getAttribute('src');
-						const src = await getAvttStorageUrl(origSrc, true);
-						image.setAttribute('data-src', origSrc)
-						image.src = src;
-					})
-				    if(editor.isDirty()){
-				    	debounceNoteSave(e, editor);
-				    }
+					editor.execCommand('setAvttImageSrc', e);
 				});
 			},
 			relative_urls : false,
@@ -3816,6 +4651,13 @@ class JournalManager{
 				self.notes[note_id].plain = tinymce.activeEditor.getContent({ format: 'text' });
 				self.notes[note_id].statBlock = statBlock;
 				self.persist();
+				const dmScreenPageOpen = $('#dmScreenCustomBlock');
+				if(dmScreenPageOpen.length > 0){
+					const openNoteId = dmScreenPageOpen.attr('data-note-id');
+					if(openNoteId == note_id){
+						$(`.dmScreenCustomDropdownItem[data-id='${note_id}']`).trigger('click');
+					}
+				}
 				if(note_id in window.TOKEN_OBJECTS){
 					window.TOKEN_OBJECTS[note_id].place(); // trigger display of the "note" condition
 				}
@@ -3973,3 +4815,6 @@ function render_source_chapter_in_iframe(url) {
 
 	iframe.attr('src', url);
 }
+
+
+

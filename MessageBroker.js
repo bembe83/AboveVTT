@@ -16,7 +16,7 @@ const debounceHandleInjected = mydebounce(() => {
 		let injection_data=current.data?.injected_data;
 
 		let found=false;
-		$(self.diceMessageSelector).each(function(){
+		$(self.diceMessageSelector).each(async function(){
 			if($(this).text()==injection_id){
 				found=true;
 				let li = $(this).closest("li");
@@ -29,11 +29,12 @@ const debounceHandleInjected = mydebounce(() => {
 				
 			 	li.html(newlihtml);
 				if(window.JOURNAL){
-					window.JOURNAL.translateHtmlAndBlocks(li);
+					await window.JOURNAL.translateHtmlAndBlocks(li);
 					add_journal_roll_buttons(li);
 					window.JOURNAL.add_journal_tooltip_targets(li);
 					add_stat_block_hover(li)
 					add_aoe_statblock_click(li);
+					
 				}
 				let rollType = current.data.injected_data?.rollType?.toLowerCase();
 				let rollAction = current.data.injected_data?.rollTitle?.toLowerCase();
@@ -44,6 +45,7 @@ const debounceHandleInjected = mydebounce(() => {
 					let damageButton = $(`<button class='applyDamageButton flat'>${damageSVG}</button>`);
 					let halfDamage = $(`<button class='applyDamageButton resist'>1/2 ${damageSVG}</button>`);
 					let doubleDamage = $(`<button class='applyDamageButton vulnerable'>2x${damageSVG}</button>`);
+					let quarterDamage = $(`<button class='applyDamageButton resist-save'>1/4 ${damageSVG}</button>`);
 					let healDamage = $(`<button class='applyDamageButton heal'>${healSVG}</button>`);
 
 
@@ -53,6 +55,9 @@ const debounceHandleInjected = mydebounce(() => {
 						let damage = current.data.injected_data.result;
 						if(clicked.hasClass('resist')){
 							damage = Math.max(1, Math.floor(damage/2));
+						}
+						else if(clicked.hasClass('resist-save')){
+							damage = Math.max(1, Math.floor(damage / 4));
 						}
 						else if(clicked.hasClass('vulnerable')){
 							damage = damage*2;
@@ -72,12 +77,8 @@ const debounceHandleInjected = mydebounce(() => {
 							showTempMessage('No non-player tokens selected');
 						}
 						
-						for(let i=0; i<window.CURRENTLY_SELECTED_TOKENS.length; i++){
-
-							let id = window.CURRENTLY_SELECTED_TOKENS[i];
-							let token = window.TOKEN_OBJECTS[id];
-							if(token.isPlayer() || token.isAoe())
-								continue;
+						forSelTokens((token, id) => {
+							if(token.isPlayer() || token.isAoe()) return;
 							let newHp = Math.max(0, parseInt(token.hp) - parseInt(damage));
 
 							if(window.all_token_objects[id] != undefined){
@@ -88,16 +89,16 @@ const debounceHandleInjected = mydebounce(() => {
 								token.place_sync_persist()
 							}		
 							addFloatingCombatText(id, damage, damage<0);
-						}
+						})
 					})
 					if(rollType == 'damage'){
-						damageButtonContainer.append(damageButton, halfDamage, doubleDamage);
+						damageButtonContainer.append(damageButton, halfDamage, quarterDamage, doubleDamage);
 					}
 					else if(rollType == 'heal'){
 						damageButtonContainer.append(healDamage);
 					}
 					else{
-						damageButtonContainer.append(damageButton, halfDamage, doubleDamage, healDamage);
+						damageButtonContainer.append(damageButton, halfDamage, quarterDamage, doubleDamage, healDamage);
 					}
 					
 					li.find(`[class*='MessageContainer-Flex']`).append(damageButtonContainer);
@@ -344,12 +345,14 @@ class MessageBroker {
 			console.log("ALREADY LOADING A WS");
 			return;
 		}
-		this.loadingWS = true;
-
 		let self = this;
 		let url = this.url;
 		let userid = this.userid;
 		let gameid = this.gameid;
+		if (!gameid) 
+			return;
+		
+		this.loadingWS = true;
 
 		console.log("STARTING MB WITH TOKEN");
 
@@ -459,7 +462,7 @@ class MessageBroker {
 				}
 
 
-				let combatSettingData = getCombatTrackersettings();
+				let combatSettingData = getCombatTrackerSettings();
 				if(combatSettingData['tie_breaker'] !='1'){
 					total = parseInt(total);
 				}
@@ -525,6 +528,28 @@ class MessageBroker {
 		this.origRequestAnimFrame = null;
 		this.lastAlertTS = 0;
 		this.latestVersionSeen = window.AVTT_VERSION;
+
+		// Will initialize when the user interacts with the page in any way
+		const initNextTurnAudio = () => {
+			if (!window.nextTurnAudio && !window.DM) {
+				window.nextTurnAudio = document.createElement('audio');
+				window.nextTurnAudio.src = window.EXTENSION_PATH + 'assets/audio/NextTurnIndicator.mp3';
+				window.nextTurnAudio.volume = 0.3;
+				window.nextTurnAudio.preload = 'metadata';
+				document.body.appendChild(window.nextTurnAudio);
+				// The below must be done to satisfy browser autoplay policy
+				window.nextTurnAudio?.load()?.then(() => {
+					window.nextTurnAudio.pause();
+					window.nextTurnAudio.currentTime = 0;
+				})
+			}
+		};
+		if(is_abovevtt_page()){
+			document.addEventListener('click', initNextTurnAudio, { once: true });
+			document.addEventListener('keydown', initNextTurnAudio, { once: true });
+		}
+
+		
 
 		this.onmessage = async function(event,tries=0) {
 			if (event.data == "pong")
@@ -595,9 +620,298 @@ class MessageBroker {
 					}
 				}
 			}
+			if (msg.eventType == "dice/roll/pending") {
+				// check for injected_data!
+				if (msg.data.injected_data) {
+					notify_gamelog();
+					self.handle_injected_data(msg);
+				}
+			}
+			if (msg.eventType == "dice/roll/fulfilled") {
+				notify_gamelog();
+				const gamelogItem = $(`ol[class*='-GameLogEntries'] li`).first();
 
+
+				if (msg.data.rolls != undefined) {
+					let critSuccess = {};
+					let critFail = {};
+
+
+					for (let i = 0; i < msg.data.rolls.length; i++) {
+						let roll = msg.data.rolls[i];
+						critSuccess[i] = false;
+						critFail[i] = false;
+
+						for (let j = 0; j < roll.diceNotation.set.length; j++) {
+							for (let k = 0; k < roll.diceNotation.set[j].dice.length; k++) {
+								let reduceCrit = 0;
+								if (parseInt(roll.diceNotation.set[j].dice[k].dieType.replace('d', '')) == 20) {
+									reduceCrit = 20 - msg.data.critRange;
+								}
+								else if (msg.data.rolls[0].rollType == 'attack' || msg.data.rolls[0].rollType == 'to hit' || msg.data.rolls[0].rollType == 'tohit') {
+									continue;
+								}
+								if (roll.diceNotation.set[j].dice[k].dieValue >= parseInt(roll.diceNotation.set[j].dice[k].dieType.replace('d', '')) - reduceCrit && roll.result.values.includes(roll.diceNotation.set[j].dice[k].dieValue)) {
+									if (roll.rollKind == 'advantage') {
+										if (k > 0 && roll.diceNotation.set[j].dice[k - 1].dieValue <= roll.diceNotation.set[j].dice[k].dieValue) {
+											critSuccess[i] = true;
+										}
+										else if (k == 0 && roll.diceNotation.set[j].dice[k + 1].dieValue <= roll.diceNotation.set[j].dice[k].dieValue) {
+											critSuccess[i] = true;
+										}
+									}
+									else if (roll.rollKind == 'disadvantage' && roll.diceNotation.set[j].dice[1].dieValue == roll.diceNotation.set[j].dice[0].dieValue) {
+										critSuccess[i] = true;
+									}
+									else if (roll.rollKind != 'disadvantage') {
+										critSuccess[i] = true;
+									}
+								}
+								else if (roll.diceNotation.set[j].dice[k].dieValue == 1 && roll.result.values.includes(roll.diceNotation.set[j].dice[k].dieValue)) {
+									if (roll.rollKind == 'disadvantage') {
+										if (k > 0 && roll.diceNotation.set[j].dice[k - 1].dieValue >= roll.diceNotation.set[j].dice[k].dieValue) {
+											critFail[i] = true;
+										}
+										else if (k == 0 && roll.diceNotation.set[j].dice[k + 1].dieValue >= roll.diceNotation.set[j].dice[k].dieValue) {
+											critFail[i] = true;
+										}
+									}
+									else if (roll.rollKind == 'advantage' && roll.diceNotation.set[j].dice[1].dieValue == roll.diceNotation.set[j].dice[0].dieValue) {
+										critFail[i] = true;
+									}
+									else if (roll.rollKind != 'advantage') {
+										critFail[i] = true;
+									}
+								}
+							}
+						}
+					}
+
+
+					setTimeout(function () {
+						let target;
+						let listItems = $(`ol>li[class*='GameLogEntry']`);
+						for (let i = 0; i < listItems.length; i++) {
+							if ($(listItems[i]).find('[class*="Pending"]').length > 0)
+								continue;
+							if (target != undefined)
+								break;
+							for (let j = 0; j < msg.data.rolls.length; j++) {
+								if (target != undefined)
+									break;
+								let totals = $(listItems[i]).find(`[class*='TotalContainer-Flex']>div[class*='Total-']`);
+								if (totals.length == msg.data.rolls.length) {
+									for (let k = 0; k < totals.length; k++) {
+										if (parseInt($(totals[k]).find('span').text()) != msg.data.rolls[k].result.total)
+											break;
+										target = $(listItems[i]);
+									}
+
+								}
+							}
+						}
+						if (target != undefined) {
+							if (msg.avttExpression !== undefined && msg.avttExpressionResult !== undefined) {
+								target.attr("data-avtt-expression", msg.avttExpression);
+								target.attr("data-avtt-expression-result", msg.avttExpressionResult);
+								replace_gamelog_message_expressions(target);
+							}
+
+							let allRollsTotal = 0;
+							for (let i = 0; i < msg.data.rolls.length; i++) {
+								let row = i
+								if (!target.attr('class').includes('-Collapsed-ref')) {
+									row = row * 2 + 1
+								} else {
+									row++;
+								}
+								target.find(`[class*='DiceResultContainer']:nth-of-type(${row})`).toggleClass(`${critSuccess[i] && critFail[i] ? 'crit-mixed' : critSuccess[i] ? 'crit-success' : critFail[i] ? 'crit-fail' : ''}`, true)
+								if (msg.avttSpellSave !== undefined) {
+
+									let totalContainer = target.find(`[class*='DiceResultContainer']:nth-of-type(${row}) [class*='TotalContainer-Flex']`);
+									if (totalContainer.length > 0) {
+										let spellSave = msg.avttSpellSave;
+										if (spellSave !== undefined && spellSave.length > 0) {
+											totalContainer.append(`${spellSave != undefined ? `<div class='custom-spell-save-text'><span class='data-spellSave' data-avtt-spellSave='${spellSave}'>${spellSave}</span></div>` : ''}`);
+										}
+									}
+								}
+								if (msg.avttDamageType !== undefined) {
+
+									let damageContainer = target.find(`[class*='DiceResultContainer']:nth-of-type(${row}) [class*='Line-Title']>[class*='-RollType']`);
+									if (damageContainer.length > 0) {
+										let damageType = msg.avttDamageType;
+										if (damageType !== undefined && damageType.length > 0) {
+											damageContainer.text(`${damageType} ${damageContainer.text()}`)
+										}
+									}
+								}
+								allRollsTotal += msg.data.rolls[i].result.total;
+							}
+
+							if (window.DM) {
+								let rollType = msg.data.rolls[0].rollType.toLowerCase();
+								let rollAction = msg.data.action.toLowerCase();
+								if (rollType != undefined && rollAction != 'initiative' && rollType != "tohit" && rollType != "attack" && rollType != "to hit" && rollType != "save" && rollType != "skill" && rollType != "check" && window.DM) {
+									let damageButtonContainer = $(`<div class='damageButtonsContainer'></div>`);
+									let damageSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="ddbc-svg ddbc-combat-attack__icon-img--weapon-melee ddbc-attack-type-icon ddbc-attack-type-icon--1-1"><path class="prefix__st0" d="M237.9 515.1s-.1-.1 0 0c2-2.7 4.3-5.8 5.3-8.4 0 0-3.8 2.4-7.8 6.1.5.6 1.8 1.7 2.5 2.3zM231.4 517.8c-.2-.2-1.5-1.6-1.5-1.6l-1.6 1 2.4 2.6-3.7 4.6 1 1 3.7-4.3 1.1.9c.4-.5.8-.9 1.2-1.4l.2-.2c-1-.8-1.9-1.7-2.8-2.6zM0 0s6.1 5.8 12.2 11.5l1.4-2.2 1.8 1.3-2.9 2.5 3.7 4.6-1 1-3.7-4.3-2.8 2.5-1.3-1 2-1.6C9.4 14.2 2.2 5.6 0 0z"></path></svg>`
+									let healSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="ddbc-svg ddbc-attunement-svg ddbc-healing-icon__icon"><path d="M9.2,2.9c3.4-6.9,13.8,0,6.9,6.9c-6.9,6.9-6.9,10.4-6.9,10.4s0-3.5-6.9-10.4C-4.6,2.9,5.8-4,9.2,2.9"></path></svg>`
+									let damageButton = $(`<button class='applyDamageButton flat'>${damageSVG}</button>`);
+									let halfDamage = $(`<button class='applyDamageButton resist'>1/2 ${damageSVG}</button>`);
+									let doubleDamage = $(`<button class='applyDamageButton vulnerable'>2x${damageSVG}</button>`);
+									let quarterDamage = $(`<button class='applyDamageButton resist-save'>1/4 ${damageSVG}</button>`);
+									let healDamage = $(`<button class='applyDamageButton heal'>${healSVG}</button>`);
+
+
+									damageButtonContainer.off('click.damage').on('click.damage', 'button', function (e) {
+										const clicked = $(e.currentTarget);
+
+										let damage = allRollsTotal;
+										if (clicked.hasClass('resist')) {
+											damage = Math.max(1, Math.floor(damage / 2));
+										}
+										else if (clicked.hasClass('resist-save')) {
+											damage = Math.max(1, Math.floor(damage / 4));
+										}
+										else if (clicked.hasClass('vulnerable')) {
+											damage = damage * 2;
+										}
+										else if (clicked.hasClass('heal')) {
+											damage = -1 * damage;
+										}
+
+										if (is_gamelog_popout()) {
+											tabCommunicationChannel.postMessage({
+												msgType: 'gamelogDamageButtons',
+												damage: damage
+											});
+											return;
+										}
+										if ($(`.tokenselected:not([data-id*='profile'])`).length == 0) {
+											showTempMessage('No non-player tokens selected');
+										}
+										forSelTokens((token, id) => {
+											if (token.isPlayer() || token.isAoe()) return;
+											let newHp = Math.max(0, parseInt(token.hp) - parseInt(damage));
+
+											if (window.all_token_objects[id] != undefined) {
+												window.all_token_objects[id].hp = newHp;
+											}
+											if (token != undefined) {
+												token.hp = newHp;
+												token.place_sync_persist()
+												addFloatingCombatText(id, damage, damage < 0);
+											}
+										});
+
+									})
+									if (rollType == 'damage') {
+										damageButtonContainer.append(damageButton, halfDamage, quarterDamage, doubleDamage);
+									}
+									else if (rollType == 'heal') {
+										damageButtonContainer.append(healDamage);
+									}
+									else {
+										damageButtonContainer.append(damageButton, halfDamage, quarterDamage, doubleDamage, healDamage);
+									}
+
+									target.find(`[class*='MessageContainer-Flex']`).append(damageButtonContainer);
+
+
+								}
+								// CHECK FOR SELF ROLLS ADD SEND TO EVERYONE BUTTON
+								if (msg.messageScope === "userId" && target.find(".gamelog-to-everyone-button").length === 0) {
+									const sendToEveryone = $(`<button class="gamelog-to-everyone-button">Send To Everyone</button>`);
+									sendToEveryone.click(function (clickEvent) {
+										let resendMessage = msg;
+										resendMessage.id = uuid();
+										resendMessage.data.rollId = uuid();
+										resendMessage.messageScope = "gameId";
+										resendMessage.messageTarget = find_game_id();
+										resendMessage.dateTime = Date.now();
+										window.diceRoller.ddbDispatch(resendMessage);
+									});
+									target.find("time").before(sendToEveryone);
+								}
+							}
+
+						}
+
+					}, 100)
+				}
+
+
+				if (!window.DM)
+					return;
+
+				// CHECK FOR INIT ROLLS (auto add to combat tracker)
+				if (msg.data.action.toLowerCase() == "initiative") {
+					console.log(msg.data);
+					let total = parseFloat(msg.data.rolls[0].result.total);
+					let entityid = msg.data.context.entityId;
+
+					let monsterTokenExists = window.TOKEN_OBJECTS[entityid] != undefined;
+					let playerExists = window.pcs.filter(d => d.characterId == entityid).length > 0;
+					if (monsterTokenExists || playerExists) {
+						if (msg.data.context?.entityType == 'monster') {
+							let monsterid = window.TOKEN_OBJECTS[entityid]?.options?.monster
+							if (monsterid == 'open5e') {
+								window.StatHandler.getStat(monsterid, function (data) {
+									total = parseFloat(total + data.stats[1].value / 100).toFixed(2);
+								}, window.TOKEN_OBJECTS[entityid]?.options?.itemId);
+							}
+							else if (monsterid == 'customStat') {
+								let decimalAdd = (window.TOKEN_OBJECTS[entityid]?.options?.customInit != undefined || (window.TOKEN_OBJECTS[entityid]?.options?.customStat != undefined && window.TOKEN_OBJECTS[entityid]?.options?.customStat[1]?.mod != undefined)) ? ((window.TOKEN_OBJECTS[entityid]?.options?.customStat[1]?.mod * 2) + 10) / 100 : 0
+								total = parseFloat(total + decimalAdd).toFixed(2);
+							}
+							else {
+								window.StatHandler.getStat(monsterid, function (stat) {
+									total = parseFloat(total + stat.data.stats[1].value / 100).toFixed(2);
+								}, window.TOKEN_OBJECTS[entityid]?.options?.itemId);
+							}
+						}
+						else {
+							let dexScore = window.pcs.filter(d => d.characterId == entityid)[0].abilities[1].score;
+							if (dexScore) {
+								total = parseFloat(total + dexScore / 100).toFixed(2);
+							}
+						}
+
+						let combatSettingData = getCombatTrackerSettings();
+						if (combatSettingData['tie_breaker'] != '1') {
+							total = parseInt(total);
+						}
+
+
+						$("#tokens .VTTToken").each(
+							function () {
+								let converted = $(this).attr('data-id').replace(/^.*\/([0-9]*)$/, "$1"); // profiles/ciccio/1234 -> 1234
+								if (converted == entityid) {
+									ct_add_token(window.TOKEN_OBJECTS[$(this).attr('data-id')]);
+									window.all_token_objects[$(this).attr('data-id')].options.init = total;
+									window.TOKEN_OBJECTS[$(this).attr('data-id')].options.init = total;
+									window.TOKEN_OBJECTS[$(this).attr('data-id')].update_and_sync();
+								}
+							}
+						);
+
+						$("#combat_area tr").each(function () {
+							let converted = $(this).attr('data-target').replace(/^.*\/([0-9]*)$/, "$1"); // profiles/ciccio/1234 -> 1234
+							if (converted == entityid) {
+								$(this).find(".init").val(total);
+								window.all_token_objects[$(this).attr('data-target')].options.init = total;
+								window.TOKEN_OBJECTS[$(this).attr('data-target')].options.init = total;
+								window.TOKEN_OBJECTS[$(this).attr('data-target')].update_and_sync();
+							}
+						});
+						debounceCombatReorder(true);
+					}
+
+				}
+
+			}
 			// WE NEED TO IGNORE CERTAIN MESSAGE IF THEY'RE NOT FROM THE CURRENT SCENE
-			if (msg.sceneId && window.CURRENT_SCENE_DATA && msg.sceneId !== window.CURRENT_SCENE_DATA.id && [
+			if (window.CURRENT_SCENE_DATA == undefined || (msg.sceneId && window.CURRENT_SCENE_DATA && msg.sceneId !== window.CURRENT_SCENE_DATA.id && [
 				"custom/myVTT/delete_token",
 				"custom/myVTT/createtoken",
 				"custom/myVTT/reveal",
@@ -607,11 +921,14 @@ class MessageBroker {
 				"custom/myVTT/highlight",
 				"custom/myVTT/pointer",
 				"custom/myVTT/place-extras-token"
-			].includes(msg.eventType)) {
+			].includes(msg.eventType))) {
 				console.log("skipping msg from a different scene");
 				return;
 			}
-
+			if (msg.eventType == "character-sheet/item-shared/fulfilled"){
+				DDBApi.debounceGetPartyInventory();
+				return;
+			}
 			if (msg.eventType == "custom/myVTT/token" && (msg.sceneId == window.CURRENT_SCENE_DATA.id || msg.data.id in window.TOKEN_OBJECTS)) {
 				self.handleToken(msg);
 			}
@@ -638,6 +955,10 @@ class MessageBroker {
 					deleteExploredScene(msg.data.sceneId)
 				}
 			}
+			if (msg.eventType == "custom/myVTT/campaignData"){
+				window.AVTT_CAMPAIGN_INFO = msg.data;
+				window.MB.checkHideSceneFromPlayers();
+			}
 			if(msg.eventType == "custom/myVTT/place-extras-token"){
 				if(window.DM){
 					let left = parseInt(msg.data.centerView.x);
@@ -646,6 +967,23 @@ class MessageBroker {
 					fetch_and_cache_monsters([monsterId], function(){
 						create_and_place_token(window.cached_monster_items[monsterId], undefined, undefined, left, top, undefined, undefined, true, msg.data.extraOptions)
 					});
+				}
+			}
+			if(msg.eventType == "custom/myVTT/createTimer"){
+				const {type, message, startTime, duration, remove} = msg.data;
+				if(type === "gamelog"){
+					create_gamelog_timer(message, duration, startTime)
+				}
+				else if(type === "combatTracker"){
+					if(remove){
+						$('.ctTimer').remove();
+						if (combatTrackerTimerId) {
+							clearInterval(combatTrackerTimerId);
+							combatTrackerTimerId = null;
+						}
+						return;
+					}
+					create_combat_tracker_timer(duration, startTime)
 				}
 			}
 			if (msg.eventType == "custom/myVTT/open-url-embed"){
@@ -669,9 +1007,11 @@ class MessageBroker {
 						window.handleSceneQueue.push(msg);
 					}
 					else{
+						window.LOADING = true;
 						AboveApi.getScene(msg.data.sceneid).then((response) => {
 							self.handleScene(response);
 						}).catch((error) => {
+							delete window.LOADING;
 							console.error("Failed to download scene", error);
 						});
 					}
@@ -993,13 +1333,7 @@ class MessageBroker {
 
 			}
 
-			if (msg.eventType == "dice/roll/pending"){
-				// check for injected_data!
-				if(msg.data.injected_data){
-					notify_gamelog();
-					self.handle_injected_data(msg);
-				}
-			}
+
 			
 
 			if(msg.eventType == "custom/myVTT/whatsyourdicerolldefault"){
@@ -1013,7 +1347,7 @@ class MessageBroker {
 						streamid: diceplayer_id
 					});		
 				}
-				else if(sendToText == "Dungeon Master"){
+				else if (sendToText == "Dungeon Master" || sendToText == "DM"){
 					window.MB.sendMessage("custom/myVTT/showonlytodmdicestream",{
 						streamid: diceplayer_id
 					});
@@ -1250,291 +1584,9 @@ class MessageBroker {
 				peer.setRemoteDescription(msg.data.answer);
 				console.log("fatto setRemoteDescription");
 			}
-			
-			if (msg.eventType == "dice/roll/fulfilled") {
-				notify_gamelog();
-				const gamelogItem = $(`ol[class*='-GameLogEntries'] li`).first(); 
-				if (msg.avttExpression !== undefined && msg.avttExpressionResult !== undefined) {	
-					gamelogItem.attr("data-avtt-expression", msg.avttExpression);
-					gamelogItem.attr("data-avtt-expression-result", msg.avttExpressionResult);
-					replace_gamelog_message_expressions(gamelogItem);
-				}
 
 
-				if(msg.data.rolls != undefined){
-					let critSuccess = {};
-					let critFail = {};
 
-
-					for(let i=0; i<msg.data.rolls.length; i++){
-						let roll = msg.data.rolls[i];
-						critSuccess[i] = false;
-						critFail[i] = false;
-
-						for (let j=0; j<roll.diceNotation.set.length; j++){
-							for(let k=0; k<roll.diceNotation.set[j].dice.length; k++){
-								let reduceCrit = 0;
-								if(parseInt(roll.diceNotation.set[j].dice[k].dieType.replace('d', '')) == 20){
-                  					reduceCrit = 20 - msg.data.critRange;
-								}
-								else if(msg.data.rolls[0].rollType == 'attack' || msg.data.rolls[0].rollType == 'to hit' || msg.data.rolls[0].rollType == 'tohit' ){
-									continue;
-								}
-								if(roll.diceNotation.set[j].dice[k].dieValue >= parseInt(roll.diceNotation.set[j].dice[k].dieType.replace('d', ''))-reduceCrit && roll.result.values.includes(roll.diceNotation.set[j].dice[k].dieValue)){
-									if(roll.rollKind == 'advantage'){
-										if(k>0 && roll.diceNotation.set[j].dice[k-1].dieValue <= roll.diceNotation.set[j].dice[k].dieValue){
-											critSuccess[i] = true;
-										}
-										else if(k==0 && roll.diceNotation.set[j].dice[k+1].dieValue <= roll.diceNotation.set[j].dice[k].dieValue){
-											critSuccess[i] = true;
-										}
-									}
-									else if(roll.rollKind == 'disadvantage' && roll.diceNotation.set[j].dice[1].dieValue == roll.diceNotation.set[j].dice[0].dieValue){
-										critSuccess[i] = true;
-									}
-									else if(roll.rollKind != 'disadvantage'){
-										critSuccess[i] = true;
-									}		
-								}
-								else if(roll.diceNotation.set[j].dice[k].dieValue == 1 && roll.result.values.includes(roll.diceNotation.set[j].dice[k].dieValue)){
-									if(roll.rollKind == 'disadvantage'){
-										if(k>0 && roll.diceNotation.set[j].dice[k-1].dieValue >= roll.diceNotation.set[j].dice[k].dieValue){
-											critFail[i] = true;
-										}
-										else if(k==0 && roll.diceNotation.set[j].dice[k+1].dieValue >= roll.diceNotation.set[j].dice[k].dieValue){
-											critFail[i] = true;
-										}
-									}
-									else if(roll.rollKind == 'advantage' && roll.diceNotation.set[j].dice[1].dieValue == roll.diceNotation.set[j].dice[0].dieValue){
-										critFail[i] = true;
-									}
-									else if(roll.rollKind != 'advantage'){
-										critFail[i] = true;
-									}		
-								}
-							}
-						}
-					}
-
-
-					setTimeout(function(){
-						let target;
-						let listItems = $(`ol>li[class*='GameLogEntry']`);
-						for(let i = 0; i<listItems.length; i++){
-							if($(listItems[i]).find('[class*="Pending"]').length > 0)
-								continue;
-							if(target != undefined)
-								break;
-							for(let j = 0; j < msg.data.rolls.length; j++){
-								if(target != undefined)
-										break;
-								let totals = $(listItems[i]).find(`[class*='TotalContainer-Flex']>div[class*='Total-']`);
-								if(totals.length == msg.data.rolls.length){
-									for(let k = 0; k<totals.length; k++){
-											if(parseInt($(totals[k]).find('span').text()) != msg.data.rolls[k].result.total)
-												break;
-											target = $(listItems[i]);
-									}
-									
-								}
-							}		
-						}
-						if(target != undefined){
-							let allRollsTotal = 0;
-							for(let i = 0; i<msg.data.rolls.length; i++){
-								let row = i
-								if(!target.attr('class').includes('-Collapsed-ref')){
-									row = row*2+1
-								}else{
-									row++;
-								}
-								target.find(`[class*='DiceResultContainer']:nth-of-type(${row})`).toggleClass(`${critSuccess[i] && critFail[i] ? 'crit-mixed' : critSuccess[i] ? 'crit-success' : critFail[i] ? 'crit-fail' : ''}`, true)
-								if(msg.avttSpellSave !== undefined){
-							
-									let totalContainer = target.find(`[class*='DiceResultContainer']:nth-of-type(${row}) [class*='TotalContainer-Flex']`);
-							    if (totalContainer.length > 0) {
-							        let spellSave = msg.avttSpellSave;
-							        if (spellSave !== undefined && spellSave.length > 0) {
-							            totalContainer.append(`${spellSave != undefined ? `<div class='custom-spell-save-text'><span class='data-spellSave' data-avtt-spellSave='${spellSave}'>${spellSave}</span></div>` : ''}`);
-							        }
-							    }
-								}
-								if(msg.avttDamageType !== undefined){
-							
-									let damageContainer = target.find(`[class*='DiceResultContainer']:nth-of-type(${row}) [class*='Line-Title']>[class*='-RollType']`);
-							    if (damageContainer.length > 0) {
-							        let damageType = msg.avttDamageType;
-							        if (damageType !== undefined && damageType.length > 0) {
-							            damageContainer.text(`${damageType} ${damageContainer.text()}`)
-							        }
-							    }
-								}
-								allRollsTotal += msg.data.rolls[i].result.total;
-							}
-
-							if(window.DM){
-								let rollType = msg.data.rolls[0].rollType.toLowerCase();
-								let rollAction = msg.data.action.toLowerCase();
-								if(rollType != undefined && rollAction != 'initiative' && rollType != "tohit" && rollType != "attack" && rollType != "to hit" && rollType != "save" && rollType != "skill" && rollType != "check" && window.DM){
-									let damageButtonContainer = $(`<div class='damageButtonsContainer'></div>`);
-									let damageSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="ddbc-svg ddbc-combat-attack__icon-img--weapon-melee ddbc-attack-type-icon ddbc-attack-type-icon--1-1"><path class="prefix__st0" d="M237.9 515.1s-.1-.1 0 0c2-2.7 4.3-5.8 5.3-8.4 0 0-3.8 2.4-7.8 6.1.5.6 1.8 1.7 2.5 2.3zM231.4 517.8c-.2-.2-1.5-1.6-1.5-1.6l-1.6 1 2.4 2.6-3.7 4.6 1 1 3.7-4.3 1.1.9c.4-.5.8-.9 1.2-1.4l.2-.2c-1-.8-1.9-1.7-2.8-2.6zM0 0s6.1 5.8 12.2 11.5l1.4-2.2 1.8 1.3-2.9 2.5 3.7 4.6-1 1-3.7-4.3-2.8 2.5-1.3-1 2-1.6C9.4 14.2 2.2 5.6 0 0z"></path></svg>`
-									let healSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="ddbc-svg ddbc-attunement-svg ddbc-healing-icon__icon"><path d="M9.2,2.9c3.4-6.9,13.8,0,6.9,6.9c-6.9,6.9-6.9,10.4-6.9,10.4s0-3.5-6.9-10.4C-4.6,2.9,5.8-4,9.2,2.9"></path></svg>`
-									let damageButton = $(`<button class='applyDamageButton flat'>${damageSVG}</button>`);
-									let halfDamage = $(`<button class='applyDamageButton resist'>1/2 ${damageSVG}</button>`);
-									let doubleDamage = $(`<button class='applyDamageButton vulnerable'>2x${damageSVG}</button>`);
-									let healDamage = $(`<button class='applyDamageButton heal'>${healSVG}</button>`);
-
-
-									damageButtonContainer.off('click.damage').on('click.damage', 'button', function(e){
-										const clicked = $(e.currentTarget);
-
-										let damage = allRollsTotal;
-										if(clicked.hasClass('resist')){
-											damage = Math.max(1, Math.floor(damage/2));
-										}
-										else if(clicked.hasClass('vulnerable')){
-											damage = damage*2;
-										}
-										else if(clicked.hasClass('heal')){
-											damage = -1*damage;
-										}
-
-										if(is_gamelog_popout()){
-											tabCommunicationChannel.postMessage({
-						           msgType: 'gamelogDamageButtons',
-						           damage: damage
-						          });
-						          return;
-										}
-										if($(`.tokenselected:not([data-id*='profile'])`).length == 0){
-											showTempMessage('No non-player tokens selected');
-										}
-										for(let i=0; i<window.CURRENTLY_SELECTED_TOKENS.length; i++){
-
-											let id = window.CURRENTLY_SELECTED_TOKENS[i];
-											let token = window.TOKEN_OBJECTS[id];
-											if(token.isPlayer() || token.isAoe())
-												continue;
-											let newHp = Math.max(0, parseInt(token.hp) - parseInt(damage));
-
-											if(window.all_token_objects[id] != undefined){
-												window.all_token_objects[id].hp = newHp;
-											}			
-											if(token != undefined){		
-												token.hp = newHp;
-												token.place_sync_persist()
-												addFloatingCombatText(id, damage, damage<0);
-											}		
-										}
-
-									})
-									if(rollType == 'damage'){
-										damageButtonContainer.append(damageButton, halfDamage, doubleDamage);
-									}
-									else if(rollType == 'heal'){
-										damageButtonContainer.append(healDamage);
-									}
-									else{
-										damageButtonContainer.append(damageButton, halfDamage, doubleDamage, healDamage);
-									}
-								
-									target.find(`[class*='MessageContainer-Flex']`).append(damageButtonContainer);
-									
-									
-								}
-								// CHECK FOR SELF ROLLS ADD SEND TO EVERYONE BUTTON
-								if (msg.messageScope === "userId" && target.find(".gamelog-to-everyone-button").length === 0) {
-									const sendToEveryone = $(`<button class="gamelog-to-everyone-button">Send To Everyone</button>`);
-									sendToEveryone.click(function (clickEvent) {
-										let resendMessage = msg;
-										resendMessage.id = uuid();
-										resendMessage.data.rollId = uuid();
-										resendMessage.messageScope = "gameId";
-										resendMessage.messageTarget = find_game_id();
-										resendMessage.dateTime = Date.now();
-										window.diceRoller.ddbDispatch(resendMessage);
-									});
-									target.find("time").before(sendToEveryone);
-								}
-							}
-
-						}
-						
-					}, 100)
-				}
-				
-				
-				if (!window.DM)
-					return;
-				
-				// CHECK FOR INIT ROLLS (auto add to combat tracker)
-				if (msg.data.action.toLowerCase() == "initiative") {
-					console.log(msg.data);
-					let total = parseFloat(msg.data.rolls[0].result.total);
-					let entityid = msg.data.context.entityId;
-					
-					let monsterTokenExists = window.TOKEN_OBJECTS[entityid] != undefined;
-					let playerExists = window.pcs.filter(d=> d.characterId == entityid).length>0;
-					if(monsterTokenExists || playerExists){
-						if(msg.data.context?.entityType == 'monster'){
-							let monsterid = window.TOKEN_OBJECTS[entityid]?.options?.monster
-							if(monsterid =='open5e')
-							{
-								window.StatHandler.getStat(monsterid, function(data) {
-									total = parseFloat(total + data.stats[1].value/100).toFixed(2);
-								}, window.TOKEN_OBJECTS[entityid]?.options?.itemId);
-							}
-							else if(monsterid =='customStat'){
-								let decimalAdd = (window.TOKEN_OBJECTS[entityid]?.options?.customInit != undefined || (window.TOKEN_OBJECTS[entityid]?.options?.customStat != undefined && window.TOKEN_OBJECTS[entityid]?.options?.customStat[1]?.mod != undefined)) ? ((window.TOKEN_OBJECTS[entityid]?.options?.customStat[1]?.mod*2)+10)/100 : 0
-								total = parseFloat(total + decimalAdd).toFixed(2);
-							}
-							else{
-								window.StatHandler.getStat(monsterid, function(stat) {
-										total = parseFloat(total + stat.data.stats[1].value/100).toFixed(2);
-								}, window.TOKEN_OBJECTS[entityid]?.options?.itemId);
-							}
-						}
-						else{
-							let dexScore = window.pcs.filter(d=> d.characterId == entityid)[0].abilities[1].score;		
-							if(dexScore){
-								total = parseFloat(total + dexScore/100).toFixed(2);
-							}
-						}
-						
-						let combatSettingData = getCombatTrackersettings();
-						if(combatSettingData['tie_breaker'] !='1'){
-							total = parseInt(total);
-						}
-
-						
-						$("#tokens .VTTToken").each(
-							function(){
-								let converted = $(this).attr('data-id').replace(/^.*\/([0-9]*)$/, "$1"); // profiles/ciccio/1234 -> 1234
-								if(converted==entityid){
-									ct_add_token(window.TOKEN_OBJECTS[$(this).attr('data-id')]);
-									window.all_token_objects[$(this).attr('data-id')].options.init = total;
-									window.TOKEN_OBJECTS[$(this).attr('data-id')].options.init = total;
-									window.TOKEN_OBJECTS[$(this).attr('data-id')].update_and_sync();
-								}
-							}
-						);
-
-						$("#combat_area tr").each(function() {
-							let converted = $(this).attr('data-target').replace(/^.*\/([0-9]*)$/, "$1"); // profiles/ciccio/1234 -> 1234
-							if (converted == entityid) {
-								$(this).find(".init").val(total);
-								window.all_token_objects[$(this).attr('data-target')].options.init = total;
-								window.TOKEN_OBJECTS[$(this).attr('data-target')].options.init = total;
-								window.TOKEN_OBJECTS[$(this).attr('data-target')].update_and_sync();
-							}
-						});
-						debounceCombatReorder(true);
-					}
-					
-				}
-				
-			}
-			
 			if (msg.eventType === "custom/myVTT/peerReady") {
 				window.PeerManager.receivedPeerReady(msg);
 			}
@@ -1592,29 +1644,55 @@ class MessageBroker {
 		self.loadAboveWS(notify_player_join);
 
 	}
-
+	checkHideSceneFromPlayers(){
+		$('#hidden-scenes-message').remove();
+		if (window.AVTT_CAMPAIGN_INFO?.hidePlayersScene == 1 && !window.DM) {
+			let hiddenMessage;
+			if (window.myUser != window.CAMPAIGN_INFO.dmId) {
+				$('#VTT').toggleClass('hide-players', true);
+				hiddenMessage = `<div id="hidden-scenes-message">The DM currently has the map hidden from players.</div>`;
+			} else {
+				hiddenMessage = `<div id="hidden-scenes-message">You have scenes hidden from players (DM user can still preview).</div>`;
+			}
+			$('body').append(hiddenMessage);
+		} else {
+			$('#VTT').toggleClass('hide-players', false);	
+		}
+	}
 	async handleScene (msg, forceRefresh=false) {
 		console.debug("handlescene", msg);
+		window.LOADING = true;
+		window.MB.checkHideSceneFromPlayers();
+		if(window.WIZARDING){
+			forceRefresh = true;
+			delete window.WIZARDING;
+		}
 		try{
 			if(msg.data.scale_factor == undefined || msg.data.scale_factor == ''){
 				msg.data.scale_factor = 1;
 			}
+			window.CURRENT_SCENE_DATA.conversion = window.CURRENT_SCENE_DATA.conversion || 1;
 			let isCurrentScene = window.CURRENT_SCENE_DATA?.id != undefined && msg.data.id == window.CURRENT_SCENE_DATA.id
 			let dmMapEqual = msg.data.dm_map == window.CURRENT_SCENE_DATA.dm_map && msg.data.dm_map_usable == '1' || msg.data.player_map == window.CURRENT_SCENE_DATA.player_map && msg.data.dm_map_usable == '0'
 			let dmMapToggleEqual = msg.data.dm_map_usable == window.CURRENT_SCENE_DATA.dm_map_usable
 			let playerMapEqual = msg.data.player_map == window.CURRENT_SCENE_DATA.player_map
-			let scaleFactorEqual = (msg.data.scale_factor == window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion || 
+			let scaleFactorEqual = (msg.data.scale_factor/window.CURRENT_SCENE_DATA.conversion == window.CURRENT_SCENE_DATA.scale_factor ||
+																		(msg.data.UVTTFile == 1  && msg.data.scale_factor == window.CURRENT_SCENE_DATA.scale_factor) || 
 																		((msg.data.scale_factor == undefined || msg.data.scale_factor=='') && window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion == 1))
-			let hppsEqual = window.CURRENT_SCENE_DATA.hpps==parseFloat(msg.data.hpps*msg.data.scale_factor)
-			let vppsEqual = window.CURRENT_SCENE_DATA.vpps==parseFloat(msg.data.vpps*msg.data.scale_factor)
+			let hppsEqual = (window.CURRENT_SCENE_DATA.gridType == 2 && window.CURRENT_SCENE_DATA.hpps == parseFloat(msg.data.vpps * msg.data.scale_factor)) || window.CURRENT_SCENE_DATA.hpps==parseFloat(msg.data.hpps*msg.data.scale_factor)
+			let vppsEqual = (window.CURRENT_SCENE_DATA.gridType == 3 && window.CURRENT_SCENE_DATA.vpps == parseFloat(msg.data.hpps * msg.data.scale_factor)) || window.CURRENT_SCENE_DATA.vpps==parseFloat(msg.data.vpps*msg.data.scale_factor)
+			let fpsqEqual = (window.CURRENT_SCENE_DATA.fpsq == msg.data.fpsq)
+			
+			
 			let isVideoEqual = window.CURRENT_SCENE_DATA.player_map_is_video == msg.data.player_map_is_video && window.CURRENT_SCENE_DATA.dm_map_is_video == msg.data.dm_map_is_video
 
-			let isSameScaleAndMaps = isCurrentScene && scaleFactorEqual && hppsEqual && vppsEqual && isVideoEqual && ((window.DM && dmMapEqual && dmMapToggleEqual) || (!window.DM && playerMapEqual))
+			let isSameScaleAndMaps = isCurrentScene && scaleFactorEqual && hppsEqual && vppsEqual && fpsqEqual && isVideoEqual && ((window.DM && dmMapEqual && dmMapToggleEqual) || (!window.DM && playerMapEqual))
 			
 			const isSameTokenLight = window.CURRENT_SCENE_DATA.disableSceneVision == msg.data.disableSceneVision;																		
 			
 
 			if(isSameScaleAndMaps && !forceRefresh){
+				delete window.LOADING;
 				let scaleFactor = window.CURRENT_SCENE_DATA.scale_factor;
 				let conversion = window.CURRENT_SCENE_DATA.conversion;
 
@@ -1644,33 +1722,24 @@ class MessageBroker {
 				$("#VTT").css("--scene-scale", scaleFactor)
 				window.CURRENT_SCENE_DATA.width = mapWidth;
 				window.CURRENT_SCENE_DATA.height = mapHeight;
-				
+				await reset_canvas(false);
 
-				if(window.CURRENT_SCENE_DATA.gridType == 2 || window.CURRENT_SCENE_DATA.gridType == 3){
-					const a = 2 * Math.PI / 6;
-					const hexWidth = window.CURRENT_SCENE_DATA.hpps * Math.sin(a) * 2 * window.CURRENT_SCENE_DATA.scale_factor;
-					const hexHeight = window.CURRENT_SCENE_DATA.hpps * (1 + Math.cos(a)) * window.CURRENT_SCENE_DATA.scale_factor;
-					window.hexGridSize = {
-						width: hexWidth,
-						height: hexHeight
-					}
-				}
 				if(!isSameTokenLight){
 					for(let i in window.TOKEN_OBJECTS){
 						const token = $(`#tokens div[data-id='${i}']`);
 						setTokenLight(token, window.TOKEN_OBJECTS[i].options);
 					}
 				}
-				await reset_canvas(false);
+				
 				if(!window.DM || window.SelectedTokenVision)
 					check_token_visibility();
 			}
 			else{
 				window.DRAWINGS = [];
 				window.wallUndo = [];
+				window.visionBlockingTokenCache = {};
+				window.lightDrawingLosCache = {};
 				$('#exploredCanvas').remove();
-				window.sceneRequestTime = Date.now();
-		    	let lastSceneRequestTime = window.sceneRequestTime;   
 				window.TOKEN_OBJECTS = {};
 				window.ON_SCREEN_TOKENS = {};
 				window.videoTokenOld = {};
@@ -1723,7 +1792,7 @@ class MessageBroker {
 				if(data.UVTTFile == 1){
 					build_import_loading_indicator("Loading UVTT Map");
 					try{
-						if(window.DM && data.dm_map && data.dm_map_usable){
+						if (window.DM && data.dm_map && data.dm_map_usable == '1'){
 							data.map = await get_map_from_uvtt_file(data.map)
 						}
 						else{
@@ -1732,7 +1801,7 @@ class MessageBroker {
 					}
 					catch{
 						console.log('non-UVTT file found for map')
-						if(window.DM && data.dm_map && data.dm_map_usable){
+						if (window.DM && data.dm_map && data.dm_map_usable == '1'){
 							data.map = data.dm_map;
 						}
 						else{
@@ -1741,12 +1810,16 @@ class MessageBroker {
 					}
 				}
 				else{
+					if (window.DM && data.dm_map && data.dm_map_usable == '1') {
+						data.map = data.dm_map;
+					}
+					else {
+						data.map = data.player_map;
+					}
 					await build_import_loading_indicator(`Loading ${window.DM ? data.title : 'Scene'}`);		
 				}
 				$('.import-loading-indicator .percentageLoaded').css('width', `0%`);
 				if(msg.data.id == window.CURRENT_SCENE_DATA.id){ // incase another map was loaded before we get uvtt data back
-
-
 					if (data.fog_of_war == 1) {
 						window.FOG_OF_WAR = true;
 						window.REVEALED = data.reveals;
@@ -1762,12 +1835,13 @@ class MessageBroker {
 					else {
 						window.DRAWINGS = [];
 					}
-					window.LOADING = true;
+
 					if(!window.DM && (data.player_map_is_video == '1' || data.player_map?.includes('youtube.com') || data.player_map?.includes("youtu.be") || data.is_video == '1')){
-						data.map = data.player_map;
 						data.is_video = data.player_map_is_video;
 					}
-
+					if (!window.CURRENT_SCENE_DATA.fpsq || window.CURRENT_SCENE_DATA.fpsq == "" ){
+						window.CURRENT_SCENE_DATA.fpsq = 5;
+					}
 					load_scenemap(data.map, data.is_video, data.width, data.height, data.UVTTFile, async function() {
 						
 						console.group("load_scenemap callback")
@@ -1780,8 +1854,8 @@ class MessageBroker {
 
 	
 						window.CURRENT_SCENE_DATA.conversion = 1;
-
-						if(!data.is_video && (mapHeight > 2500 || mapWidth > 2500)){
+						
+						if (!data.map?.includes('youtube.com') && (mapHeight > 2500 || mapWidth > 2500)){
 							let conversion = 2;
 							if(mapWidth >= mapHeight){
 								conversion = 1980 / mapWidth;
@@ -1811,16 +1885,9 @@ class MessageBroker {
 						$('.import-loading-indicator .percentageLoaded').css('width', `10%`);	
 						window.CURRENT_SCENE_DATA.width = mapWidth;
 						window.CURRENT_SCENE_DATA.height = mapHeight;
-						
-
 						if(window.CURRENT_SCENE_DATA.gridType == 2 || window.CURRENT_SCENE_DATA.gridType == 3){
-							const a = 2 * Math.PI / 6;
-							const hexWidth = window.CURRENT_SCENE_DATA.hpps * Math.sin(a) * 2 * window.CURRENT_SCENE_DATA.scale_factor;
-							const hexHeight = window.CURRENT_SCENE_DATA.hpps * (1 + Math.cos(a)) * window.CURRENT_SCENE_DATA.scale_factor;
-							window.hexGridSize = {
-								width: hexWidth,
-								height: hexHeight
-							}
+						}else{
+							delete window.CURRENT_SCENE_DATA.scaleAdjustment;
 						}
 
 						// Scale map according to scaleFactor
@@ -1844,26 +1911,11 @@ class MessageBroker {
 						}
 
 
-						if(!window.DM && data.dm_map_usable=="1" && data.UVTTFile != 1 && !data.is_video){
-	
-							$("#scene_map").stop();
-							$("#scene_map").css("opacity","0");
-							console.log("switching back to player map");
-							$("#scene_map").off("load");
-							$("#scene_map").on("load", () => {
-								$("#scene_map").css('opacity', 1)
-								$("#darkness_layer").show();
-							});
-							const url = data.player_map.startsWith(`above-bucket-not-a-url`) ? await getAvttStorageUrl(data.player_map) : await getGoogleDriveAPILink(data.player_map);
-							
-							$("#scene_map").attr('src', url);
-							$('.import-loading-indicator .percentageLoaded').css('width', `20%`);		
-						}
 						await reset_canvas();
-		        		await set_default_vttwrapper_size();
+        				await set_default_vttwrapper_size();
+						$('.import-loading-indicator .percentageLoaded').css('width', `20%`);	
 						remove_loading_overlay();
 						console.log("LOADING TOKENS!");
-						
 
 						let tokensLength = Object.keys(data.tokens).length;
 						let count = 0;
@@ -1886,8 +1938,8 @@ class MessageBroker {
 			
 						await tokenLoop(data, count, tokensLength);
 
-						if(window.TELEPORTER_PASTE_BUFFER != undefined){
-							try{
+						if (window.TELEPORTER_PASTE_BUFFER != undefined) {
+							try {
 								const teleporterTokenId = window.TELEPORTER_PASTE_BUFFER.targetToken
 								const targetPortal = window.TOKEN_OBJECTS[teleporterTokenId];
 								const top = (parseInt(targetPortal.options.top) + 25) * (window.CURRENT_SCENE_DATA.scale_factor / targetPortal.options.scaleCreated);
@@ -1896,10 +1948,9 @@ class MessageBroker {
 								await paste_selected_tokens(left, top, isTeleporter);
 								window.TOKEN_OBJECTS[teleporterTokenId].highlight();
 							}
-							catch{
+							catch {
 								window.TELEPORTER_PASTE_BUFFER = undefined;
 							}
-							
 						}
 
 
@@ -1952,6 +2003,7 @@ class MessageBroker {
 			}
 		}
 		catch (e) {
+			delete window.LOADING;
 			window.MB.loadNextScene();
 			remove_loading_overlay();
 			showError(e);
@@ -1963,18 +2015,65 @@ class MessageBroker {
 		if (window.handleSceneQueue == undefined || window.handleSceneQueue?.length == 0)
 			return;
 		const msg = window.handleSceneQueue.pop(); // get most recent item and load it
+		if(msg.data.sceneid == window.CURRENT_SCENE_DATA.id){ 
+			this.loadNextScene();
+			return;
+		}
 		window.handleSceneQueue = [];
+		window.LOADING = true;
 		AboveApi.getScene(msg.data.sceneid).then((response) => {
 			window.MB.handleScene(response);
 		}).catch((error) => {
 			if (window.handleSceneQueue?.length > 0) {
-				setTimeout(loadNextScene, 100);
+				setTimeout(window.MB.loadNextScene, 100);
+			} else{
+				delete window.LOADING;
 			}
 			console.error("Failed to download scene", error);
 		});
 	}
   	handleCT(data){
 		ct_load(data);
+		if(getCombatTrackerSettings().next_turn_indicator == '1'){
+			this.handleNextTurnIndicator();
+		}
+	}
+
+	handleNextTurnIndicator() {
+		let nextPlayerId = undefined
+		let nextAfterCurrent = $("#combat_area tr[data-current=1]").nextAll('tr:not([skipTurn])').first();
+		if(nextAfterCurrent.length == 0){
+			// If we're at the end, get the first combatant
+			nextAfterCurrent = $("#combat_area tr:not([skipTurn])").first();
+		}
+
+		if(nextAfterCurrent.length > 0){
+			let nextCombatantId = nextAfterCurrent.attr('data-target');
+			console.log(nextCombatantId);
+			if(nextCombatantId && window.TOKEN_OBJECTS[nextCombatantId]){
+				let token = window.TOKEN_OBJECTS[nextCombatantId];
+				console.log(token);
+				if(token.isPlayer()){
+					let playerId = getPlayerIDFromSheet(token.options.id);
+					console.log(playerId)
+					if(playerId && playerId != -1 && playerId != 'DM'){
+						nextPlayerId = playerId;
+					}
+				}
+			}
+		}
+		if(!window.DM && nextPlayerId == window.PLAYER_ID){
+			showTempMessage("Your turn is next! Get ready!");
+			try {
+				window.nextTurnAudio.currentTime = 0;
+				window.nextTurnAudio.play().catch(err => {
+					console.warn("Failed to play next turn notification sound.", err);
+				});
+
+			} catch (error) {
+				console.error("Error playing next turn notification sound:", error);
+			}
+		}
 	}
 
 	encode_message_text(text) {
@@ -2001,13 +2100,19 @@ class MessageBroker {
 	}
 	
 	convertChat(data,local=false) {
-
 		data.text = this.decode_message_text(data.text);
 
+
+		const isChatEnabled = is_encounters_page() || is_characters_page() || is_campaign_page();
+
 		//Security logic to prevent content being sent which can execute JavaScript.
-		data.player = DOMPurify.sanitize( data.player,{ALLOWED_TAGS: []});
-		data.img = DOMPurify.sanitize( data.img,{ALLOWED_TAGS: []});
+		let image = `<img class="${isChatEnabled ? 'tss-1e4a2a1-AvatarPortrait' : 'Avatar_AvatarPortrait__3cq6B'}" src="${encodeURI(data.img)}" alt="">`;
+		let player = `<span class="tss-1tj70tb-Sender" title="${data.player}">${data.player}</span>`;
+
+		player = DOMPurify.sanitize( player,{ALLOWED_TAGS: ['span']});
+		image = DOMPurify.sanitize( image,{ALLOWED_TAGS: ['img']});
 		data.text = DOMPurify.sanitize( data.text,{ALLOWED_TAGS: ['video','img','div','p', 'b', 'button', 'span', 'style', 'path', 'rect', 'svg', 'a', 'hr', 'ul', 'li', 'ol', 'h3', 'h2', 'h4', 'h1', 'table', 'tr', 'td', 'th', 'br', 'input', 'strong', 'em'], ADD_ATTR: ['target']}); //This array needs to include all HTML elements the extension sends via chat.
+
 
 		if(data.dmonly && !(window.DM) && !local) // /dmroll only for DM of or the user who initiated it
 			return $("<div/>");
@@ -2042,50 +2147,36 @@ class MessageBroker {
 		}
 
 
-		if (is_encounters_page() || is_characters_page() || is_campaign_page()) {
+		if (isChatEnabled) {
 			return $(`
 				<li class="tss-8-Other-ref tss-17y30t1-GameLogEntry-Other-Flex">
 					<p role="img" class="tss-wyeh8h-Avatar-Flex">
-						<img class="tss-1e4a2a1-AvatarPortrait" src="${data.img}" alt="">
+						${image}
 					</p>
 					<div class="tss-1e6zv06-MessageContainer-Flex">
 						<div class="tss-dr2its-Line-Flex">
-							<span class="tss-1tj70tb-Sender" title="${data.player}">${data.player}</span>
+							${player}
 						</div>
 						<div class="tss-8-Collapsed-ref tss-8-Other-ref tss-11w0h4e-Message-Collapsed-Other-Flex">${data.text}</div>
 						<time datetime="${datetime}" title="${datestamp} ${timestamp}" class="tss-1yxh2yy-TimeAgo-TimeAgo">${timestamp}</time>
 					</div>
 				</li>
 			`);
-		} /*else if (is_characters_page()) {
-			return $(`
-				<li class="cwBGi-s80YSXZFf9zFTAGg== wtVS4Bjey6LwdMo1GyKvpQ== QXDbdjnpeXLRB22KlOxDsA== _42x6X+dUmW-21eOxSO1c7Q== _9ORHCNDFVTb1uWMCEaGDYg==">
-					<p role="img" class="TILdlgSwOYvXr2yBdjxU7A== QXDbdjnpeXLRB22KlOxDsA==">
-						<img class="U5icMJo74qXY3K0pjow8zA==" src="${data.img}" alt="">
-					</p>
-					<div class="pw06vls7GmA2pPxoGyDytQ== QXDbdjnpeXLRB22KlOxDsA== VwlMdrxdj-7VFbj4bhgJCg== bDu7knPli3v29ahk5PQFIQ==">
-						<div class="zmFwkmlgaKJ3kVU14zW8Lg== QXDbdjnpeXLRB22KlOxDsA== CoBE7nCohYcFyEBBP3K93A==">
-							<span class="_22SVeI3ayk2KgS4V+GqCCA==">${data.player}</span>
-						</div>
-						<div class="oDA6c7IdLEVJ7uSe5103CQ== iQqUeZkD8989e4pBhSqIrQ== wtVS4Bjey6LwdMo1GyKvpQ== QXDbdjnpeXLRB22KlOxDsA==">${data.text}</div>
-						<time datetime="${datetime}" title="${datestamp} ${timestamp}" class="VL1LOQfDhMHRvAGyWG2vGg== _1-XSkDcxqHW18wFo5qzQzA==">${timestamp}</time>
-					</div>
-				</li>
-			`);
-		}*/
+		} 
 
 		let newentry = $("<div/>");
 		newentry.attr('class', 'GameLogEntry_GameLogEntry__2EMUj GameLogEntry_Other__1rv5g Flex_Flex__3cwBI Flex_Flex__alignItems-flex-end__bJZS_ Flex_Flex__justifyContent-flex-start__378sw');
-		newentry.append($("<p role='img' class='Avatar_Avatar__131Mw Flex_Flex__3cwBI'><img class='Avatar_AvatarPortrait__3cq6B' src='" + data.img + "'></p>"));
+		newentry.append($("<p role='img' class='Avatar_Avatar__131Mw Flex_Flex__3cwBI'>" + image + "</p>"));
 		let container = $("<div class='GameLogEntry_MessageContainer__RhcYB Flex_Flex__3cwBI Flex_Flex__alignItems-flex-start__HK9_w Flex_Flex__flexDirection-column__sAcwk'></div>");
 		container.append($("<div class='GameLogEntry_Line__3fzjk Flex_Flex__3cwBI Flex_Flex__justifyContent-space-between__1FcfJ'><span>" + data.player + "</span></div>"));
 		let entry = $("<div class='GameLogEntry_Message__1J8lC GameLogEntry_Collapsed__1_krc GameLogEntry_Other__1rv5g Flex_Flex__3cwBI'>" + data.text + "</div>");
+
+		
+		entry = DOMPurify.sanitize(entry, { ALLOWED_TAGS: allowedTagArray, ADD_ATTR: ['target'] }); //This array needs to include all HTML elements the extension sends via chat.
+
+
 		container.append(entry);
 
-		
-
-
-		
 		container.append($("<time datetime='" + datetime + "' class='GameLogEntry_TimeAgo__zZTLH TimeAgo_TimeAgo__2M8fr'></time"));
 
 		newentry.append(container);
@@ -2095,7 +2186,6 @@ class MessageBroker {
 		}
 
 		return newentry;
-		
 	}
 
 
@@ -2138,7 +2228,20 @@ class MessageBroker {
 			
 		if (data.id in window.TOKEN_OBJECTS) {
 
+			if(window.visionBlockingTokenCache?.[data.id] != undefined){
+				
+				const wallType = window.TOKEN_OBJECTS[data.id]?.options?.tokenWall;
+				const dataWall = data.tokenWall;
 
+				const wallOptions = window.TOKEN_OBJECTS[data.id]?.options?.tokenWallPoly;
+				const relativePoints = wallOptions?.relativePoints;
+
+				const dataWallPoints = data.tokenWallPoly?.relativePoints;
+
+				if(window.TOKEN_OBJECTS[data.id] == undefined || dataWall == undefined || dataWall == false || (wallType != dataWall) || relativePoints?.[0] != dataWallPoints?.[0]){
+					delete window.visionBlockingTokenCache[data.id];
+				}
+			}
 			for (let property in data) {
 				if(msg.sceneId != window.CURRENT_SCENE_DATA.id && (property == "left" || property == "top" || property == "hidden" || property == "scaleCreated"))
 					continue;	
@@ -2163,6 +2266,24 @@ class MessageBroker {
 			if(data.groupId == undefined){
 				delete window.TOKEN_OBJECTS[data.id].options.groupId;
 				delete window.all_token_objects[data.id].options.groupId;
+			}
+			if(data.tokenWallPoly == undefined){
+				delete window.TOKEN_OBJECTS[data.id].options.tokenWallPoly;
+				delete window.all_token_objects[data.id].options.tokenWallPoly;
+			}
+			if(window.visionBlockingTokenCache?.[data.id] != undefined){
+				
+				const wallType = window.TOKEN_OBJECTS[data.id]?.options?.tokenWall;
+				const dataWall = data.tokenWall;
+
+				const wallOptions = window.TOKEN_OBJECTS[data.id]?.options?.tokenWallPoly;
+				const relativePoints = wallOptions?.relativePoints;
+
+				const dataWallPoints = data.tokenWallPoly?.relativePoints;
+
+				if(window.TOKEN_OBJECTS[data.id] == undefined || dataWall == undefined || dataWall == false || (wallType != dataWall) || relativePoints?.[0] != dataWallPoints?.[0]){
+					delete window.visionBlockingTokenCache[data.id];
+				}
 			}
 			let selector = "div[data-id='" + data.id + "']";
 			let token = $("#tokens").find(selector);
@@ -2304,14 +2425,15 @@ class MessageBroker {
 			"rollId": uuid(),
 		};
 		let eventType = "dice/roll/pending";
+		const targetSelf = injected_data.whisper == window.PLAYER_NAME;
 		let message = {
 			id: uuid(),
 			source: "web",
 			gameId: this.gameid,
 			userId: this.userid,
 			persist: false, // INTERESSANTE PER RILEGGERLI, per ora non facciamogli casini
-			messageScope: "gameId",
-			messageTarget: this.gameid,
+			messageScope: targetSelf ? "userId": "gameId", 
+			messageTarget: targetSelf ? window.MB.userid : window.MB.gameid,
 			eventType: eventType,
 			data: data,
 			entityId: this.userid, //proviamo a non metterla
@@ -2320,7 +2442,7 @@ class MessageBroker {
 		if (message.data.injected_data?.img?.startsWith('above-bucket-not-a-url')) {
 			message.data.injected_data.img = await getAvttStorageUrl(message.data.injected_data.img);
 		}
-		if (this.ws.readyState == this.ws.OPEN) {
+		if (this.ws?.readyState != undefined && this.ws.readyState == this.ws.OPEN) {
 			this.ws.send(JSON.stringify(message));
 		}
 
@@ -2474,6 +2596,7 @@ class MessageBroker {
 	  $("#reconnect-button").on("click", function(){
 	  	window.onCloseNumberPerPopup = 0;
 	  	window.MB.loadAboveWS(function(){ 
+			window.LOADING = true;
 	  		AboveApi.getScene(window.CURRENT_SCENE_DATA.id).then((response) => {
 	  			window.MB.handleScene(response, true);
 	  			setTimeout(
@@ -2488,6 +2611,7 @@ class MessageBroker {
 	  				}, 4000)
 	  			removeError();
 	  		}).catch((error) => {
+				delete window.LOADING;
 	  			console.error("Failed to download scene", error);
 	  		});
   		}, true);	

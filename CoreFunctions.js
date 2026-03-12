@@ -4,7 +4,6 @@
  * so be thoughtful about which functions go in this file
  * */
 
-
 /** The first time we load, collect all the things that we need.
  * Remember that this is injected from both Load.js and LoadCharacterPage.js
  * If you need to add things for when AboveVTT is actively running, do that in Startup.js
@@ -20,7 +19,8 @@ $(function() {
   $("head").append('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />');
   if (is_encounters_page()) {
     window.DM = true; // the DM plays from the encounters page
-    dmAvatarUrl = $('#site-bar').attr('user-avatar') != undefined ? $('#site-bar').attr('user-avatar') : $('.site-bar .user-interactions-profile-img').attr('src');
+    dmAvatarUrl = $('#site-bar').attr('user-avatar') != undefined ? $('#site-bar').attr('user-avatar') : $('.site-bar .user-interactions-profile-img').attr('src') != undefined ? $('.site-bar .user-interactions-profile-img').attr('src') : $('img[class*="avatarImage"]').attr('src');
+    dmAvatarUrl = dmAvatarUrl || defaultAvatarUrl;
   } else if (is_campaign_page() && !is_spectator_page()) {
     // The owner of the campaign (the DM) is the only one with private notes on the campaign page
     window.DM = $(".ddb-campaigns-detail-body-dm-notes-private").length === 1;
@@ -196,7 +196,8 @@ function inject_chat_buttons() {
     Advantage: 2d20kh1 (keep highest)&#xa;
     Disadvantage: 2d20kl1 (keep lowest)&#xa;
     '/w [playername] a whisper to playername'&#xa;
-    '/dm for a shortcut to whisper THE DM'"><input id='chat-text' autocomplete="off" placeholder='Chat, /r 1d20+4..'></div>`
+    '/dm for a shortcut to whisper THE DM'&#xa;
+    '/timer Timer Title 5:00' or '/timer 5:00'"><input id='chat-text' autocomplete="off" placeholder='Chat, /r 1d20+4..'></div>`
   );
   const diceRoller = $(`
     <div class="dice-roller">
@@ -238,16 +239,16 @@ function inject_chat_buttons() {
 
   gameLog.append(chatTextWrapper, languageSelect, diceRoller);
 
-  $(".dice-roller > div img").on("click", function(e) {
-    if ($(".dice-toolbar__dropdown").length > 0 && !window.EXPERIMENTAL_SETTINGS['rpgRoller']) {
+  $(".dice-roller > div img").on("click", async function(e) {
+    if ($(".dice-toolbar__dropdown, [class*='DiceContainer_button']").length > 0 && !window.EXPERIMENTAL_SETTINGS['rpgRoller']) {
       // DDB dice are on the screen so let's use those. Ours will synchronize when these change.
-      if (!$(".dice-toolbar__dropdown").hasClass("dice-toolbar__dropdown-selected")) {
+      if (($(".dice-toolbar__dropdown").length > 0 && !$(".dice-toolbar__dropdown").hasClass("dice-toolbar__dropdown-selected")) || $(`[class*='DiceContainer_button']:not([class*='DiceContainer_customDiceRollOpen'])`).length>0) {
         // make sure it's open
-        $(".dice-toolbar__dropdown-die").click();
+        await $(".dice-toolbar__dropdown-die, [class*='DiceContainer_button']").click();
       }
       // select the DDB dice matching the one that the user just clicked
       let dieSize = $(this).attr("alt");
-      $(`.dice-die-button[data-dice='${dieSize}']`).click();
+      await $(`.dice-die-button[data-dice='${dieSize}'], [class*='AnchoredPopover_wrapper'] #${dieSize}`).click();
     } else {
       // there aren't any DDB dice on the screen so use our own
       const dataCount = $(this).attr("data-count");
@@ -285,11 +286,26 @@ function inject_chat_buttons() {
           ourDiceElement.parent().append(`<span class="dice-badge">${diceCount}</span>`);
         }
       })
-
+      $("[class*='AnchoredPopover_wrapper'] button[id^='d']").each(function () {
+        let dieSize = this.id;
+        let ourDiceElement = $(`.dice-roller > div img[alt='${dieSize}']`);
+        let diceCountElement = $(this).attr('data-quantity');
+        ourDiceElement.parent().find("span").remove();
+        if (diceCountElement == undefined) {
+          ourDiceElement.removeAttr("data-count");
+        } else {
+          let diceCount = parseInt(diceCountElement);
+          ourDiceElement.attr("data-count", diceCount);
+          ourDiceElement.parent().append(`<span class="dice-badge">${diceCount}</span>`);
+        }
+      })
+      if ($("[class*='AnchoredPopover_wrapper']").length>0 && $("[class*='AnchoredPopover_wrapper'] button[id^='d']").length == 0){
+        $('.dice-roller .dice-badge').remove();
+      }
 
       // make sure our roll button is shown/hidden after all animations have completed
       setTimeout(function() {
-        if ($(".dice-toolbar").hasClass("rollable")) {
+        if ($(".dice-toolbar").hasClass("rollable") || $("[class*='DiceContainer_customDiceRollOpen']").length > 0) {
           if(!$(".roll-mod-container").hasClass('show')){
             $(".roll-mod-container").addClass("show");
             $(".roll-mod-container").find('input').val(0);
@@ -298,21 +314,21 @@ function inject_chat_buttons() {
           $(".roll-mod-container").removeClass("show");
         }
       }, 0);  
-    })
+  })
 
   let watchForDicePanel = new MutationObserver((mutations) => {
-   mutations.every((mutation) => {
+   mutations.every(async (mutation) => {
       if (!mutation.addedNodes) return
 
       for (let i = 0; i < mutation.addedNodes.length; i++) {
         // do things to your newly added nodes here
         let node = mutation.addedNodes[i]
         if ((node.className == 'dice-rolling-panel' || $('.dice-rolling-panel').length>0)){
-          const mutation_target = $(".dice-toolbar__dropdown")[0];
-      const mutation_config = { attributes: true, childList: true, characterData: true, subtree: true };
-      window.rollButtonObserver.observe(mutation_target, mutation_config);
-      watchForDicePanel.disconnect();
-      return false;
+          const mutation_target = $(".dice-toolbar__dropdown, [class*='AnchoredPopover_wrapper']")[0];
+          const mutation_config = { attributes: true, childList: true, characterData: true, subtree: true };
+          window.rollButtonObserver.observe(mutation_target, mutation_config);
+          watchForDicePanel.disconnect();
+          return false;
         }
       }
       return true // must return true if doesn't break
@@ -320,7 +336,7 @@ function inject_chat_buttons() {
   });
 
   window.sendToDefaultObserver = new MutationObserver(function() {
-      localStorage.setItem(`${gameId}-sendToDefault`, gamelog_send_to_text());
+    localStorage.setItem(`${window.gameId != undefined ? window.gameId : window.myUser}-sendToDefault`, gamelog_send_to_text());
   })
 
 
@@ -356,12 +372,12 @@ function inject_chat_buttons() {
   $(".dice-roller > div img").on("contextmenu", function(e) {
     e.preventDefault();
 
-    if ($(".dice-toolbar__dropdown").length > 0 && !window.EXPERIMENTAL_SETTINGS['rpgRoller']) {
+    if ($(".dice-toolbar__dropdown, [class*='DiceContainer_button']").length > 0 && !window.EXPERIMENTAL_SETTINGS['rpgRoller']) {
       // There are DDB dice on the screen so update those buttons. Ours will synchronize when these change.
       // the only way I could get this to work was with pure javascript. Everything that I tried with jQuery did nothing
       let dieSize = $(this).attr("alt");
-      let  element = $(`.dice-die-button[data-dice='${dieSize}']`)[0];
-      let  e = element.ownerDocument.createEvent('MouseEvents');
+      let element = $(`.dice-die-button[data-dice='${dieSize}'], #${dieSize}`)[0];
+      let e = element.ownerDocument.createEvent('MouseEvents');
       e.initMouseEvent('contextmenu', true, true,
           element.ownerDocument.defaultView, 1, 0, 0, 0, 0, false,
           false, false, false, 2, null);
@@ -392,15 +408,17 @@ function inject_chat_buttons() {
   if ($(".roll-button").length == 0) {
     const rollButton = $(`<button class="roll-button">Roll</button>`);
     const modInput = $(`<div class='roll-mod-container'>
+        <button class="roll-button-mod dis roll_mods_button icon-disadvantage markers-icon"></button>
         <button class="roll-button-mod minus">-</button>
         <input class="roll-input-mod" type='number' value='0' step='1'></input>
         <button class="roll-button-mod plus">+</button>
+        <button class="roll-button-mod adv roll_mods_button icon-advantage markers-icon"></button>
       </div>`)
     modInput.append(rollButton);
 
     
     $("body").append(modInput);
-
+    let advDis;
     modInput.off('click.button').on('click.button', 'button.roll-button-mod', function(e){
       e.preventDefault();
       const clickedButton = $(this)
@@ -411,17 +429,17 @@ function inject_chat_buttons() {
       else if(clickedButton.hasClass('plus')){
         input.val(parseInt(input.val())+1);
       }
+      else if (clickedButton.hasClass('adv')){
+        advDis = 'kh';
+        rollButton.click();
+      }
+      else if(clickedButton.hasClass('dis')){
+        advDis = 'kl'
+        rollButton.click();
+      }
     });
     rollButton.on("click", function (e) {
       let modValue = parseInt($('.roll-input-mod').val())
-      if ($(".dice-toolbar").hasClass("rollable") && modValue == 0 && !window.EXPERIMENTAL_SETTINGS['rpgRoller']) {     
-          let theirRollButton = $(".dice-toolbar__target").children().first();
-          if (theirRollButton.length > 0) {
-            // we found a DDB dice roll button. Click it and move on
-            theirRollButton.click();
-            return;
-          }
-      }
 
       const rollExpression = [];
       const diceToCount = $(".dice-roller > div img[data-count]").length>0 ? $(".dice-roller > div img[data-count]") : $('.dice-die-button__count')
@@ -435,35 +453,21 @@ function inject_chat_buttons() {
           count = $(this).attr("data-count");
           dieType = $(this).attr("alt");
         }
-        rollExpression.push(count + dieType);
+        if(advDis != undefined){
+          for (let i = 0; i<count; i++){
+            rollExpression.push('2' + dieType + advDis + '1');
+          }       
+        }
+        else{
+          rollExpression.push(count + dieType);
+        }
+        
       });
+      advDis = undefined;
       $('.dice-toolbar__dropdown-selected>div:first-of-type')?.click();
       let expression = `${rollExpression.join("+")}${modValue<0 ? modValue : `+${modValue}`}`
-      let sendToDM = window.DM || false;
-      let sentAsDDB = send_rpg_dice_to_ddb(expression, sendToDM);
-      if (!sentAsDDB) {
-        const roll = new rpgDiceRoller.DiceRoll(rollExpression.join("+"));
-        
-        const text = roll.output;
-        const uuid = new Date().getTime();
-        const data = {
-          player: window.PLAYER_NAME,
-          img: window.PLAYER_IMG,
-          text: text,
-          dmonly: sendToDM,
-          id: window.DM ? `li_${uuid}` : undefined
-        };
-        window.MB.inject_chat(data);
 
-        if (window.DM) { // THIS STOPPED WORKING SINCE INJECT_CHAT
-          $("#" + uuid).on("click", () => {
-            const newData = {...data, dmonly: false, id: undefined, text: text};
-            window.MB.inject_chat(newData);
-            $(this).remove();
-          });
-        }
-            
-      }
+      window.diceRoller.roll(new DiceRoll(expression));
 
       $(".roll-mod-container").removeClass("show");
       $(".dice-roller > div img[data-count]").removeAttr("data-count");
@@ -985,6 +989,233 @@ function add_journal_roll_buttons(target, tokenId=undefined, specificImage=undef
 
   console.groupEnd()
 }
+/**
+ * Posts a message to the chat when a player connected to the server.
+ */
+function report_connection() {
+  if (!is_abovevtt_page())
+    return;
+  setTimeout(() => {
+    let msgdata = {
+      player: window.PLAYER_NAME,
+      img: window.PLAYER_IMG,
+      text: PLAYER_NAME + " has connected to the server!",
+    };
+    window.MB.inject_chat(msgdata);
+  }, 5000)
+}
+/**
+ * Notifie about player joining the game.
+ */
+function notify_player_join() {
+  if (window.DM || !is_abovevtt_page())
+    return;
+  const playerdata = {
+    abovevtt_version: window.AVTT_VERSION,
+    player_id: window.PLAYER_ID,
+    pc: read_pc_object_from_character_sheet(window.PLAYER_ID)
+  };
+
+  console.log("Sending playerjoin msg, abovevtt version: " + playerdata.abovevtt_version + ", sheet ID:" + window.PLAYER_ID);
+  whenAvailable('JOURNAL', function () { window.MB.sendMessage("custom/myVTT/playerjoin", playerdata) });
+}
+
+/**
+ * Load dice configuration from DDB.
+ */
+function init_my_dice_details() {
+  get_cobalt_token(function (token) {
+    window.ajaxQueue.addRequest({
+      type: 'GET',
+      url: "https://dice-service.dndbeyond.com/diceuserconfig/v1/get",
+      contentType: "application/json; charset=utf-8",
+      dataType: 'json', // added data type
+      beforeSend: function (xhr) {
+        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      },
+      xhrFields: {
+        withCredentials: true
+      },
+      success: function (res) {
+        window.mydice = res
+      }
+    });
+  });
+}
+/**
+ * Attempts to convert the output of an rpgDiceRoller DiceRoll to the DDB format.
+ * If the conversion is successful, it will be sent over the websocket, and this will return true.
+ * If the conversion fails for any reason, nothing will be sent, and this will return false,
+ * @param {String} expression the dice rolling expression; ex: 1d20+4
+ * @param {Boolean} toSelf    whether this is sent to self or everyone
+ * @returns {Boolean}         true if we were able to convert and send; else false
+ */
+//currently used for flat value rolls
+
+function send_ddb_dice_message(expression, displayName, imgUrl, rollType = "roll", damageType, actionType = "custom", sendTo = "") {
+  let diceRoll = new DiceRoll(expression);
+  diceRoll.action = actionType;
+  diceRoll.rollType = rollType;
+  diceRoll.name = displayName == true ? 'THE DM' : displayName;
+  diceRoll.avatarUrl = imgUrl;
+  // diceRoll.entityId = monster.id;
+  // diceRoll.entityType = monsterData.id;
+
+  console.log("with values", expression, displayName, imgUrl, rollType, damageType, actionType, sendTo)
+
+
+  try {
+    expression = expression.replace(/\s+/g, ''); // remove all whitespace
+
+    const supportedDieTypes = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"];
+
+    let roll = new rpgDiceRoller.DiceRoll(expression);
+
+    // rpgDiceRoller doesn't give us the notation of each roll so we're going to do our best to find and match them as we go
+    let choppedExpression = expression;
+    let notationList = [];
+    for (let i = 0; i < roll.rolls.length; i++) {
+      let currentRoll = roll.rolls[i];
+      if (typeof currentRoll === "string") {
+        let idx = choppedExpression.indexOf(currentRoll);
+        let previousNotation = choppedExpression.slice(0, idx);
+        notationList.push(previousNotation);
+        notationList.push(currentRoll);
+        choppedExpression = choppedExpression.slice(idx + currentRoll.length);
+      }
+    }
+    console.log("chopped expression", choppedExpression)
+    notationList.push(choppedExpression); // our last notation will still be here so add it to the list
+
+    if (roll.rolls.length != notationList.length) {
+      console.warn(`Failed to convert expression to DDB roll; expression ${expression}`);
+      console.groupEnd()
+      return false;
+    }
+
+    let convertedDice = [];       // a list of objects in the format that DDB expects
+    let allValues = [];           // all the rolled values
+    let convertedExpression = []; // a list of strings that we'll concat for a string representation of the final math being done
+    let constantsTotal = 0;       // all the constants added together
+    for (let i = 0; i < roll.rolls.length; i++) {
+      let currentRoll = roll.rolls[i];
+      if (typeof currentRoll === "object") {
+        let currentNotation = notationList[i];
+        let currentDieType = supportedDieTypes.find(dt => currentNotation.includes(dt)); // we do it this way instead of splitting the string so we can easily clean up things like d20kh1, etc. It's less clever, but it avoids any parsing errors
+        if (!supportedDieTypes.includes(currentDieType)) {
+          console.warn(`found an unsupported dieType ${currentNotation}`);
+          console.groupEnd()
+          return false;
+        }
+        if (currentNotation.includes("kh") || currentNotation.includes("kl")) {
+          let cleanerString = currentRoll.toString()
+            .replace("[", "(")    // swap square brackets with parenthesis
+            .replace("]", ")")    // swap square brackets with parenthesis
+            .replace("d", "")     // remove all drop notations
+            .replace(/\s+/g, ''); // remove all whitespace
+          convertedExpression.push(cleanerString);
+        } else {
+          convertedExpression.push(currentRoll.value);
+        }
+        let dice = currentRoll.rolls.map(d => {
+          allValues.push(d.value);
+          console.groupEnd()
+          return { dieType: currentDieType, dieValue: d.value };
+        });
+
+        convertedDice.push({
+          "dice": dice,
+          "count": dice.length,
+          "dieType": currentDieType,
+          "operation": 0
+        })
+      } else if (typeof currentRoll === "string") {
+        convertedExpression.push(currentRoll);
+      } else if (typeof currentRoll === "number") {
+        convertedExpression.push(currentRoll);
+        if (i > 0) {
+          if (convertedExpression[i - 1] == "-") {
+            constantsTotal -= currentRoll;
+          } else if (convertedExpression[i - 1] == "+") {
+            constantsTotal += currentRoll;
+          } else {
+            console.warn(`found an unexpected symbol ${convertedExpression[i - 1]}`);
+            console.groupEnd()
+            return false;
+          }
+        } else {
+          constantsTotal += currentRoll;
+        }
+      }
+    }
+    if(sendTo == ''){
+      sendTo = gamelog_send_to_text().trim().replace('/\s/gi', '');
+    }
+    sendTo = sendTo.toLowerCase();
+    
+    let ddbJson = {
+      id: uuid(),
+      dateTime: `${Date.now()}`,
+      gameId: `${window.gameId}`,
+      userId: `${window.myUser}`,
+      source: "web",
+      persist: true,
+      messageScope: sendTo === "everyone" ? "gameId" : "userId",
+      messageTarget: sendTo === "everyone" ? `${window.gameId}` : sendTo === "dungeonmaster" || sendTo === "dm" ? `${window.CAMPAIGN_INFO.dmId}` : `${window.myUser}`,
+      entityId: `${window.myUser}`,
+      entityType: "user",
+      eventType: "dice/roll/fulfilled",
+      data: {
+        action: actionType,
+        setId: window.mydice.data.setId,
+        context: {
+          entityId: `${window.myUser}`,
+          entityType: "user",
+          messageScope: sendTo === "everyone" ? "gameId" : "userId",
+          messageTarget: sendTo === "everyone" ? `${window.gameId}` : sendTo === "dungeonmaster" || sendTo === "dm"  ? `${window.CAMPAIGN_INFO.dmId}` : `${window.myUser}`,
+          name: displayName,
+          avatarUrl: imgUrl
+        },
+        rollId: uuid(),
+        rolls: [
+          {
+            diceNotation: {
+              set: convertedDice,
+              constant: constantsTotal
+            },
+            diceNotationStr: expression,
+            rollType: rollType,
+            rollKind: expression.includes("kh") ? "advantage" : expression.includes("kl") ? "disadvantage" : "",
+            result: {
+              constant: constantsTotal,
+              values: allValues,
+              total: roll.total,
+              text: convertedExpression.join("")
+            }
+          }
+        ]
+      }
+    };
+    if (window.MB?.ws?.readyState && window.MB.ws.readyState == window.MB.ws.OPEN) {
+      window.MB.ws.send(JSON.stringify(ddbJson));
+      console.groupEnd()
+      return true;
+    } else { // TRY TO RECOVER
+      get_cobalt_token(function (token) {
+        window.MB.loadWS(token, function () {
+          // TODO, CONSIDER ADDING A SYNCMEUP / SCENE PAIR HERE
+          window.MB.ws.send(JSON.stringify(ddbJson));
+        });
+      });
+      console.groupEnd()
+      return true; // we can't guarantee that this actually worked, unfortunately
+    }
+  } catch (error) {
+    console.warn(`failed to send expression as DDB roll; expression = ${expression}`, error);
+    console.groupEnd()
+    return false;
+  }
+}
 
 function general_statblock_formating(input){
   input = input.replace(/&nbsp;/g,' ')
@@ -1027,6 +1258,7 @@ function general_statblock_formating(input){
   return input;
         
 }
+
 function process_monitored_logs() {
   const logs = [...console.concerningLogs, ...console.otherLogs].sort((a, b) => a.timeStamp < b.timeStamp ? 1 : -1);
   let processedLogs = [];
@@ -1053,10 +1285,8 @@ function process_monitored_logs() {
 }
 function inject_dice(){
 
-  const initialSetupTime = Date.now();
-
-
-  $('body .container').append(`
+  $('body #site').append(`
+    <div class='container'>
         <div id="encounter-builder-root" data-config="{&quot;assetBasePath&quot;:&quot;https://media.dndbeyond.com/encounter-builder&quot;,&quot;authUrl&quot;:&quot;https://auth-service.dndbeyond.com/v1/cobalt-token&quot;,&quot;campaignDetailsPageBaseUrl&quot;:&quot;https://www.dndbeyond.com/campaigns&quot;,&quot;campaignServiceUrlBase&quot;:&quot;https://www.dndbeyond.com/api/campaign&quot;,&quot;characterServiceUrlBase&quot;:&quot;https://character-service-scds.dndbeyond.com/v2/characters&quot;,&quot;diceApi&quot;:&quot;https://dice-service.dndbeyond.com&quot;,&quot;gameLogBaseUrl&quot;:&quot;https://www.dndbeyond.com&quot;,&quot;ddbApiUrl&quot;:&quot;https://api.dndbeyond.com&quot;,&quot;ddbBaseUrl&quot;:&quot;https://www.dndbeyond.com&quot;,&quot;ddbConfigUrl&quot;:&quot;https://www.dndbeyond.com/api/config/json&quot;,&quot;debug&quot;:false,&quot;encounterServiceUrl&quot;:&quot;https://encounter-service.dndbeyond.com/v1&quot;,&quot;featureFlagsDomain&quot;:&quot;https://api.dndbeyond.com&quot;,&quot;mediaBucket&quot;:&quot;https://media.dndbeyond.com&quot;,&quot;monsterServiceUrl&quot;:&quot;https://monster-service.dndbeyond.com/v1/Monster&quot;,&quot;sourceUrlBase&quot;:&quot;https://www.dndbeyond.com/sources/&quot;,&quot;subscriptionUrl&quot;:&quot;https://www.dndbeyond.com/subscribe&quot;,&quot;toastAutoDeleteInterval&quot;:3000000}" >
            <div class="dice-rolling-panel">
               <div class="dice-toolbar  ">
@@ -1124,7 +1354,7 @@ function inject_dice(){
               </div>
               <canvas class="dice-rolling-panel__container" width="1917" height="908" data-engine="Babylon.js v6.3.0" touch-action="none" tabindex="1" style="touch-action: none; -webkit-tap-highlight-color: transparent;"></canvas>
            </div>
-        </div>
+        </div> 
         <script src="https://media.dndbeyond.com/encounter-builder/static/js/main.221d749b.js"></script>
 
         <style>
@@ -1145,8 +1375,9 @@ function inject_dice(){
               left: 10px;
               pointer-events: all
           }
-        </style>
 
+        </style>
+    </div>
   `);
  window.encounterObserver = new MutationObserver(function(mutationList, observer) {
 
@@ -1156,7 +1387,6 @@ function inject_dice(){
        
        if(mutationTarget.hasClass(['encounter-details', 'encounter-builder', 'release-indicator'])){
          mutationTarget.remove();
-
        }
        if($(mutation.addedNodes).is('.encounter-builder, .release-indicator')){
          $(mutation.addedNodes).remove();
@@ -1176,7 +1406,7 @@ function inject_dice(){
  setTimeout(function(){
    window.encounterObserver.disconnect();
    delete window.encounterObserver;
- }, 20000);
+ }, 300000);
  
 }
 /**
@@ -1289,11 +1519,12 @@ function get_cobalt_token(callback) {
 }
 function removeError() {
   $("#above-vtt-error-message").remove();
-  remove_loading_overlay(); // in case there was an error starting up, remove the loading overlay, so they're not completely stuck
+  if(typeof remove_loading_overlay == "function")
+    remove_loading_overlay(); // in case there was an error starting up, remove the loading overlay, so they're not completely stuck
   delete window.logSnapshot;
 }
 
-function createCustomOnedriveChooser(text, callback = function(){}, selectionMode = 'single', selectionType = ['photo', 'video', '.webp']){
+function createCustomOnedriveChooser(text, callback = function(){}, selectionMode = 'single', selectionType = ['photo', '.webp']){
   let button = $(`<button class="launchPicker"><span class='onedrive-btn-status'></span>${text}</button>`);
   button.off('click.onedrive').on('click.onedrive', function(e){
     e.stopPropagation();
@@ -1310,7 +1541,7 @@ function createCustomAvttChooser(text, callback = function () { }, selectionType
   })
   return button;
 }
-function createCustomDropboxChooser(text, options){
+function createCustomDropboxChooser(text, options) {
   let button = $(`<button class="dropboxChooser"><span class="dropin-btn-status"></span>${text}</button>`)
   button.off('click.dropbox').on('click.dropbox', function(e){
     e.stopPropagation();
@@ -1336,26 +1567,10 @@ function dropBoxOptions(callback, multiselect = false, fileType=['images', 'vide
       cancel: function() {
 
       },
-
-      // Optional. "preview" (default) is a preview link to the document for sharing,
-      // "direct" is an expiring link to download the contents of the file. For more
-      // information about link types, see Link types below.
-      linkType: "preview", // or "direct"
-
-      // Optional. A value of false (default) limits selection to a single file, while
-      // true enables multiple file selection.
-      multiselect: multiselect, // or true
-
-      // Optional. This is a list of file extensions. If specified, the user will
-      // only be able to select files with these extensions. You may also specify
-      // file types, such as "video" or "images" in the list. For more information,
-      // see File types below. By default, all extensions are allowed.
+      linkType: "preview",
+      multiselect: multiselect,
       extensions: fileType,
-
-      // Optional. A value of false (default) limits selection to files,
-      // while true allows the user to select both folders and files.
-      // You cannot specify `linkType: "direct"` when using `folderselect: true`.
-      folderselect: false, // or true
+      folderselect: false, 
   }
 
   return options
@@ -1574,6 +1789,44 @@ function showTempMessage(messageString){
   }, 1000);
 
 }
+function convertMmSsToMs(text) {
+  const [minutes, seconds] = text.split(':').map(Number); //
+  const totalMilliseconds = (minutes * 60 + seconds) * 1000; //
+  return totalMilliseconds;
+}
+function convertMsToMmSs(duration) {
+  return  `${`${Math.floor(duration / 60000)}`.padStart(2, '0')}:${`${Math.floor((duration % 60000) / 1000)}`.padStart(2, '0')}`
+}
+function create_gamelog_timer(message, duration = 60000, startTime = Date.now()){
+  let timerId;
+  const startTimeString = convertMsToMmSs(duration);
+  const timerBox = $(`<div class='chatTimer' data-start='${startTime}'><span class='timerMessage'>${message}</span><span class='timerBar'>${startTimeString}</span></div>`);
+  const closeButton = $(`<span class='timerCloseButton'>&#10006;</span>`);
+  closeButton.on('click', function(){
+    clearInterval(timerId);
+    timerBox.remove();
+  });
+  timerBox.append(closeButton);
+  $(".glc-game-log > [class*='-GameLog']").before(timerBox);
+  timerId = setInterval(function(){
+    const elapsed = Date.now() - startTime;
+    const remaining = duration - elapsed;
+    if(remaining <= 0){
+      clearInterval(timerId);
+      setTimeout(function(){
+        timerBox.remove();
+      }, 5000)
+      timerBox.find('.timerBar').css('color', 'red');
+    } else {
+      const timerExists = $(`.chatTimer[data-start="${startTime}"]`).length > 0;
+      if(!timerExists){
+        $(".glc-game-log > [class*='-GameLog']").before(timerBox);
+      }
+      const timeRemainingString = convertMsToMmSs(remaining);
+      timerBox.find('.timerBar').text(timeRemainingString);
+    }
+  }, 1000);
+}
 /** The string "THE DM" has been used in a lot of places.
  * This prevents typos or case sensitivity in strings.
  * @return {String} "THE DM" */
@@ -1708,6 +1961,10 @@ function find_pc_by_player_id(idOrSheet, useDefault = true) {
   const regex = new RegExp(regexStr, 'gi');
   const pc = window.pcs.find(pc => pc.sheet.match(regex) || pc.sheet == idOrSheet);
   if (pc) {
+    const unusedPlayerData = ['attacks', 'attunedItems', 'campaign', 'campaignSetting', 'classes'];
+    for (let i = 0; i < unusedPlayerData.length; i++) {
+      delete pc[unusedPlayerData[i]];
+    }
     return pc;
   }
   if (useDefault) {
@@ -1718,7 +1975,7 @@ function find_pc_by_player_id(idOrSheet, useDefault = true) {
 
 async function rebuild_window_pcs() {
   const campaignCharacters = await DDBApi.fetchCampaignCharacterDetails(window.gameId);
-  window.pcs = campaignCharacters.map(characterData => {
+  window.pcs = await campaignCharacters.map(characterData => {
     // we are not making a shortcut for `color` because the logic is too complex. See color_from_pc_object for details
     return {
       ...characterData,
@@ -1882,7 +2139,10 @@ async function harvest_game_id() {
     // we didn't find it on the page so hit the DDB API, and try to pull it from there
     const characterId = window.location.pathname.split("/").pop();
     window.characterData = await DDBApi.fetchCharacter(characterId);
-    return window.characterData.campaign.id.toString();
+    if (!window.characterData?.campaign){
+      return false;
+    }
+    return window.characterData?.campaign?.id?.toString();
   }
 
   throw new Error(`harvest_game_id failed to find gameId on ${window.location.href}`);
@@ -1893,7 +2153,11 @@ function set_game_id(gameId) {
 }
 
 async function harvest_campaign_secret() {
+
   if (typeof window.gameId !== "string" || window.gameId.length <= 1) {
+    if (window.gameId === false){
+      return
+    }
     throw new Error("harvest_campaign_secret requires gameId to be set. Make sure you call harvest_game_id first");
   }
 
@@ -2339,7 +2603,7 @@ function inject_sidebar_send_to_gamelog_button(sidebarPaneContent) {
         text: html
       };
       window.MB.inject_chat(data);
-      notify_gamelog();
+      notify_gamelog([]);
     }
     else{
       
@@ -2356,6 +2620,200 @@ function inject_sidebar_send_to_gamelog_button(sidebarPaneContent) {
     
     
   });
+}
+
+function find_items_in_cache_by_id_and_name(items = []) {
+  const foundItems = [];
+  for (let item of items) {
+    const cachedItem = window.ITEMS_CACHE.find(ci => ci.id.toString() === item.id.toString() && ci.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '').includes(item.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')));
+    if (cachedItem) {
+      foundItems.push(cachedItem);
+    }
+  }
+  return foundItems;
+}
+function find_items_in_cache_by_name(names = [], exactMatch = false) {
+  names = names.map(name => name.toLowerCase());
+  
+  if(exactMatch){
+    return window.ITEMS_CACHE.filter(ci => names.includes(ci.name.toString().toLowerCase()));
+  }
+  return window.ITEMS_CACHE.filter(ci => ci.name.toString().toLowerCase().includes(names));
+}
+
+
+class PartyInventoryQueue {
+  constructor() {
+    this.queue = [];
+    this.isProcessing = false;
+    this.batchTimer = null;
+    this.requestTimeout = null;
+  }
+
+  addToQueue(item) {
+    this.queue.push(item);
+    
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+    }
+    
+    if (!this.isProcessing) {
+      this.batchTimer = setTimeout(() => {
+        this.batchTimer = null;
+        this.processQueue();
+      }, 10);
+    }
+  }
+
+  processQueue() {
+    if (this.isProcessing || this.queue.length === 0) {
+       return;
+    }
+
+    this.isProcessing = true;
+    const item = this.queue.shift();
+
+    this.requestTimeout = setTimeout(() => {
+      this.isProcessing = false;
+      if (this.queue.length > 0) {
+        setTimeout(() => this.processQueue(), 100);
+      }
+    }, 15000);
+
+    try {
+      if (item.type === 'items') {
+        add_items_to_party_inventory(item.data);
+      } else if (item.type === 'currency') {
+        add_currency_to_party_inventory(item.data);
+      } else if (item.type === 'customItem') {
+        add_custom_item_to_party_inventory(item.data);
+      }
+    } catch (error) {
+      this.isProcessing = false;
+      if (this.queue.length > 0) {
+        setTimeout(() => this.processQueue(), 100); 
+      }
+    }
+  }
+
+  onResponseReceived() {    
+    if (this.requestTimeout) {
+      clearTimeout(this.requestTimeout);
+      this.requestTimeout = null;
+    }
+
+    this.isProcessing = false;
+    
+    if (this.queue.length > 0) {
+      setTimeout(() => this.processQueue(), 100);
+    } else {
+      if (window.MB) {
+        window.MB.sendMessage('character-sheet/item-shared/fulfilled', {});
+        if(DDBApi)
+          DDBApi.debounceGetPartyInventory();
+      }
+      else {
+        tabCommunicationChannel.postMessage({
+          msgType: 'DDBMessage',
+          action: 'character-sheet/item-shared/fulfilled',
+          data: {},
+          sendTo: window.sendToTab
+        });
+      }
+    }
+  }
+}
+
+window.partyInventoryQueue = new PartyInventoryQueue();
+
+function add_items_to_party_inventory(items = []) {
+  const itemIds = Object.keys(items);
+  if (itemIds.length === 0) {
+    console.warn('add_items_to_party_inventory called with no items');
+    return;
+  }
+  const characterId = window.DM || is_spectator_page() ? parseInt(window.playerUsers[0]?.id) : parseInt(my_player_id());
+  const data = { characterId, equipment: [] };
+  for (let item of items) {
+    const entityId = parseInt(item.id);
+    const entityTypeId = parseInt(item.entityTypeId);
+    const quantity = parseInt(item.quantity);
+    const containerEntityTypeId = 618115330; // campaign inventory enum. See ContainerTypeEnum[ContainerTypeEnum["CAMPAIGN"] on DDB.
+    const containerEntityId = parseInt(find_game_id());
+    data.equipment.push({
+      entityId,
+      entityTypeId,
+      containerEntityTypeId,
+      containerEntityId,
+      quantity
+    });
+  }
+
+  DDBApi.addItemsToPartyInventory(data).then(response => {
+    console.log('add_items_to_party_inventory response:', response);
+    window.partyInventoryQueue.onResponseReceived();
+  }).catch(error => {
+    console.error('add_items_to_party_inventory error:', error);
+    window.partyInventoryQueue.onResponseReceived();
+  });
+
+}
+function add_custom_item_to_party_inventory(item) {
+
+  if (!item) {
+    console.warn('add_items_to_party_inventory called with no items');
+    return;
+  }
+  const characterId = window.DM || is_spectator_page() ? parseInt(window.playerUsers[0]?.id) : parseInt(my_player_id());
+
+ 
+  const name = item.name ? item.name : 'Custom Item';
+  const weight = item.weight ? parseFloat(item.weight) : null;
+  const cost = item.cost ? parseFloat(item.cost) : null;
+  const notes = item.notes ? item.notes : null;
+  const description = item.description ? item.description : null;
+  const quantity = parseInt(item.quantity);
+  const containerEntityTypeId = 618115330; // campaign inventory enum. See ContainerTypeEnum[ContainerTypeEnum["CAMPAIGN"] on DDB.
+  const containerEntityId = parseInt(find_game_id());
+  const data = {
+    characterId,
+    containerEntityTypeId,
+    containerEntityId,
+    description,
+    notes,
+    cost,
+    weight,
+    name,
+    quantity,
+    partyId: containerEntityId
+  };
+  
+
+  DDBApi.addCustomItemToPartyInventory(data).then(response => {
+    console.log('add_custom_item_to_party_inventory response:', response);
+    window.partyInventoryQueue.onResponseReceived();
+  }).catch(error => {
+    console.error('add_custom_item_to_party_inventory error:', error);
+    window.partyInventoryQueue.onResponseReceived();
+  });
+
+}
+function add_currency_to_party_inventory(currency = {cp:0,sp:0,gp:0,ep:0,pp:0}) {
+  
+  const characterId = window.DM || is_spectator_page() ? parseInt(window.playerUsers[0]?.id) : parseInt(my_player_id());
+  const destinationEntityTypeId = 618115330; // campaign inventory enum. See ContainerTypeEnum[ContainerTypeEnum["CAMPAIGN"] on DDB.
+  const destinationEntityId = parseInt(find_game_id());
+  const data = { characterId, destinationEntityId, destinationEntityTypeId, ...currency };
+
+
+  DDBApi.addCurrenciesToPartyInventory(data).then(response => {
+    console.log('add_currency_to_party_inventory response:', response);
+    window.partyInventoryQueue.onResponseReceived();
+  }).catch(error => {
+    console.error('add_currency_to_party_inventory error:', error);
+    window.partyInventoryQueue.onResponseReceived();
+  });
+
 }
 async function fetch_github_issue_comments(issueNumber) {
   const request = await fetch("https://api.github.com/repos/cyruzzo/AboveVTT/issues?labels=bug", { credentials: "omit" });
@@ -2390,7 +2848,7 @@ function display_url_embeded(url){
   $('body').append(container);
 }
 
-function find_or_create_generic_draggable_window(id, titleBarText, addLoadingIndicator = true, addPopoutButton = false, popoutSelector=``, width='80%', height='80%', top='10%', left='10%', showSlow = true, cancelClasses='') {
+function find_or_create_generic_draggable_window(id, titleBarText, addLoadingIndicator = true, addPopoutButton = false, popoutSelector=``, width='80%', height='80%', top='10%', left='10%', showSlow = true, cancelClasses='', hideOnX = false) {
   console.log(`find_or_create_generic_draggable_window id: ${id}, titleBarText: ${titleBarText}, addLoadingIndicator: ${addLoadingIndicator}, addPopoutButton: ${addPopoutButton}`);
   const existing = id.startsWith("#") ? $(id) : $(`#${id}`);
   if (existing.length > 0) {
@@ -2406,7 +2864,7 @@ function find_or_create_generic_draggable_window(id, titleBarText, addLoadingInd
     "position": "fixed",
     "height": height,
     "width": width,
-    "z-index": "90000",
+    "z-index": "110000",
     "display": "none"
   });
 
@@ -2445,13 +2903,19 @@ function find_or_create_generic_draggable_window(id, titleBarText, addLoadingInd
   const close_title_button = $(`<div class="title_bar_close_button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g transform="rotate(-45 50 50)"><rect></rect></g><g transform="rotate(45 50 50)"><rect></rect></g></svg></div>`);
   titleBar.append(close_title_button);
   close_title_button.on("click.close", function (event) {
-    close_and_cleanup_generic_draggable_window($(event.currentTarget).closest('.resize_drag_window').attr('id'));
+    if(hideOnX){
+      $(event.currentTarget).closest('.resize_drag_window').hide();
+    }
+    else{
+      close_and_cleanup_generic_draggable_window($(event.currentTarget).closest('.resize_drag_window').attr('id'));
+    }
+
   });
 
   if (addPopoutButton) {
     let popoutButton = $(`<div class="popout-button"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"/></svg></div>`);
     titleBar.append(popoutButton);
-    popoutButton.off('click.popout').on('click.popout', function(){
+    popoutButton.off('click.popout').on('click.popout', function(event){
       if($(popoutSelector).is("iframe")){
         
         const name = titleBarText.replace(/(\r\n|\n|\r)/gm, "").trim();
@@ -2480,7 +2944,7 @@ function find_or_create_generic_draggable_window(id, titleBarText, addLoadingInd
       else{
         popoutWindow(titleBarText, $(popoutSelector), container.width(), container.height());
       }
-
+      $(event.currentTarget).closest('.resize_drag_window').hide();
     })
   }
 

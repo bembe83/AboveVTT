@@ -33,6 +33,15 @@ body > button,
     border: 1px solid lightgray;
     font-size: 12px;
 }
+/*Common simple positioning*/
+.TLA {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+.note-text table{
+    width: revert-layer;
+}
 .top_menu input,
 .top_menu select{
     box-sizing: border-box;
@@ -76,11 +85,17 @@ div#hide_interface_button [data-name]:after {
     right: 40px;
     top: 15px;
 }
-canvas.dice-rolling-panel__container{
+canvas.dice-rolling-panel__container,
+#character-tools-target>canvas{
     max-width: calc(100% - var(--sidebar-width, 340px)) !important;
     z-index: 160000 !important;
+    visibility: visible;
 }
-
+.hide-button.active{
+    color: #fff;
+    background-color: #c53131;
+}
+#hidden-scenes-message,
 .abovevttTempMessage{
     display:block;
     position:fixed;
@@ -103,6 +118,14 @@ canvas.dice-rolling-panel__container{
     text-align:center;
     text-transform: uppercase;
     font-weight:bold;
+}
+#hidden-scenes-message{
+    background: #000d;
+    border-radius:5px;
+    width: fit-content;
+    max-width: calc(100% - 600px);
+    min-width: 400px;
+    padding:5px;
 }
 .percentageLoaded{
     height: 10px;
@@ -140,7 +163,7 @@ button.daylight span.material-symbols-outlined {
     left: -2%;
     width: 104%;
     height: 104%;
-    z-index: 70000;
+    z-index: 170000;
     background-color: #26282a;
 }
 #loading_overlay_bg {
@@ -194,7 +217,25 @@ body > div {
     padding: 2px 4px;
 }
 
-
+.party-item-table input.injected-input[disabled] {
+    appearance: none !important;
+    background: none !important;
+    border: none !important;
+}
+.party-item-table td.item-add-cell{
+    min-width: 90px;
+}
+.note-text .ct-currency-button__currency-item-preview{
+    width:16px;
+    height:16px;
+    position:relative;
+    display:inline-block;
+}
+.note-text .party-currency {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 [class*='GameLogEntries'] [class*='Message-Collapsed-Other-Flex'] {
     padding: 8px 10px;
     color: rgb(92, 112, 128);
@@ -340,10 +381,18 @@ button .ddbc-tab-options__header-heading .menu-option{
 
 .top_menu.visible {
     max-height: 100%;
-    overflow-y: auto;
     border: solid black 1px;
+    overflow: hidden auto;
+    height: fit-content;
+    max-height: calc(100% - 100px);
 }
-
+span.button-text{
+    width:fit-content;
+    display:block;
+    position:relative;
+    margin:0;
+    padding:0;
+}
 .body-rpgcharacter-sheet div.avtt-sidebar-controls {
     margin: 4px 0px 0px 0px !important;
 }
@@ -381,7 +430,7 @@ button .ddbc-tab-options__header-heading .menu-option{
     justify-content: center;
     width: 75px;
     top: 2px;
-    z-index: 57000;
+    z-index: 125000;
 }
 
 #scene_selector_toggle > span {
@@ -873,7 +922,15 @@ select#doorTypeSelectUVTT{
     top:-100px;
     left:-100px;
 }
-
+.note form .mce-container-body .iframeResizeCover{
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width:100%;
+    height:100%;
+    position: absolute;
+}
 #exitWizard{
     z-index: 50;
     position: fixed;
@@ -887,17 +944,24 @@ select#doorTypeSelectUVTT{
     background-image: none;
     border: none;
 }
-
+#fog_overlay {
+    opacity: 0.5;
+}
 .body-rpgcharacter-sheet #fog_overlay,
 .avtt-spectator-sheet #fog_overlay {
     filter: drop-shadow(0px 0px 2px #000) blur(1px); /*fill in fog gaps on player view*/
-  
+    opacity: 1;
+}
+#groupRotationGrabber,
+#rotationGrabber {
+    scale: min(4, max(1, calc(0.5 / var(--window-zoom))))
 }
 #fog_overlay,
 #draw_overlay_under_fog_darkness,
 #draw_overlay{
   pointer-events:none;
 }
+
 #elev_overlay{
     opacity: 0.5;
 }
@@ -938,7 +1002,7 @@ select#doorTypeSelectUVTT{
 }
 
 div#combat_button {
-    z-index: 57000;
+    z-index: 125000;
     position: fixed;
 }
 .ui-resizable-s{
@@ -984,7 +1048,7 @@ ul.context-menu-list.context-menu-root{
 
 div.top_menu.visible,
 .ddbc-tab-options--layout-pill{
-    z-index: 57000;
+    z-index: 125000;
 }
 
 #scene_selector{
@@ -1358,13 +1422,48 @@ input {
 }
 
 #scene_properties form > button,
-#combat-tracker-settings form > button
+#combat-tracker-settings form>button
  {
     float: right;
     vertical-align: bottom;
     margin-top: 20px;
 }
+#combat-tracker-settings>#edit_scene_form>div {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    padding: 5px 5px;
+}
 
+#combat-tracker-settings>#edit_scene_form>div>div {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    margin: 2px 5px;
+}
+#combat-tracker-settings form>div {
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    align-items: center;
+}
+#combat-tracker-settings h7{
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    flex-grow: 1;
+    margin: 4px 6px 2px 2px;
+    align-self: center;
+    line-height: 20px;
+    display: block;
+    font-size: 15px;
+    text-align: center;
+    position: relative;
+    margin: 10px 0px;
+    border-bottom: 1px solid;
+}
 #mega_importer {
     width:100%;
     height: calc(100% - 16px);
@@ -1399,16 +1498,19 @@ input {
     border-radius: 0px 0px 5px 5px !important;
 }
 #sources-import-iframe {
-    top: 0;
+    top: 8px;
     left: 0;
-    height: 100%;
+    height: calc(100% - 8px);
     width: 100%;
     position: absolute;
     border: none;
     border-radius: 0px 0px 5px 5px;
 }
 
-
+#sources-import-main-container .sidebar-panel-loading-indicator {
+    height: calc(100% - 8px) !important;
+    top: 8px !important;
+}
 #sources-import-content-container{
     width:100%;
     height:100%;
@@ -1556,23 +1658,15 @@ div#template_section {
     border-bottom:  1px solid #00000066;
 }
 
-div#scene_properties,
-div#combat-tracker-settings {
+div#scene_properties{
     margin: 0 5px;
 }
 
-div#scene_properties form > div,
-div#combat-tracker-settings form > div {
+div#scene_properties form > div{
     margin: 5px 0;
 }
 
-#combat-tracker-settings form > div {
-    text-transform: uppercase;
-    display: flex;
-    justify-content: space-between;
-    font-weight: bold;
-    align-items: center;
-}
+
 
 #importer_toggles {
     display: flex;
@@ -1612,7 +1706,7 @@ div#combat-tracker-settings form > div {
 #zoom_buttons {
     position: absolute;
     top: -3px;
-    z-index: 57000;
+    z-index: 125000;
     display: flex;
     flex-direction: row;
 }
@@ -1765,7 +1859,12 @@ div#combat-tracker-settings form > div {
 [class*='styles_mobileNav'].visibleMobileNav>div>button[class*='styles_navToggle']{
     display: flex;
 }
-
+#adjustments-flyout>div>button.token-wall-poly-button{
+    display:none;
+}
+#adjustments-flyout>div>button.token-wall-poly-button.visible{
+    display:block;
+}
 .hasTooltip::after {
     content: attr(data-name);
     -webkit-font-smoothing: antialiased;
@@ -1848,12 +1947,22 @@ div#combat-tracker-settings form > div {
     display:none;
 }
 
-.hasTooltip:hover:after {
+.hasTooltip:not(.drawbutton):hover:after,
+.mobileAVTTUI .drawbutton.hasTooltip:hover:after {
     opacity: 1;
     visibility: visible;
-    transition: 0.05s ease-in-out 0.3s;
+    transition: 0.05s ease-in-out 0.4s;
 }
-
+.drawbutton.hasTooltip{
+    position: relative;
+}
+.drawbutton.hasTooltip:after{
+    position:absolute;
+    font-size: 12px;
+    top: 9px;
+    left: 35px;
+    transition: none;
+}
 .hasTooltip.CTToken:hover:after {
     transition: visibility 0s ease-in-out 0s;
 }
@@ -2057,7 +2166,13 @@ input.menu-input.hpMenuInput[readonly]:focus  {
     height: 450px;
     left: 5px;
     top: 67px;
-    z-index: 56000;
+    z-index: 125000;
+}
+#noty_layout__bottomRight {
+    z-index: 128000 !important;
+}
+.dice-rolling-panel{
+    z-index: 130000 !important;
 }
 div#combat_button{
     top: 40px;
@@ -2293,7 +2408,7 @@ padding-top:10px;
     background: #F58231;
 }
 
-:is(.token, .folder-item-list) .note-condition.condition-img {
+:is(.token, .folder) .note-condition.condition-img {
     background: #e4c700;
 }
 
@@ -2356,15 +2471,13 @@ padding-top:10px;
 .tokenselected::before {
     content: "";
     position: absolute;
-    top: -7px;
-    left: -7px;
-    right: -7px;
-    bottom: -7px;
-    border-radius: 0px;
-    padding: 5px;
-    border: 5px #c0f3fff5 solid;
-    z-index: 0;
-    border-radius: 5px;
+    top: calc(-5px * var(--scene-scale, 1));
+    left: calc(-5px * var(--scene-scale, 1));
+    right: calc(-5px * var(--scene-scale, 1));
+    bottom: calc(-5px * var(--scene-scale, 1));
+    padding: calc(5px * var(--scene-scale, 1));
+    border: calc(5px * var(--scene-scale, 1)) #c0f3fff5 solid;
+    border-radius: calc(1px * var(--scene-scale, 1));
     pointer-events: none;
 }
 
@@ -2796,8 +2909,7 @@ body .gamelogcontainer .sidebar__pane-content {
     bottom: 21px;
     border-radius: 50%;
     width: 40px;
-    transform: translate(-50%);
-    left: 50%;
+    left: 0;
     height: 40px;
     border: none;
 }
@@ -2854,6 +2966,25 @@ button.roll-button-mod.plus {
 }
 button.roll-button-mod.minus {
     border-radius: 5px 0px 0px 5px
+}
+button.roll-button-mod:is(.dis, .adv) {
+    position: absolute;
+    bottom: 20px;
+    border-radius: 50%;
+    left: 40px;
+    filter: sepia(0.3) hue-rotate(312deg) saturate(14) drop-shadow(0px 0px 0px #F00);
+    width: 20px;
+    background: none;
+    outline: none;
+    border: none;
+    height: 20px;
+    position: absolute;
+    padding: 0px;
+}
+button.roll-button-mod.adv {
+    left: 40px;
+    filter: sepia(0.3) hue-rotate(63deg) saturate(8) drop-shadow(0px 0px 0px #0F0);
+    bottom: 40px
 }
 .d-block {
     display: block;
@@ -3191,6 +3322,138 @@ body .note-visibility-toggle-container {
     padding: 10px;
     width:80%;
 }
+
+#dmScreenContainer {
+    overflow: hidden;
+    height: calc(100% - 35px);
+    width: calc(100% + 2px);
+    left: -1px;
+    border: 1px solid #ddd;
+    text-align: center;
+    border: 1px solid #ddd;
+    border-radius: 0px 0px 10px 10px;
+    padding: 10px;
+    position: relative;
+    top: -5px;
+    background: var(--background-color, #F9F8F3);
+
+    .tooltip-hover:not(.spell-tooltip):not(.monster-tooltip):not(.magic-item-tooltip){
+        color: #18623d !important;
+        &:hover,
+        &:focus,
+        &:active,
+        &:visited{
+            color: #18623d !important;
+        }
+    }
+
+    .dmScreenheader{
+        position: sticky;
+        top: 0px;
+        background: var(--background-color, #F9F8F3);
+        z-index: 10;
+        .dmScreenTitle {
+            cursor: pointer;
+            span {
+                font-size: 0.8em;
+            }
+        }
+        .dmScreenPageButtons{
+            position: absolute;
+            right: 10px;
+            top: 5px;
+            display:flex;
+            align-items: center;
+            align-content: center;
+            button {
+                width: 20px;
+                height: 20px;
+                background: var(--background-color, #F9F8F3);
+                border: 1px solid #ddd;
+                border-radius: 3px;
+                padding: 0px;
+                margin-left: 5px;
+                font-size: 14px;
+                color: var(--font-color, #000);
+            }
+        }
+
+    }
+    h1{
+        font-size: 24px;
+    }
+    table {
+        font-size: 12px;
+        tr:nth-child(odd) {
+            background-color: #F1EBDD;
+        }
+        tr:nth-child(even) {
+            background-color: #F9F8F3;
+        }
+    }
+    .dmScreenDropdown {
+        position: absolute;
+        top: 100%;
+        left: calc(50% - 125px);
+        background: white;
+        border: 2px solid rgb(51, 51, 51);
+        box-shadow: rgba(0, 0, 0, 0.3) 0px 4px 8px;
+        z-index: 1000;
+        min-width: 250px;
+        .dmScreenDropdownItem {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid rgb(221, 221, 221);
+            background-color: rgb(255, 255, 255);
+        }
+    }
+    #dmScreenBlocks {
+        overflow: auto;
+        height: calc(100% - 26px);
+    }
+    .dmScreenBlock { 
+        h1 {
+            font-size: 20px;
+        }
+        h2 {
+            font-size: 16px;
+            border-bottom: #D6BE8C solid thin;
+        }
+        
+        &#dmScreenTravel {
+            .dmScreenColumns{
+                column-width: 400px;
+            }
+        }
+        .dmScreenColumns {
+            column-count: auto;
+            column-width: 300px;
+            column-gap: 20px;
+            column-rule: 1px solid #ccc;
+        }
+
+        .dmScreenChunk {
+            break-inside: avoid;
+            margin-bottom: 15px;
+            font-size: 12px;
+            text-align: left;
+        }
+        .dmScreenChunkDefinition {
+            margin: 5px 0px;
+            h3 {
+                font-size: 15px;
+                border: none;
+            }
+            hr {
+                display: none;
+            }
+        }
+    }
+}
+#dmScreenContainer .dmScreenColumns>.note-text>.block-send-to-game-log {
+    right: -6px;
+    top: 10px;
+}
 #patreons ul li {
     width: 136px;
 }
@@ -3247,7 +3510,19 @@ body .note-visibility-toggle-container {
     z-index: 23;
     filter: blur(calc(3px / var(--scene-scale)));
 }
-
+.alphaNumGrid{
+   fill: rgb(255, 255, 255);
+   stroke: rgb(0, 0, 0); 
+   stroke-width: max(5, var(--stroke-width, 5)); 
+   text-decoration: none; 
+   stroke-linecap:butt;
+   stroke-linejoin:round;
+   paint-order:stroke;
+   stroke-opacity:1; 
+   font-size: max(5px, var(--font-size, 25px));
+   text-anchor: middle;
+   dominant-baseline: middle;
+}
 .body-rpgcharacter-sheet #raycastingCanvas,
 .avtt-spectator-sheet #raycastingCanvas{
     opacity: 1;
@@ -3314,8 +3589,14 @@ body .note-visibility-toggle-container {
     display:none;
 }
 .aura-element-container-clip [id*='vision_'].notVisible,
-.door-button.notVisible{
+.door-button.notVisible,
+[id^='aura_'].notVisible{
     visibility: hidden;
+}
+.token.notVisible,
+.token.notVisible *{
+    visibility: hidden !important; 
+    pointer-events: none !important;
 }
 div#selectedTokensBorder {
     pointer-events: none;
@@ -3482,7 +3763,7 @@ div#selectedTokensBorder {
     z-index: 10;
 }
 .mce-floatpanel{
-    z-index: 91000 !important;
+    z-index: 191000 !important;
 }
 .icon-condition,
 .context-menu-icon-condition {
@@ -3985,7 +4266,7 @@ div.token-image {
 }
 
 .token:before{
-    transform: rotate(var(--token-rotation));
+    transform: rotate(calc(var(--token-rotation) + var(--token-heading)));
 }
 
 .markers-icon:before,
@@ -4549,6 +4830,12 @@ div.ct-sidebar__pane-content > div.selected-tab,
 .ct-sidebar--visible{
    height: calc(-15px + 100vh) !important;
 }
+.ct-sidebar__inner [class*='styles_controls']>span{
+    visibility: hidden; 
+    width: 0px;
+    height: 0px; 
+    position: absolute;
+}
 
 /*this may be a DDB bug - as the `Send to (default)` button scrolls off screen and messess with our layout as at 4/25/2024*/
 .ct-sidebar__pane-content>div:first-of-type,
@@ -4675,6 +4962,10 @@ h5.token-image-modal-footer-title:after {
     background-color: #979AA4;
     display: block;
 }
+.avtt-settings-section h4~div>h5.token-image-modal-footer-title:after {
+    margin: 0px;
+}
+
 .sidebar-panel-footer input,
 .token-image-modal-footer input {
     margin-bottom: 6px;
@@ -4686,6 +4977,7 @@ h5.token-image-modal-footer-title:after {
     display: flex;
     flex-direction: row;
     width: 100%;
+    position:relative;
 }
 .sidebar-panel-footer-horizontal-wrapper .sidebar-panel-footer-button {
     margin: 0px 4px 0px 4px;
@@ -4699,6 +4991,19 @@ h5.token-image-modal-footer-title:after {
 }
 .avtt-settings-section h4.token-image-modal-footer-title {
     font-size: 15px;
+}
+
+.avtt-settings-section h4~div>h5.token-image-modal-footer-title {
+    margin-top: 20px;
+    font-size: 12px;
+    text-align: center;
+    width: 100px;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+}
+.avtt-settings-section h4~div:first-of-type>h5.token-image-modal-footer-title {
+    margin-top: 0px;
 }
 h3.no-bottom-margin-setting:after {
     margin-bottom:0px;
@@ -4786,6 +5091,9 @@ div#importer_area>div>div:first-of-type {
     position: relative !important;
     opacity: 1 !important;
 }
+div#token-change-image-modal img.example-token:first-of-type {
+    box-shadow: 0px 0px 2px 2px #1b9af07a;
+}
 #token-change-image-modal .example-token{
     width:90px;
     height:90px;
@@ -4848,7 +5156,7 @@ td button.block-send-to-game-log {
     display: flex;
     float: unset;
     top:50%;
-    right: -2px;
+    right: 2px;
     transform: translate(0px, -50%);
 }
 td button.block-send-to-game-log span{
@@ -5442,6 +5750,15 @@ button.token-row-button.token-row-edit-encounter{
     background-color: rgb(235, 241, 245);
     height: 100%;
 }
+.sidebar__pane-content>div.sidebar-panel-content {
+    display: none;
+    pointer-events: none;
+}
+
+.sidebar__pane-content>div.sidebar-panel-content.selected-tab {
+    display: flex;
+    pointer-events: auto;
+}
 .sidebar-panel-content .sidebar-panel-body {
     height: 100%;
     padding: 8px;
@@ -6028,6 +6345,7 @@ button.avtt-roll-button:has(button.avtt-roll-button) {
     font-size:unset;
     font-weight:unset;
 }
+
 .ct-sidebar__portal{
     overflow: unset !important;
     z-index: 57000 !important;
@@ -6279,7 +6597,7 @@ div#selectedTokensBorderRotationGrabberConnector,
 }
 .top_menu.visible,
 .ddbc-tab-options--layout-pill{
-    z-index: 57000;
+    z-index: 125000;
 }
 
 /*combat tracker face lift*/
@@ -6598,7 +6916,19 @@ div#selectedTokensBorderRotationGrabberConnector,
     position: absolute;
     right: 55px;
     width: 20px;
-    height: 20px
+    height: 20px;
+    top:0px;
+}
+.combat-settings-header input {
+    border-radius: 5px;
+    width: 45px;
+}
+#round_number_label .ctTimer {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    float: right;
+    right: 5px;
 }
 #combat_tracker_title_bar_settings span{
     height: 20px;
@@ -7698,7 +8028,9 @@ button span.onedrive-btn-status{
 #sounds-panel .sidebar-panel-body>button{
     vertical-align:top;
 }
-
+#journal-panel .addTokenMenu button {
+    height: 28px;
+}
 .addTokenMenu {
     display: flex;
     width: 34px;
@@ -7714,7 +8046,7 @@ button span.onedrive-btn-status{
 
 .addTokenMenu:hover,
 .hover-add-button:hover~.addTokenMenu {
-    width: 102px;
+    width: 136px;
     flex-shrink: 0;
 }
 
@@ -7900,7 +8232,10 @@ button span.onedrive-btn-status{
     margin-bottom: 2px !important;
 }
 .sp-cf:after, .sp-cf:before{
-    display:none;
+    display:none !important;
+}
+#sources-import-content-container .sp-container{
+    position: fixed !important;
 }
 .sp-replacer.sp-light{
     float:  right;
@@ -7935,6 +8270,7 @@ button span.onedrive-btn-status{
 }
 .flyout-from-menu-item,
 #tokenOptionsContainer>button,
+#tokenOptionsContainer>div>button,
 #notes-flyout button,
 #adjustments-flyout>div>button {
     line-height: 24px;
@@ -8066,7 +8402,23 @@ button#changeTokenImage:before{
 .flyout-from-menu-item:hover:after {
     border-left: 5px solid #ddd;
 }
-
+.button-refresh.material-symbols-outlined {
+    margin: 0px 0px 0px 2px !important;
+    background: none;
+    font-size: 18px;
+    display: flex;
+    flex-direction: row;
+    width: 20px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    height: 26px;
+    color: #738694;
+    padding: 0px;
+}
+.ui-dialog .ui-dialog-titlebar{
+    display:block;
+}
 .context-menu-flyout{
     visibility: hidden;
     transition: visibility 0s;
@@ -8137,7 +8489,7 @@ button#changeTokenImage:before{
 }
 #tokenOptionsPopup>#tokenOptionsContainer>div[data-option-name='lockRestrictDrop'] .door-lock {
     position:absolute;
-    left:-1px;
+    left:-6px;
     padding:3px 0px;
     font-size:16px;  
 }
@@ -8147,12 +8499,17 @@ button#changeTokenImage:before{
 .ct-character-sheet__inner,
 .ct-sidebar__inner *,
 .moveableWindow *,
-.sidebar *,
+.sidebar .sidebar-panel-body,
+.sidepanel-content [class*='-GameLog'],
 .sidebar-flyout,
+#mixer-channels,
 .note,
 .sources-import-main-container *,
 .sidebar-modal{
     overscroll-behavior: contain;
+}
+[class*='styles_gameLogPane'] *{
+    overscroll-behavior: auto;
 }
 .VTTToken:not(.freeform) .hpvisualbar:before{
     display: var(--token-hpbar-display);
@@ -8171,7 +8528,7 @@ button#changeTokenImage:before{
 .VTTToken:not(.freeform):not(.hasbase) .hpvisualbar:before{
     --mask-size:calc(100% - 7px);
     border-radius: 50%;
-    transform: scale(var(--token-scale)) rotate(var(--token-rotation));
+    transform: scale(var(--token-scale)) rotate(calc(var(--token-rotation) + var(--token-heading))) scaleX(var(--image-flip-x, 1));
     height: 100%;
     width: 100%;
     top: 0px;
@@ -8589,7 +8946,9 @@ body.color-blind-avtt {
     right: 0;
     bottom: 0;
 }
-
+.ui-front{
+    z-index: 100000 !important;
+}
 #combat_area tr.CTToken:before{
     content:  '???';
     font-size: 12px;
@@ -8670,7 +9029,6 @@ body.avtt-spectator-sheet #combat_area tr.CTToken:before{
 
 div.ddbc-tab-options--layout-pill button{
     background-image: none;
-    height: auto;
     box-shadow: none;
     transition: none;
     border: 0px;
@@ -8798,9 +9156,11 @@ body:not(.body-rpgcampaign) .site-bar{
     z-index: 8;
     mix-blend-mode: lighten;
 }
-
+.aura-clip-container.vision:has(.devilsight){
+    z-index: 20 !important;
+}
 [data-darkness]{
-    transform: rotate(var(--token-rotation));
+    transform: rotate(calc(var(--token-rotation) + var(--token-heading)));
     z-index:16 !important;
     opacity: 1 !important;
 }
@@ -8827,8 +9187,9 @@ body:not(.body-rpgcampaign) .site-bar{
     opacity: 1 !important;
 }
 
-.body-rpgcharacter-sheet #tokens .inPersonMini,
-.avtt-spectator-sheet #tokens .inPersonMini {
+.body-rpgcharacter-sheet :is(#tokens, #token_map_items) .inPersonMini,
+.avtt-spectator-sheet :is(#tokens, #token_map_items) .inPersonMini
+{
     display: none !important;
 }
 
@@ -9016,6 +9377,11 @@ div.note[id^="ui-id"] .mce-listbox button{
 
 div.note[id^="ui-id"] .mce-btn button {
     padding: 1px 4px;
+}
+.note .mce-container .mce-btn i.mce-ico.mce-i-upload:not(.mce-i-resize):before {
+    font-family: "Material Icons", sans-serif !important;
+    content: "\f09b";
+    font-size: 20px;
 }
 body .mce-abs-layout-item,
 .mce-abs-end{
@@ -10217,6 +10583,26 @@ button.journal-view-button.journal-button img {
     border: 1px solid #d8e1e8; 
     border-radius: 3px;
 }
+.chatTimer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position:relative;
+    width: calc(100% - 40px);
+    span.timerMessage {
+        font-weight: bold;
+        font-size: 16px;
+        max-width: 80%;
+    }
+    span.timerBar {
+        font-size: 20px;
+    }
+    .timerCloseButton{
+        position:absolute;
+        top: 5px;
+        right: 5px;
+    }
+}
 
 .custom-stat-block input.injected-input {
     margin-left: 5px;
@@ -10393,7 +10779,7 @@ button.resistanceButton.qrm_buttons_bar span {
 [data-animation='aurafx-rotate'] .islight,
 .aura-element[data-animation='aurafx-rotate'][id*='aura_'],
 [data-animation='aurafx-rotate'].darkvision-animation .darkvision {
-    animation: aurafx-rotate 40s infinite linear;
+    animation: aurafx-rotate var(--custom-rotate-rpm, 40s) infinite linear;
     transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
 }
 
@@ -10414,7 +10800,7 @@ button.resistanceButton.qrm_buttons_bar span {
 
 [data-animation='rays-fx'] .islight:after,
 .aura-element[data-animation='rays-fx'][id*='aura_']:after{
-    animation: aurafx-rotate 100s infinite linear;
+    animation: aurafx-rotate var(--custom-rotate-rpm, 100s) infinite linear;
     transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     content:'';
     width:100%;
@@ -10427,7 +10813,7 @@ button.resistanceButton.qrm_buttons_bar span {
     background-image: repeating-conic-gradient(from 0deg, transparent 0deg 3deg, #000 5deg 7deg, transparent 9deg)
 }
 .aura-element[data-animation='rays-fx'][id*='aura_']{
-    animation: aurafx-rotate 100s infinite linear;
+    animation: aurafx-rotate var(--custom-rotate-rpm, 100s) infinite linear;
     transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     -webkit-mask-image: repeating-conic-gradient(from 0deg, #fff 0deg 3deg, transparent 5deg 7deg, #fff 9deg);
 }
@@ -10505,21 +10891,21 @@ button.resistanceButton.qrm_buttons_bar span {
 
 [data-animation='magic-circle-fx'] .islight,
 .aura-element[data-animation='magic-circle-fx'][id*='aura_'] {
-    animation: aurafx-rotate 80s infinite linear;
+    animation: aurafx-rotate var(--custom-rotate-rpm, 80s) infinite linear;
     transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
    -webkit-mask-size: contain;
 }
 
 [data-animation='magic-circle-2-fx'] .islight,
 .aura-element[data-animation='magic-circle-2-fx'][id*='aura_'] {
-    animation: aurafx-rotate 80s infinite linear;
+    animation: aurafx-rotate var(--custom-rotate-rpm, 80s) infinite linear;
     transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     -webkit-mask-size: contain;
 }
 
 [data-animation='spore-fx'] .islight,
 .aura-element[data-animation='spore-fx'][id*='aura_'] {
-    animation: aurafx-rotate 180s infinite linear;
+    animation: aurafx-rotate var(--custom-rotate-rpm, 180s) infinite linear;
     transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
    -webkit-mask-size: contain;
    filter:blur(5px);
@@ -10537,7 +10923,7 @@ button.resistanceButton.qrm_buttons_bar span {
 
 [data-animation='hurricane-fx'] .islight,
 .aura-element[data-animation='hurricane-fx'][id*='aura_'] {
-    animation: aurafx-rotate 30s infinite linear;
+    animation: aurafx-rotate var(--custom-rotate-rpm, 30s) infinite linear;
     transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
     -webkit-mask-size: contain;
     --light1-blur-size: var(--radius1);
@@ -10747,10 +11133,14 @@ float: right;
     display: flex;
 }
 
-.dice-rolling-panel .dice-toolbar{
+.dice-rolling-panel .dice-toolbar,
+.dice-rolling-panel [class*='DiceContainer_button']{
     bottom: 35px !important;
 }
-
+[data-floating-ui-portal].hidden,
+.roll-mod-container.hidden{
+    visibility:hidden;
+}
 @keyframes bubble {
      0%{
         --opacity: 0;
@@ -11803,7 +12193,7 @@ div#playlistFields {
 }
 
 
-.stat-block .monster-header+p {
+p.monster-header+p {
     break-before: avoid
 }
 
@@ -11866,7 +12256,7 @@ div#playlistFields {
 .stat-block .stats+p {
     margin-top: 10px
 }
-.stat-block :is(p.monster-header, .monster-header) {
+:is(p.monster-header, .monster-header) {
     padding-top: 4px;
     letter-spacing: .35px;
     font-weight: 500;
@@ -13168,7 +13558,7 @@ button#displayedDiceFormulaExit:hover {
     padding-top: 0
 }
 
-:is(.tooltip) .stat-block .monster-header {
+:is(.tooltip) .monster-header {
     padding-top: 4px;
     letter-spacing: .35px;
     font-weight: 500;
@@ -14132,7 +14522,36 @@ button#displayedDiceFormulaExit:hover {
 
 }
 
-
+.list-item-identifier.folder.avtt-drop-target:after,
+.sidebar-panel-content.avtt-drop-target:after,
+#track-list.avtt-drop-target:after {
+    content: '';
+    position: absolute;
+    top: 0px;
+    bottom: 0px;
+    left: 0px;
+    right: 0px;
+    box-shadow: inset 0px 0px 4px 1px #aaF;
+    border: 1px #0000ff33 dotted;
+    pointer-events: none;
+}
+.sidebar-panel-content.avtt-drop-target::after {
+    top: 89px;
+}
+.grid-svg-tile {
+  position: absolute;
+  transform-origin: top left;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;  
+  background-repeat: repeat;
+}
+#VTT.hide-players *{
+    visibility:hidden !important;
+    pointer-events:none !important;
+}
 
 /***** Icon UI *****/
 
@@ -14141,11 +14560,12 @@ button#displayedDiceFormulaExit:hover {
 .mobileAVTTUI #combat_tracker div.ddbc-tab-options--layout-pill>button{
     width: 30px !important;
     height: 30px !important;
-    text-indent: 40px;
-    overflow: hidden;
     padding: 0px;
     margin: 0px 0px 3px 0px;
     font-size: 20px;
+}
+.mobileAVTTUI .drawbutton .button-text{
+    display:none;
 }
 .mobileAVTTUI>div.ddbc-tab-options--layout-pill{
     display: flex;
@@ -14210,6 +14630,7 @@ button#displayedDiceFormulaExit:hover {
     height: 30px;
     width: 30px;
     text-indent: 0px;
+    position:relative;
 }
 .mobileAVTTUI #select-button:before{
     content:"\f82f";        

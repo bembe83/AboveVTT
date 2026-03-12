@@ -181,8 +181,7 @@ function token_context_menu_expanded(tokenIds, e) {
 		scroll: false,
 		handle: "div:not(:has(select)), button, label, input",
 		start: function () {
-			$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+			$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 		},
 		stop: function () {
 			$('.iframeResizeCover').remove();
@@ -776,27 +775,13 @@ function token_context_menu_expanded(tokenIds, e) {
 
 		toTopMenuButton.off().on("click", function(tokenIds){
 			tokens.forEach(token => {
-				$(".token").each(function(){	
-					let tokenId = $(this).attr('data-id');	
-					let tokenzindexdiff = window.TOKEN_OBJECTS[tokenId].options.zindexdiff;
-					if (tokenzindexdiff >= window.TOKEN_OBJECTS[token.options.id].options.zindexdiff && tokenId != token.options.id) {
-						window.TOKEN_OBJECTS[token.options.id].options.zindexdiff = tokenzindexdiff + 1;
-					}		
-				});
-				token.place_sync_persist();
+				token.moveToTop();
 			});
 		});
 
 		toBottomMenuButton.off().on("click", function(tokenIds){
 			tokens.forEach(token => {			
-				$(".token").each(function(){	
-					let tokenId = $(this).attr('data-id');	
-					let tokenzindexdiff = window.TOKEN_OBJECTS[tokenId].options.zindexdiff;
-					if (tokenzindexdiff <= window.TOKEN_OBJECTS[token.options.id].options.zindexdiff && tokenId != token.options.id) {
-						window.TOKEN_OBJECTS[token.options.id].options.zindexdiff = Math.max(tokenzindexdiff - 1, -5000);
-					}		
-				});
-				token.place_sync_persist();
+				token.moveToBottom();
 			});
 		});
 		let lockSettings = token_setting_options().filter((d) => d.name == 'lockRestrictDrop')[0];
@@ -1064,7 +1049,7 @@ function token_context_menu_expanded(tokenIds, e) {
 					e.stopPropagation();
 					$(this).parent().trigger(shiftClick);
 				});
-				const reset_init = getCombatTrackersettings().remove_init;
+				const reset_init = getCombatTrackerSettings().remove_init;
 				tokens.forEach(t =>{
 					if(t.options.combatGroup && Object.values(window.TOKEN_OBJECTS).filter(d=>d.options.combatGroup == t.options.combatGroup).length == 2 && window.TOKEN_OBJECTS[t.options.combatGroup]){
 						window.TOKEN_OBJECTS[t.options.combatGroup].delete()
@@ -1085,9 +1070,9 @@ function token_context_menu_expanded(tokenIds, e) {
 			} else {
 				clickedButton.removeClass("add-to-ct").addClass("remove-from-ct");
 				clickedButton.html(removeButtonInternals);
-				const reset_init = getCombatTrackersettings().remove_init;
+				const reset_init = getCombatTrackerSettings().remove_init;
 
-				const autoGroup = getCombatTrackersettings().autoGroup;
+				const autoGroup = getCombatTrackerSettings().autoGroup;
 
 				if(autoGroup === '1'){
 					const groupedByStat = tokens.reduce((acc, token) => {
@@ -1104,7 +1089,7 @@ function token_context_menu_expanded(tokenIds, e) {
 						let group = uuid();
 						let allHidden = true;
 						let allVisibleNames = true
-						const reset_init = getCombatTrackersettings().remove_init;
+						const reset_init = getCombatTrackerSettings().remove_init;
 						
 						groupedByStat[i].forEach(t => {
 							if(t.isPlayer()){
@@ -1201,7 +1186,7 @@ function token_context_menu_expanded(tokenIds, e) {
 					e.stopPropagation();
 					$(this).parent().trigger(shiftClick);
 				});
-				const reset_init = getCombatTrackersettings().remove_init;
+				const reset_init = getCombatTrackerSettings().remove_init;
 				tokens.forEach(t =>{
 					if(t.options.combatGroup != undefined && Object.values(window.TOKEN_OBJECTS)?.filter(d=>d.options.combatGroup == t.options.combatGroup)?.length == 2 && window.TOKEN_OBJECTS[t.options.combatGroup]){
 						window.TOKEN_OBJECTS[t.options.combatGroup].delete()
@@ -1228,7 +1213,7 @@ function token_context_menu_expanded(tokenIds, e) {
 				let group = uuid();
 				let allHidden = true;
 				let allVisibleNames = true
-				const reset_init = getCombatTrackersettings().remove_init;
+				const reset_init = getCombatTrackerSettings().remove_init;
 	
 
 				tokens.forEach(t => {
@@ -1414,27 +1399,13 @@ function token_context_menu_expanded(tokenIds, e) {
 
 	toTopMenuButton.off().on("click", function(tokenIds){
 		tokens.forEach(token => {
-			$(".token").each(function(){	
-				let tokenId = $(this).attr('data-id');	
-				let tokenzindexdiff = window.TOKEN_OBJECTS[tokenId].options.zindexdiff;
-				if (tokenzindexdiff >= window.TOKEN_OBJECTS[token.options.id].options.zindexdiff && tokenId != token.options.id) {
-					window.TOKEN_OBJECTS[token.options.id].options.zindexdiff = tokenzindexdiff + 1;
-				}		
-			});
-			token.place_sync_persist();
+			token.moveToTop();
 		});
 	});
 
 	toBottomMenuButton.off().on("click", function(tokenIds){
 		tokens.forEach(token => {			
-			$(".token").each(function(){	
-				let tokenId = $(this).attr('data-id');	
-				let tokenzindexdiff = window.TOKEN_OBJECTS[tokenId].options.zindexdiff;
-				if (tokenzindexdiff <= window.TOKEN_OBJECTS[token.options.id].options.zindexdiff && tokenId != token.options.id) {
-					window.TOKEN_OBJECTS[token.options.id].options.zindexdiff = Math.max(tokenzindexdiff - 1, -5000);
-				}		
-			});
-			token.place_sync_persist();
+			token.moveToBottom();
 		});
 	});
 
@@ -1517,6 +1488,31 @@ function token_context_menu_expanded(tokenIds, e) {
 		let tokenNames = tokens.map(t => t.options.name);
 		let uniqueNames = [...new Set(tokenNames)];
 		let nameInput = $(`<input title="Token Name" placeholder="Token Name" name="name" type="text" />`);
+		let nameGeneratorButton = $(`<button title="Generate Random Name" type="button" class="button-refresh material-symbols-outlined">autorenew</button>`);
+		nameGeneratorButton.on('click', function() {
+			let generatedName;
+			tokens.forEach(token => {
+				const gender = Math.random() < 0.5 ? 'male' : 'female';
+				const firstNames = gender === 'male' ? MaleFirstNames : FemaleFirstNames;
+				const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+				const surname = Surnames[Math.floor(Math.random() * Surnames.length)];
+				const personality = token.options.placeType == 'personality' ? ` (${getPersonalityTrait()})` : '';
+				generatedName = `${firstName} ${surname}${personality}`;
+				
+				if(window.JOURNAL.notes[token.options.id]){
+					window.JOURNAL.notes[token.options.id].title = generatedName;
+					window.JOURNAL.persist();
+				}
+				token.options.name = generatedName;
+				token.place_sync_persist();
+			});
+				
+			if (tokens.length > 1) {
+				nameInput.val("Individual names generated");
+			} else {
+				nameInput.val(generatedName);
+			}
+		});
 		if (uniqueNames.length === 1) {
 			nameInput.val(tokenNames[0]);
 		} else {
@@ -1557,6 +1553,7 @@ function token_context_menu_expanded(tokenIds, e) {
 			</div>
 		`);
 		nameWrapper.append(nameInput); // input below label
+		nameWrapper.append(nameGeneratorButton);
 
 
 		
@@ -2041,7 +2038,8 @@ function build_token_auras_inputs(tokenIds) {
 					...token.options.animation,
 					aura: preset,
 					customAuraMask: undefined,
-					customAuraRotate: undefined
+					customAuraRotate: undefined,
+					customAuraRpm: undefined
 				}
 			}
 			else{
@@ -2049,7 +2047,8 @@ function build_token_auras_inputs(tokenIds) {
 					...token.options.animation,
 					aura: preset,
 					customAuraMask: customPreset.mask,
-					customAuraRotate: customPreset.rotate
+					customAuraRotate: customPreset.rotate,
+					customAuraRpm: customPreset.rpm
 				}
 			}
 			token.place_sync_persist();
@@ -2529,8 +2528,8 @@ function build_token_light_inputs(tokenIds, door=false) {
 					light: preset,
 					customLightMask: undefined,
 					customLightRotate: undefined,
-					customLightDarkvision: undefined
-
+					customLightDarkvision: undefined,
+					customLightRpm: undefined
 				}
 			}
 			else{
@@ -2539,7 +2538,8 @@ function build_token_light_inputs(tokenIds, door=false) {
 					light: preset,
 					customLightMask: customPreset.mask,
 					customLightRotate: customPreset.rotate,
-					customLightDarkvision: customPreset.darkvision
+					customLightDarkvision: customPreset.darkvision,
+					customLightRpm: customPreset.rpm
 				}
 			}
 			
@@ -2840,6 +2840,9 @@ function create_animation_presets_edit(isVision = false){
 				<th>
 					Rotate	
 				</th>
+				<th>
+					RPM
+				</th>
 				${isVision ? `<th>
 					Apply to Darkvision			
 				</th>` : ``}
@@ -2854,6 +2857,7 @@ function create_animation_presets_edit(isVision = false){
 				<td><input class='animation_preset_title' value='${window.ANIMATION_PRESETS[i].name}'></input>
 				<td><input class='animation_preset_mask' placeholder='transparency mask url' value='${window.ANIMATION_PRESETS[i].mask}'></input></td>
 				<td><button name="rotate_button" data-id='rotate' type="button" role="switch" class="rc-switch ${(window.ANIMATION_PRESETS[i].rotate === true) ? 'rc-switch-checked' : ''}"><span class="rc-switch-inner"></span></button></td>
+				<td><input class='rotate_rpm' placeholder='1' type='number' min='0' step='0.1' value='${window.ANIMATION_PRESETS[i].rpm || ''}'></input></td>
 				${isVision ? ` <td><button name="apply_darkvision" data-id='darkvision' type="button" role="switch" class="rc-switch ${(window.ANIMATION_PRESETS[i].darkvision === true) ? 'rc-switch-checked' : ''}"><span class="rc-switch-inner"></span></button></td>` : ''}
 				<td><div class='removePreset'><svg class="" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g transform="rotate(-45 50 50)"><rect></rect></g><g transform="rotate(45 50 50)"><rect></rect></g></svg></div></td>
 			</tr>
@@ -2873,6 +2877,10 @@ function create_animation_presets_edit(isVision = false){
 		})
 		row.find('input[class*="animation_preset_mask"]').off('change.mask').on('change.mask', function(){
 			window.ANIMATION_PRESETS[i].mask = $(this).val();
+			localStorage.setItem('ANIMATION_PRESETS', JSON.stringify(window.ANIMATION_PRESETS));
+		})
+		row.find('input[class*="rotate_rpm"]').off('change.rpm').on('change.rpm', function () {
+			window.ANIMATION_PRESETS[i].rpm = $(this).val();
 			localStorage.setItem('ANIMATION_PRESETS', JSON.stringify(window.ANIMATION_PRESETS));
 		})
 		row.find('.removePreset').off('click.removePreset').on('click.removePreset', function(){
@@ -3543,6 +3551,7 @@ function build_adjustments_flyout_menu(tokenIds) {
 		});
 		body.append(imageZoomWrapper);
 
+
 		let tokenOpacity = tokens.map(t => t.options.imageOpacity);
 		let uniqueOpacity = [...new Set(tokenOpacity)];
 		let startingOpacity = uniqueOpacity.length === 1 && uniqueOpacity[0] != undefined ? uniqueOpacity[0] : 1;
@@ -3556,6 +3565,34 @@ function build_adjustments_flyout_menu(tokenIds) {
 		});
 		body.append(opacityWrapper);
 
+		let tokenHeading = tokens.map(t => t.options.imageHeading);
+		let uniqueHeading = [...new Set(tokenHeading)];
+		let startingHeading = uniqueHeading.length === 1 && uniqueHeading[0] != undefined ? uniqueHeading[0] : 0;
+		let headingWrapper = build_token_num_input(startingHeading, tokens,  'Image Heading', 0, 360, 1, function (heading, persist=false) {
+			tokens.forEach(token => {
+				token.options.imageHeading = heading; //currently only takes effect on "rotating towards"
+				$(`.VTTToken[data-id='${token.options.id}']`).css("--token-heading", heading + "deg");
+				if(persist)
+					token.place_sync_persist();
+			});
+		});
+		body.append(headingWrapper);
+
+		let tokFlip = tokens.map(t => t.options?.tokenFlip);
+		let uniqueTokenFlip = [...new Set(tokFlip)];
+		let startingTokenFlip = uniqueTokenFlip.length === 1 && uniqueTokenFlip[0] != undefined ? uniqueTokenFlip[0] : 0;
+		let tokenFlipWrapper = build_token_flip_input(startingTokenFlip,
+			function (newFlip) {
+				tokens.forEach(token => {
+					token.options.tokenFlip = +newFlip;
+					$(`.VTTToken[data-id='${token.options.id}']`).css({
+						"--token-flip-x": `${((+newFlip || 0) & 1) ? -1 : 1}`,
+						"--token-flip-y": `${((+newFlip || 0) & 2) ? -1 : 1}`
+					});
+					token.place_sync_persist();
+				});
+			});
+		body.append(tokenFlipWrapper);
 		//border color selections
 		let tokenBorderColors = tokens.map(t => t.options.color);
 		let initialColor = tokenBorderColors.length === 1 ? tokenBorderColors[0] : random_token_color();
@@ -3625,6 +3662,9 @@ function build_adjustments_flyout_menu(tokenIds) {
 			let inputWrapper = build_dropdown_input(setting, currentValue, function(name, newValue) {
 				tokens.forEach(token => {
 					token.options[name] = newValue;
+					if (name == 'tokenWall' && window.visionBlockingTokenCache?.[token.options.id] != undefined){
+						delete window.visionBlockingTokenCache[token.options.id];
+					}
 					token.place_sync_persist();
 				});
 				if(setting.name =='tokenStyleSelect'){		
@@ -3642,6 +3682,14 @@ function build_adjustments_flyout_menu(tokenIds) {
 						
 					}
 				}
+				else if(setting.name =='tokenWall'){
+					if(newValue.includes('poly')){
+						$('.token-wall-poly-button').toggleClass('visible', true);
+					}
+					else{
+						$('.token-wall-poly-button').toggleClass('visible', false);
+					}
+				}
 			});
 			if(setting.menuPosition != undefined){
 				const position = body.find(`>div:nth-of-type(${setting.menuPosition})`)
@@ -3653,7 +3701,28 @@ function build_adjustments_flyout_menu(tokenIds) {
 			else{
 				body.append(inputWrapper);
 			}
-			
+			if(setting.name =='tokenWall'){
+				const tokenId = tokenIds[0];
+				const polyButton = $(`<button class="token-wall-poly-button material-icons ${typeof currentValue === 'string' && currentValue.includes('poly') ? 'visible' : ''}" title="Edit Token Wall Polygon">${!window.TOKEN_OBJECTS[tokenId].options.tokenWallPoly ? "Draw" : "Delete"} Token Wall Polygon</button>`);
+				polyButton.off('click').on('click', function(){
+					let clickedItem = $(this);
+					if (window.visionBlockingTokenCache?.[tokenId] != undefined)
+						delete window.visionBlockingTokenCache[tokenId];
+					if (window.TOKEN_OBJECTS[tokenId].options.tokenWallPoly == undefined) {
+						window.drawingTokenWallTokenId = tokenId;
+						window.drawTokenWallPolygon = true;
+						$("#temp_overlay").css("z-index", "50");
+						close_token_context_menu();
+					}
+					else {
+						$(this).text('Draw Token Wall Polygon')
+						delete window.TOKEN_OBJECTS[tokenId].options.tokenWallPoly;
+						window.TOKEN_OBJECTS[tokenId].place_sync_persist();
+						clear_temp_canvas();
+					}
+				});
+				inputWrapper.after(polyButton);
+			}	
 		} else if (setting.type === "toggle") {
 			let inputWrapper = build_toggle_input(setting, currentValue, function (name, newValue) {
 				tokens.forEach(token => {
@@ -4079,6 +4148,20 @@ function build_options_flyout_menu(tokenIds) {
 	});
 	body.append(resetToDefaults);
 	return body;
+}
+
+function build_token_flip_input(value, changeHandler) {
+	const flipOption = {
+		name: "TokenFlip",
+		label: "Flip Token",
+		type: "toggle",
+		options: [
+			{ value: false, label: "None", description: "No Flip" },
+			{ value: true, label: "Horizontal", description: "Horizontal" }
+		],
+		defaultValue: false
+	};
+	return build_toggle_input(flipOption, value ? true : false, (name, value) => { changeHandler(value ? 1 : 0)});
 }
 
 /**
@@ -4635,8 +4718,7 @@ function open_quick_roll_menu(e){
 		scroll: false,
 		containment: "#windowContainment",
 		start: function () {
-			$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+			$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 		},
 		stop: function () {
 			$('.iframeResizeCover').remove();
@@ -4647,8 +4729,7 @@ function open_quick_roll_menu(e){
 		handles: "all",
 		containment: "#windowContainment",
 		start: function () {
-			$("#resizeDragMon").append($('<div class="iframeResizeCover"></div>'));			
-			$("#sheet").append($('<div class="iframeResizeCover"></div>'));
+			$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
 		},
 		stop: function () {
 			$('.iframeResizeCover').remove();
@@ -5007,7 +5088,10 @@ function qrm_fetch_stat(token) {
 		if(token.options.customStat != undefined){
 			roll_bonus = token.options.customStat[save_dropdown_value]['save']
 		}
-		if(roll_bonus == undefined){
+		if (roll_bonus >= 0) {
+			roll_bonus = "+" + parseInt(roll_bonus);
+		}
+		else if(roll_bonus == undefined){
 			roll_bonus = "+"+0;	
 		}
 	}

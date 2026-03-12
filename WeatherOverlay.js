@@ -1,46 +1,115 @@
 class WeatherOverlay {
-    constructor(canvas, lightCanvas, type = 'rain') {
-        
-        this.offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height);;
-        this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+    constructor(canvas, lightCanvas, type = 'rain', intensity = 120) {
+        this.offscreenCanvas = new OffscreenCanvas(0,0);
+        this.offscreenCtx = this.offscreenCanvas.getContext('2d');          
         this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
+        this.ctx = canvas.getContext('2d');          
         this.lightCanvas = lightCanvas;
         this.lightCtx = lightCanvas.getContext('2d');  
-        this.type = type;
         this.particles = [];
         this.animationId = null;
         this.width = canvas.width;
         this.height = canvas.height;
-        this._initParticles();
+        this.setType(type, intensity);
     }
-    setType(type) {
+    resizeCtx(current, canvas, nonzero) {
+        if(nonzero) {
+            if(canvas.width != this.width || canvas.height != this.height) {
+                canvas.width = this.width;
+                canvas.height = this.height;
+            $(canvas).css({
+                'transform-origin': 'top left',
+                'transform': 'scale(var(--scene-scale))'
+            });
+            } else {
+                current.clearRect(0, 0, this.width, this.height);
+            }
+        } else {
+            canvas.width = canvas.height = 0;
+        }
+    }
+    stop() {
+        if (this.animationId) {        //stop
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+    }
+    setType(type, intensity) {
+        this.stop();
         this.type = type;
+        const weatherData = getWeatherTypes()[this.type];
+        this.intensity = intensity || weatherData?.default || 120;
+        //start or optimize canvas away
+        const weatherExists = (this.type && this.type != '0');
+        this.resizeCtx(this.ctx, this.canvas, weatherExists);
+        this.resizeCtx(this.offscreenCtx, this.offscreenCanvas, weatherExists);
+        this.resizeCtx(this.lightCtx, this.lightCanvas, weatherExists && weatherData?.lit);
+        
+        if(weatherExists) {
+            this._initParticles();
+            this._animate();
+            
+            if (this.type === 'fog') {
+                $(this.canvas).css({
+                    filter: `blur(${ window.CURRENT_SCENE_DATA.hpps }px`
+                })
+            }
+            else if (this.type === 'faerieLight' || this.type === 'fireflies') {
+                $(this.canvas).css({
+                    filter: `blur(1px)`
+                })
+            }
+            else {
+                $(this.canvas).css({
+                    filter: ``
+                })
+            }
+            
+            if (weatherData?.lit) {
+                $(this.lightCanvas).css({
+                    filter: `blur(${window.CURRENT_SCENE_DATA.hpps / window.CURRENT_SCENE_DATA.scale_factor}px`
+                })
+            }
+            else{
+                $(this.lightCanvas).css({
+                    filter: ``
+                })
+            }
+            
+        }
+    }
+    
+    setIntensity(intensity) {
+        this.intensity = intensity;
         this._initParticles();
     }
 
     setSize(width, height) {
+        console.log("WEATHERSIZE", width, height);
         this.width = width;
         this.height = height;
-        this.offscreenCanvas.width = width;
-        this.offscreenCanvas.height = height;
         this._initParticles();
     }
 
     _initParticles() {
         this.particles = [];
-        let count;
-        if (this.type === 'fog') count = 10;
-        else if (this.type === 'rain') count = 120;
+        const count = this.intensity !== undefined ? this.intensity : 120;
+        const weatherTypes = getWeatherTypes();
+        const data = weatherTypes[this.type];
+        if (data != undefined){
 
-        else if (this.type === 'snow') count = 120;
-        else if (this.type === 'embers') count = 40;
-        else if (this.type === 'cherryBlossoms') count = 40;
-        else if (this.type === 'lightning') count = 60;
-        else if (this.type === 'faerieLight') count = 23;
-        else if (this.type === 'fireflies') count = 28;
-        else if (this.type === 'leaves' || this.type === 'greenLeaves') count = 32;
-        else count = 60;
+            const defaultIntensity = data.default;
+
+            const intensityMultiplier = this.intensity > defaultIntensity
+                ? 1 + Math.pow((this.intensity - defaultIntensity) / defaultIntensity, 1.5) * 3
+                : 1;
+            this.intensityMultiplier = intensityMultiplier;
+            const maxIntensity = data.max;
+            const angleMultiplier = Math.max(0, Math.min(1, (this.intensity - defaultIntensity) / (maxIntensity - defaultIntensity)));
+            const maxAngleDegrees = 25;
+            this.angleRadians = (angleMultiplier * maxAngleDegrees) * (Math.PI / 180);
+            this.horizontalOffset = Math.tan(this.angleRadians) * this.height;
+        }
 
         if (this.type === 'fog' || this.type === 'embers' || this.type === 'cherryBlossoms') {
             const angle = Math.random() * Math.PI * 2;
@@ -56,19 +125,20 @@ class WeatherOverlay {
         if (this.type === 'rain' || this.type === 'lightning') {
             for (let i = 0; i < count; i++) {
                 const id = i + '_' + Math.floor(Math.random() * 1000000);
-                const startX = this.width / 2;
-                const startY = 0;
                 const endX = Math.random() * this.width;
                 const endY = Math.random() * this.height;
+                const startX = endX - this.horizontalOffset;
+                const startY = endY - this.height * (0.5 + Math.random() * 0.5);
                 const wind = -0.7 + Math.random() * 1.4;
+                const z = Math.random();
                 this.particles.push({
                     id,
                     startX,
                     startY,
                     endX,
                     endY,
-                    z: 0,
-                    fadeIn: 0,
+                    z: z,
+                    fadeIn: Math.ceil(fadeInFrames * z),
                     fadeInFrames,
                     splash: false,
                     splashed: false
@@ -93,12 +163,12 @@ class WeatherOverlay {
             for (let i = 0; i < count; i++) {
                 const windVar = 0.06 + Math.random() * 0.08;
                 const windAngleVar = windAngle + (-0.18 + Math.random() * 0.36);
-                const r = 8 + Math.random() * this.width/200;
+                const r = 4 + Math.random() * this.width/500;
                 this.particles.push({
                     x: Math.random() * this.width,
                     y: Math.random() * this.height,
                     r,
-                    alpha: 0.7 + Math.random() * 0.3,
+                    alpha: 1,
                     angle: Math.random() * Math.PI * 2,
                     spin: -0.02 + Math.random() * 0.04,
                     windDx: this._leavesWindDx + Math.cos(windAngleVar) * windVar,
@@ -109,23 +179,27 @@ class WeatherOverlay {
                 });
             }
         } else if (this.type === 'snow') {
+
+            
             for (let i = 0; i < count; i++) {
                 const groundX = Math.random() * this.width;
-                const groundY = Math.random() * this.height;
+                const groundY = (1 + Math.random() * 0.25) * this.height;
+                const startY = Math.random() * 1.25 * this.height;
+                const ratio = startY / groundY;
                 this.particles.push({
                     startX: groundX,
-                    startY: groundY - this.height * 0.5 - Math.random() * this.height * 0.5,
+                    startY: startY,
                     groundX: groundX,
                     groundY: groundY,
-                    z: Math.random(),
-                    r: 3 + Math.random() * 5,
-                    alpha: 0.7 + Math.random() * 0.3,
-                    drift: 1 + Math.random() * 100, 
-                    speed: 0.0001 + Math.random() * 0.0002, 
+                    z: ratio,
+                    r: 2 + Math.random() * 4,
+                    alpha: 0.8 + Math.random() * 0.2,
+                    drift: 1 + Math.random() * 100 * this.intensityMultiplier, 
+                    speed: (0.0001 + Math.random() * 0.0002) * this.intensityMultiplier, 
                     phase: Math.random() * Math.PI * 2,
-                    angle: Math.random() * Math.PI * 2,
-                    spin: -0.01 + Math.random() * 0.02,
-                    wind: 0.001 + Math.random() * 0.025,
+                    angle: Math.random() * Math.PI * 2 * this.intensityMultiplier,
+                    spin: -0.01 + Math.random() * 0.02 * this.intensityMultiplier,
+                    wind: 0.001 + Math.random() * 0.025 * this.intensityMultiplier * this.intensityMultiplier,
                     fadeIn: 0,
                     fadeInFrames: fadeInFrames
                 });
@@ -141,11 +215,12 @@ class WeatherOverlay {
                     aspect: aspect,
                     alpha: 0.1 + Math.random() * 0.05,
                     phase: Math.random() * Math.PI * 2,
-                    fadeIn: 1,
+                    fadeIn: 0,
                     fadeInFrames: fadeInFrames
                 });
             }
         } else if (this.type === 'embers') {
+            
             for (let i = 0; i < count; i++) {
                 let baseX = Math.random() * (this.width + 40) - 20;
                 let baseY = Math.random() * (this.height + 40) - 20;
@@ -214,7 +289,7 @@ class WeatherOverlay {
                 this.particles.push({
                     x: Math.random() * this.width,
                     y: Math.random() * this.height,
-                    r,
+                    r: r,
                     baseR: r,
                     alpha: 0.7 + Math.random() * 0.3,
                     hue: Math.random() * 360,
@@ -235,7 +310,7 @@ class WeatherOverlay {
             p.x >= -32 && p.x <= this.width + 32 &&
             p.y >= -32 && p.y <= this.height + 32
         );
-        while (this.particles.length < 32) {
+        while (this.particles.length < this.intensity) {
             let x, y;
             const windDx = this._leavesWindDx || 1;
             const windDy = this._leavesWindDy || 0;
@@ -262,8 +337,8 @@ class WeatherOverlay {
             this.particles.push({
                 x,
                 y,
-                r: 8 + Math.random() * this.width / 200,
-                alpha: 0.7 + Math.random() * 0.3,
+                r: 4 + Math.random() * this.width / 500,
+                alpha: 1,
                 angle: Math.random() * Math.PI * 2,
                 spin: -0.02 + Math.random() * 0.04,
                 windDx: this._leavesWindDx + Math.cos(windAngleVar) * windVar,
@@ -276,23 +351,29 @@ class WeatherOverlay {
         let leafTypes;
         if (this.type === 'greenLeaves') {
             leafTypes = [
-                { shape: 'maple', color: () => `rgba(${40+Math.floor(Math.random()*40)},${120+Math.floor(Math.random()*60)},${40+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#185a1c', points: 6 },
+                { shape: 'maple', color: () => `rgba(${40+Math.floor(Math.random()*40)},${120+Math.floor(Math.random()*60)},${40+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#185a1c',},
+                { shape: 'maple', color: () => `rgba(${40 + Math.floor(Math.random() * 40)},${120 + Math.floor(Math.random() * 60)},${40 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#185a1c'},
+                { shape: 'maple', color: () => `rgba(${40 + Math.floor(Math.random() * 40)},${120 + Math.floor(Math.random() * 60)},${40 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#185a1c'},
                 { shape: 'oak', color: () => `rgba(${60+Math.floor(Math.random()*40)},${140+Math.floor(Math.random()*60)},${60+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#1a4a1a' },
                 { shape: 'elm', color: () => `rgba(${70+Math.floor(Math.random()*40)},${160+Math.floor(Math.random()*60)},${70+Math.floor(Math.random()*30)},0.88)`, edgeColor: '#185a1c' }
             ];
         } else {
             leafTypes = [
-                { shape: 'maple', color: () => `rgba(${170+Math.floor(Math.random()*60)},${30+Math.floor(Math.random()*40)},${20+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#a02a1c', points: 5 + Math.floor(Math.random()*2) },
-                { shape: 'maple', color: () => `rgba(${220+Math.floor(Math.random()*25)},${110+Math.floor(Math.random()*60)},${30+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#b93a1a', points: 7 },
-                { shape: 'maple', color: () => `rgba(${230+Math.floor(Math.random()*20)},${180+Math.floor(Math.random()*40)},${40+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#b98c1a', points: 6 },
-                { shape: 'maple', color: () => `rgba(${120+Math.floor(Math.random()*40)},${70+Math.floor(Math.random()*30)},${30+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#6e3b1a', points: 5 },
-                { shape: 'maple', color: () => `rgba(${220+Math.floor(Math.random()*20)},${170+Math.floor(Math.random()*40)},${60+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#157901ff', points: 7 },
-                { shape: 'maple', color: () => `rgba(${90+Math.floor(Math.random()*40)},${120+Math.floor(Math.random()*40)},${60+Math.floor(Math.random()*30)},0.82)`, edgeColor: '#4a5a1a', points: 6 },
-                { shape: 'oak', color: () => `rgba(${120+Math.floor(Math.random()*40)},${80+Math.floor(Math.random()*30)},${40+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#6e3b1a' },
-                { shape: 'oak', color: () => `rgba(${220+Math.floor(Math.random()*20)},${180+Math.floor(Math.random()*40)},${60+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#b98c1a' },
-                { shape: 'oak', color: () => `rgba(${90+Math.floor(Math.random()*40)},${120+Math.floor(Math.random()*40)},${60+Math.floor(Math.random()*30)},0.82)`, edgeColor: '#4a5a1a' },
-                { shape: 'elm', color: () => `rgba(${200+Math.floor(Math.random()*30)},${180+Math.floor(Math.random()*40)},${60+Math.floor(Math.random()*30)},0.88)`, edgeColor: '#b98c1a' },
-                { shape: 'elm', color: () => `rgba(${120+Math.floor(Math.random()*40)},${90+Math.floor(Math.random()*30)},${50+Math.floor(Math.random()*30)},0.88)`, edgeColor: '#6e3b1a' }
+                { shape: 'maple', color: () => `rgba(${170+Math.floor(Math.random()*60)},${30+Math.floor(Math.random()*40)},${20+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#a02a1c'},
+                { shape: 'maple', color: () => `rgba(${220+Math.floor(Math.random()*25)},${110+Math.floor(Math.random()*60)},${30+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#b93a1a'},
+                { shape: 'maple', color: () => `rgba(${230+Math.floor(Math.random()*20)},${180+Math.floor(Math.random()*40)},${40+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#b98c1a'},
+                { shape: 'maple', color: () => `rgba(${170 + Math.floor(Math.random() * 20)},${220 + Math.floor(Math.random() * 35)},${60+Math.floor(Math.random()*30)},0.92)`, edgeColor: '#157901ff'},
+                { shape: 'maple', color: () => `rgba(${170 + Math.floor(Math.random() * 20)},${220 + Math.floor(Math.random() * 35)},${60 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#157901ff'},
+                { shape: 'maple', color: () => `rgba(${220 + Math.floor(Math.random() * 25)},${110 + Math.floor(Math.random() * 60)},${30 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#b93a1a'},
+                { shape: 'maple', color: () => `rgba(${230 + Math.floor(Math.random() * 20)},${180 + Math.floor(Math.random() * 40)},${40 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#b98c1a'},
+                { shape: 'oak', color: () => `rgba(${170 + Math.floor(Math.random() * 60)},${30 + Math.floor(Math.random() * 40)},${20 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#a02a1c'},
+                { shape: 'oak', color: () => `rgba(${220 + Math.floor(Math.random() * 25)},${110 + Math.floor(Math.random() * 60)},${30 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#b93a1a'},
+                { shape: 'oak', color: () => `rgba(${230 + Math.floor(Math.random() * 20)},${180 + Math.floor(Math.random() * 40)},${40 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#b98c1a'},
+                { shape: 'oak', color: () => `rgba(${170 + Math.floor(Math.random() * 20)},${220 + Math.floor(Math.random() * 35)},${60 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#157901ff'},
+                { shape: 'elm', color: () => `rgba(${170 + Math.floor(Math.random() * 60)},${30 + Math.floor(Math.random() * 40)},${20 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#a02a1c'},
+                { shape: 'elm', color: () => `rgba(${220 + Math.floor(Math.random() * 25)},${110 + Math.floor(Math.random() * 60)},${30 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#b93a1a'},
+                { shape: 'elm', color: () => `rgba(${230 + Math.floor(Math.random() * 20)},${180 + Math.floor(Math.random() * 40)},${40 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#b98c1a'},
+                { shape: 'elm', color: () => `rgba(${170 + Math.floor(Math.random() * 20)},${220 + Math.floor(Math.random() * 35)},${60 + Math.floor(Math.random() * 30)},0.92)`, edgeColor: '#157901ff'},
             ];
         }
         for (let p of this.particles) {
@@ -301,8 +382,6 @@ class WeatherOverlay {
                 p.leafShape = type.shape;
                 p.edgeColor = type.edgeColor;
                 p.color = typeof type.color === 'function' ? type.color() : type.color;
-                if (type.lobes) p.lobes = type.lobes;
-                if (type.points) p.points = type.points;
             }
             const pathVar = Math.sin(t * 0.7 + p.pathVar) * 1.5 + Math.cos(t * 0.5 + p.pathVar) * 1.5;
             p.angle += p.spin;
@@ -347,49 +426,7 @@ class WeatherOverlay {
         }
     }
 
-    start() {
-        if (!this.animationId) {
-            this._animate();
-            if (this.type === 'fog') {
-                $(this.canvas).css({
-                    filter: `blur(${window.CURRENT_SCENE_DATA.hpps / window.CURRENT_SCENE_DATA.scale_factor}px`
-                })
-            }
-            else if (this.type === 'faerieLight' || this.type === 'fireflies') {
-                $(this.canvas).css({
-                    filter: `blur(1px)`
-                })
-            }
-            else {
-                $(this.canvas).css({
-                    filter: ``
-                })
-            }
-
-            if (this.type === 'lightning') {
-                $(this.lightCanvas).css({
-                    filter: `blur(${window.CURRENT_SCENE_DATA.hpps / window.CURRENT_SCENE_DATA.scale_factor}px`
-                })
-            }
-            else{
-                $(this.lightCanvas).css({
-                    filter: ``
-                })
-            }
-        }
-    }
-
     
-    stop(){
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
-            this.animationId = null;
-        }
-        this.offscreenCtx.clearRect(0, 0, this.width, this.height);
-        this.ctx.clearRect(0, 0, this.width, this.height);
-        this.lightCtx.clearRect(0, 0, this.width, this.height);   
-    }
-
     _animate = () => {
         const now = Date.now();
         if (!this._lastFrameTime) this._lastFrameTime = now;
@@ -461,7 +498,7 @@ class WeatherOverlay {
             p.x >= -20 && p.x <= this.width + 20 &&
             p.y >= -20 && p.y <= this.height + 20
         );
-        while (this.particles.length < 23) {
+        while (this.particles.length < this.intensity) {
             this.particles.push({
                 x: Math.random() * this.width,
                 y: Math.random() * this.height,
@@ -499,7 +536,7 @@ class WeatherOverlay {
             p.x >= -20 && p.x <= this.width + 20 &&
             p.y >= -20 && p.y <= this.height + 20
         );
-        while (this.particles.length < 28) {
+        while (this.particles.length < this.intensity) {
             this.particles.push({
                 x: Math.random() * this.width,
                 y: Math.random() * this.height,
@@ -538,7 +575,7 @@ class WeatherOverlay {
             p.y >= -20 && p.y <= this.height + 20 &&
             p.life <= p.maxLife
         );
-        while (this.particles.length < 40) {
+        while (this.particles.length < this.intensity) {
             let baseX = Math.random() * (this.width + 40) - 20;
             let baseY = Math.random() * (this.height + 40) - 20;
             this.particles.push({
@@ -639,7 +676,7 @@ class WeatherOverlay {
             p.x >= -20 && p.x <= this.width + 20 &&
             p.y >= -20 && p.y <= this.height + 20
         );
-        while (this.particles.length < 40) {
+        while (this.particles.length < this.intensity*2) {
             let baseX = Math.random() * (this.width + 40) - 20;
             let baseY = Math.random() * (this.height + 40) - 20;
             this.particles.push({
@@ -680,10 +717,10 @@ class WeatherOverlay {
     }
 
     _drawLightning() {
-        const t = Date.now() * 0.002;
+       
         if (!this._lightningTimer || this._lightningTimer <= 0) {
             this._lightningAlpha = 0.18 + Math.random() * 0.10;
-            this._lightningTimer = 360 + Math.floor(Math.random() * 360);
+            this._lightningTimer = (360 / this.intensityMultiplier + Math.floor(Math.random() * 360));
             this._lightningFlashFrames = 10 + Math.floor(Math.random() * 8);
             const angle = Math.random() * Math.PI * 2;
             const length = this.width * (0.7 + Math.random() * 0.5);
@@ -704,10 +741,10 @@ class WeatherOverlay {
             this.lightCtx.globalAlpha = 0.5;
             this.lightCtx.beginPath();
             this.lightCtx.ellipse(
-                this._lightningStrike.x + Math.cos(this._lightningStrike.angle) * this._lightningStrike.length * 0.5,
-                this._lightningStrike.y + Math.sin(this._lightningStrike.angle) * this._lightningStrike.length * 0.5,
-                glowRadiusX,
-                glowRadiusY,
+                (this._lightningStrike.x + Math.cos(this._lightningStrike.angle) * this._lightningStrike.length * 0.5) / window.CURRENT_SCENE_DATA.scale_factor,
+                (this._lightningStrike.y + Math.sin(this._lightningStrike.angle) * this._lightningStrike.length * 0.5) / window.CURRENT_SCENE_DATA.scale_factor,
+                glowRadiusX / window.CURRENT_SCENE_DATA.scale_factor,
+                glowRadiusY / window.CURRENT_SCENE_DATA.scale_factor,
                 this._lightningStrike.angle,
                 0,
                 Math.PI * 2
@@ -760,7 +797,6 @@ class WeatherOverlay {
     }
 
     _drawRain() {
-        const t = Date.now() * 0.001;
         for (let p of this.particles) {
             if (p.splash && p.start == true) {
                 this.offscreenCtx.save();
@@ -803,13 +839,15 @@ class WeatherOverlay {
                 p.x = (1 - p.z) * p.startX + p.z * p.groundX + windOffset;
                 p.y = (1 - p.z) * p.startY + p.z * p.groundY;
                 const streakLen = 18 + 22 * (1 - p.z);
+                const endX = p.x + Math.sin(this.angleRadians) * streakLen;
+                const endY = p.y + Math.cos(this.angleRadians) * streakLen;
                 this.offscreenCtx.save();
                 this.offscreenCtx.globalAlpha = 0.2 + (2 * (1 - p.z) * fade*.8);
                 this.offscreenCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
                 this.offscreenCtx.lineWidth = 1.4 + 1.7 * (1 - p.z);
                 this.offscreenCtx.beginPath();
                 this.offscreenCtx.moveTo(p.x, p.y);
-                this.offscreenCtx.lineTo(p.x, p.y + streakLen);
+                this.offscreenCtx.lineTo(endX, endY);
                 this.offscreenCtx.shadowColor = '#00aeff80';
                 this.offscreenCtx.shadowBlur = 10 * (1 - p.z);
                 this.offscreenCtx.stroke();
@@ -824,10 +862,11 @@ class WeatherOverlay {
                         splash.fadeIn = 0;
                         splash.start = true;
                     }
+
                     const groundX = Math.random() * this.width;
                     const groundY = Math.random() * this.height;
-                    p.startX = groundX;
-                    p.startY = groundY - this.height * 0.5 - Math.random() * this.height * 0.5;
+                    p.startX = groundX - this.horizontalOffset;
+                    p.startY = groundY - this.height * (0.5 + Math.random() * 0.5);
                     p.groundX = groundX;
                     p.groundY = groundY;
                     p.z = 0;
@@ -854,10 +893,10 @@ class WeatherOverlay {
             p.x = (1 - p.z) * p.startX + p.z * p.groundX + windOffset;
             p.y = (1 - p.z) * p.startY + p.z * p.groundY;
             this.offscreenCtx.save();
-            this.offscreenCtx.globalAlpha = (p.alpha ?? 1) * fade * (1 - p.z + 0.2);
+            this.offscreenCtx.globalAlpha = (p.alpha ?? 1) * fade;
             this.offscreenCtx.translate(p.x, p.y);
             this.offscreenCtx.rotate(p.angle + Math.sin(t * 0.7 + p.phase) * 0.7);
-            const grad = this.offscreenCtx.createRadialGradient(0, 0, 0, 0, 0, p.r * (1 - p.z + 0.2));
+            const grad = this.offscreenCtx.createRadialGradient(0, 0, 0, 0, 0, p.r);
             grad.addColorStop(0, 'rgba(255,255,255,1)');
             grad.addColorStop(0.7, 'rgba(220,240,255,0.7)');
             grad.addColorStop(1, 'rgba(200,220,255,0.1)');
@@ -865,27 +904,32 @@ class WeatherOverlay {
             this.offscreenCtx.beginPath();
             for (let i = 0; i < 6; i++) {
                 const theta = (Math.PI * 2 / 6) * i;
-                this.offscreenCtx.lineTo(Math.cos(theta) * p.r * (1 - p.z + 0.2), Math.sin(theta) * p.r * (1 - p.z + 0.2));
+                this.offscreenCtx.lineTo(Math.cos(theta) * p.r, Math.sin(theta) * p.r);
             }
             this.offscreenCtx.closePath();
             this.offscreenCtx.fill();
+            this.offscreenCtx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+            this.offscreenCtx.lineWidth = 1;
+            this.offscreenCtx.stroke();
             this.offscreenCtx.restore();
-            if (p.z >= 1) {
+            if (p.y >= p.groundY) {
                 const groundX = Math.random() * this.width;
-                const groundY = Math.random() * this.height;
+                const groundY = (1 + Math.random() * 0.25) * this.height;
+                const startY = groundY - (1.25 * this.height);
+                const ratio = startY / groundY;
                 p.startX = groundX;
-                p.startY = groundY - this.height * 0.5 - Math.random() * this.height * 0.5;
+                p.startY = startY;
                 p.groundX = groundX;
                 p.groundY = groundY;
-                p.z = 0;
-                p.r = 3 + Math.random() * 5;
-                p.alpha = 0.7 + Math.random() * 0.3;
-                p.drift = 1 + Math.random() * 100;
-                p.speed = 0.0001 + Math.random() * 0.0002; 
+                p.z = ratio;
+                p.r = 2 + Math.random() * 4;
+                p.alpha = 0.8 + Math.random() * 0.2;
+                p.drift = 1 + Math.random() * 100 * this.intensityMultiplier;
+                p.speed = (0.0001 + Math.random() * 0.0002) * this.intensityMultiplier;
                 p.phase = Math.random() * Math.PI * 2;
-                p.angle = Math.random() * Math.PI * 2;
+                p.angle = Math.random() * Math.PI * 2 * this.intensityMultiplier;
                 p.spin = -0.01 + Math.random() * 0.02;
-                p.wind = 0.001 + Math.random() * 0.025;
+                p.wind = (0.001 + Math.random() * 0.025) * this.intensityMultiplier * this.intensityMultiplier;
                 p.fadeIn = 1;
             }
         }
@@ -937,36 +981,34 @@ class WeatherOverlay {
     }
 }
 
-function set_weather(){
-    const currentWeather = window.CURRENT_SCENE_DATA.weather || 'none';
+function ensure_weather() {
     if(window.WeatherOverlay == undefined){
         const weatherCanvas = $('#weather_overlay');
         const weatherLightCanvas = $('#weather_light');
-        window.WeatherOverlay = new WeatherOverlay(weatherCanvas[0], weatherLightCanvas[0], currentWeather);
+        window.WeatherOverlay = new WeatherOverlay(weatherCanvas[0], weatherLightCanvas[0]);
     }
-
-    if(!currentWeather || currentWeather == 'none' || currentWeather == '0'){
-        window.WeatherOverlay.stop();
-        window.WeatherOverlay.ctx.clearRect(0, 0, window.WeatherOverlay.width, window.WeatherOverlay.height);
-        return;
-    }
-         
-    window.WeatherOverlay.stop();
-    window.WeatherOverlay.setType(window.CURRENT_SCENE_DATA.weather);
-    window.WeatherOverlay.start();
+}
+function set_weather(){
+    ensure_weather();
+    window.WeatherOverlay.setType(window.CURRENT_SCENE_DATA.weather || 'none', window.CURRENT_SCENE_DATA.weatherIntensity);
+}
+function set_weather_size(w, h){
+    ensure_weather();
+    window.WeatherOverlay.setSize(w, h);
+    set_weather();
 }
 
 function getWeatherTypes() {
     return {
-        'rain': 'Rain',
-        'snow': 'Snow',
-        'fog': 'Fog',
-        'embers': 'Embers',
-        'cherryBlossoms': 'Cherry Blossoms',
-        'lightning': 'Lightning',
-        'faerieLight': 'Faerie Light',
-        'fireflies': 'Fireflies',
-        'leaves': 'Fall Leaves',
-        'greenLeaves': 'Green Leaves'
+        'rain': { type: 'Rain', min: 0, default: 180, max: 360 },
+        'snow': { type: 'Snow', min: 0, default: 320, max: 640 },
+        'fog': { type: 'Fog', min: 0, default: 10, max: 20 },
+        'embers': { type: 'Embers', min: 0, default: 40, max: 80 },
+        'cherryBlossoms': { type: 'Cherry Blossoms', min: 0, default: 40, max: 80 },
+        'lightning': { type: 'Lightning', min: 0, default: 60, max: 120, lit: true },
+        'faerieLight': { type: 'Faerie Light', min: 0, default: 23, max: 46 },
+        'fireflies': { type: 'Fireflies', min: 0, default: 28, max: 56 },
+        'leaves': { type: 'Fall Leaves', min: 0, default: 32, max: 64 },
+        'greenLeaves': { type: 'Green Leaves', min: 0, default: 32, max: 64 }
     };
 }

@@ -53,17 +53,16 @@ function build_stat_block_for_copy(listItem, options, open5e = false){
   build_import_loading_indicator('Fetching Statblock Info');
   if (cachedMonsterItem) {
       // we have a cached monster. this data is the best data we have so display that instead of whatever we were given
-      create_token_inside(find_sidebar_list_item_from_path(RootFolder.MyTokens.path), undefined, undefined, undefined, options, build_monster_copy_stat_block(new MonsterStatBlock(cachedMonsterItem.monsterData)));
-      $(".import-loading-indicator").remove();
+    create_token_inside(find_sidebar_list_item_from_path(RootFolder.MyTokens.path), undefined, undefined, undefined, options, build_monster_copy_stat_block(new MonsterStatBlock(cachedMonsterItem.monsterData)));
+    $(".import-loading-indicator").remove();
   } else {
     fetch_and_cache_monsters([monsterId], function (open5e = false) {
-      if(!open5e){
-         create_token_inside(find_sidebar_list_item_from_path(RootFolder.MyTokens.path), undefined, undefined, undefined, options, build_monster_copy_stat_block(new MonsterStatBlock(cached_monster_items[monsterId].monsterData)));
-      }
-      else{
-         create_token_inside(find_sidebar_list_item_from_path(RootFolder.MyTokens.path), undefined, undefined, undefined, options, build_monster_copy_stat_block(new MonsterStatBlock(cached_open5e_items[monsterId].monsterData)));
-   
-      }
+        if(!open5e){
+          create_token_inside(find_sidebar_list_item_from_path(RootFolder.MyTokens.path), undefined, undefined, undefined, options, build_monster_copy_stat_block(new MonsterStatBlock(cached_monster_items[monsterId].monsterData)));
+        }
+        else{
+          create_token_inside(find_sidebar_list_item_from_path(RootFolder.MyTokens.path), undefined, undefined, undefined, options, build_monster_copy_stat_block(new MonsterStatBlock(cached_open5e_items[monsterId].monsterData)));
+        }
       $(".import-loading-indicator").remove();
     }, open5e);
   }  
@@ -77,25 +76,12 @@ async function display_stat_block_in_container(statBlock, container, tokenId, cu
     container.find(".avtt-stat-block-container").remove(); // in case we're re-rendering with better data
     container.append(html);
     if(customStatBlock){
-      window.JOURNAL.translateHtmlAndBlocks(html)
+      await window.JOURNAL.translateHtmlAndBlocks(html);
       add_journal_roll_buttons(html, tokenId);
       window.JOURNAL.add_journal_tooltip_targets(html);
 
       
-      $(container).find('.add-input').each(function(){
-        let numberFound = $(this).attr('data-number');
-        const spellName = $(this).attr('data-spell');
-        const remainingText = $(this).hasClass('each') ? '' : `${spellName} slots remaining`
-
-        if (token.options.abilityTracker?.[spellName]>= 0){
-          numberFound = token.options.abilityTracker[spellName]
-        } else{
-          token.track_ability(spellName, numberFound)
-        }
-        let input = createCountTracker(token, spellName, numberFound, remainingText, "");
-        $(this).find('p').remove();
-        $(this).after(input)
-      })
+      $(container).find('.add-input').each(function(){window.JOURNAL.addTrackedInputs($(this), {token})});
       let imageUrl = parse_img(token.options.imgsrc);
 
       if(token.options.imgsrc.startsWith('above-bucket-not-a-url')){
@@ -1811,10 +1797,18 @@ const fetch_tooltip = mydebounce(async (dataTooltipHref, name, callback) => {
           let bodyClass = $(moreInfo).find('body').attr('class');
           let subClasses = !tooltipBody.length && dataTooltipHref[1].match(/#.*$/gi) ? ['p-article-a', 'p-article-content'] : ['more-info', 'detail-content']
           if(!tooltipBody.length && dataTooltipHref[1].match(/#.*$/gi)){
-          let section = $(moreInfo).find(dataTooltipHref[1].match(/#.*$/gi)[0]);
-          let sectionElementType = $(moreInfo).find(dataTooltipHref[1].match(/#.*$/gi)[0])[0].tagName
+            let section = $(moreInfo).find(dataTooltipHref[1].match(/#.*$/gi)[0]);
+            if(section.length == 0){
 
-           tooltipBody = $('<div>').append(section.nextUntil(`${sectionElementType}.heading-anchor`).addBack());
+              const toolTipJson = { Tooltip: '' }
+              window.tooltipCache[typeAndId] = toolTipJson;
+              callback(toolTipJson); 
+              return;
+            } 
+              
+            let sectionElementType = $(moreInfo).find(dataTooltipHref[1].match(/#.*$/gi)[0])[0].tagName
+            tooltipBody = $('<div>').append(section.nextUntil(`${sectionElementType}.heading-anchor`).addBack());
+            
           }
           else if(!tooltipBody.length && $(moreInfo).find('.p-article-content').length>0){
             tooltipBody = $('<div>').append($(moreInfo).find('.p-article-content'));
