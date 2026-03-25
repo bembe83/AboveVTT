@@ -1839,12 +1839,19 @@ class JournalManager{
 
 		})
 	}
+	
 	display_note(id, statBlock = false){
 		let self=this;
 		let noteAlreadyOpen = $(`div.note[data-id='${id}']`).length>0;
 		
 		let note= noteAlreadyOpen ? $(`div.note[data-id='${id}']`) : $(`<div class='note' data-id='${id}'></div>`);
-		
+		const note_container = find_or_create_generic_draggable_window(`noteWindow_${id}`, self.notes[id].title, false, true, `div.note[data-id='${id}']`, "860px", "600px", undefined, undefined, false, undefined, false, true)
+		//to do adjust so these attr/classes are no longer needed - they are hold over from when we used dialog instead of our own draggable window
+		note_container.attr("role", "dialog");
+		note_container.addClass(['ui-dialog', 'ui-corner-all', 'ui-widget', 'ui-widget-content', 'ui-front', 'ui-draggable', 'ui-resizable'])
+		note_container.find('.title_bar').off('dblclick.adjustClasses').on('dblclick.adjustClasses', function (event) {
+			note_container.toggleClass(['ui-dialog', 'ui-corner-all', 'ui-widget', 'ui-widget-content', 'ui-front', 'ui-draggable', 'ui-resizable']);
+		});
 		if(!noteAlreadyOpen){
 			note.attr('title',self.notes[id].title);
 			if(window.DM){
@@ -1928,7 +1935,7 @@ class JournalManager{
 				
 				let edit_btn=$("<button>Edit</button>");
 				edit_btn.click(function(){
-					note.remove();
+					note_container.remove();
 					window.JOURNAL.edit_note(id, statBlock);
 				});
 				
@@ -1938,13 +1945,12 @@ class JournalManager{
 				
 			}
 		}
-		
 		let note_text= noteAlreadyOpen ? note.find('.note-text') : $("<div class='note-text'/>");
 		if(noteAlreadyOpen){
 			note_text.empty();
 		}
 		note_text.append(self.notes[id].text); // valid tags are controlled by tinyMCE.init()
-		this.translateHtmlAndBlocks(note_text, id).then(() => {
+		this.translateHtmlAndBlocks(note_text, id).then(() => {	
 			add_journal_roll_buttons(note_text);
 			this.add_journal_tooltip_targets(note_text);
 			this.block_send_to_buttons(note_text);
@@ -1956,81 +1962,30 @@ class JournalManager{
 				note.append(note_text);
 			}
 			note.find("a").attr("target", "_blank");
-			if (!noteAlreadyOpen) {
-				note.dialog({
-					draggable: true,
-					width: 860,
-					height: 600,
-					position: {
-						my: "center",
-						at: "center-200",
-						of: window
-					},
-					close: function (event, ui) {
-						$(this).remove();
-					}
-				});
-				$("[role='dialog']").draggable({
-					containment: "#windowContainment",
-					start: function () {
-						$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
-					},
-					stop: function () {
-						$('.iframeResizeCover').remove();
-					}
-				});
-				$("[role='dialog']").resizable({
-					start: function () {
-						$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
-					},
-					stop: function () {
-						$('.iframeResizeCover').remove();
-					}
-				});
-				frame_z_index_when_click(note.parent(), true);
-				let btn_popout = $(`<div class="popout-button journal-button"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"></path><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"></path></svg></div>"`);
-				note.parent().append(btn_popout);
-				btn_popout.click(function () {
-					let uiId = $(this).siblings(".note").attr("id");
-					let journal_text = $(`#${uiId}.note .note-text`)
-					let title = self.notes[id]?.title?.trim() || $("#resizeDragMon .avtt-stat-block-container .mon-stat-block__name-link").text();
-					popoutWindow(title, note, journal_text.width(), journal_text.height());
-					removeFromPopoutWindow(title, ".visibility-container");
-					removeFromPopoutWindow(title, ".ui-resizable-handle");
-					$(window.childWindows[title].document).find("head").append(`<style id='noteStyles'>
-					body div.note[id^="ui-id"]{
-						height: 100% !important;
-					    max-height: 100% !important;
-					    overflow: auto !important;
-					}
-				</stlye>`);
-					if (!window.DM)
-						$(window.childWindows[title].document).find("body").addClass('body-rpgcharacter-sheet');
-
-					$(this).siblings(".ui-dialog-titlebar").children(".ui-dialog-titlebar-close").click();
-				});
-				note.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function (event) {
-					event.preventDefault();
-					render_source_chapter_in_iframe(event.target.href);
-				});
-				note.parent().css('height', '600px');
-			} else {
-				frame_z_index_when_click(note.parent());
-			}
+			note_container.append(note);
+			
+			note.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function (event) {
+				event.preventDefault();
+				render_source_chapter_in_iframe(event.target.href);
+			});
+		
 			this.positionNotePins(id, note_text);
 		});	
 		
 	}
 	add_journal_tooltip_targets(target){
+		const monsterIds = [];
 		$(target).find('.tooltip-hover').each(function(){
-			let self = this;
-			if($(self).hasClass('note-tooltip')){
-					let noteId = $(self).attr('data-id');
-					if(noteId.replace(/[-+*&<>]/gi, '') == $(self).text().replace(/[-+*&<>\s]/gi, '')){
-						noteId = Object.keys(window.JOURNAL.notes).filter(d=> window.JOURNAL.notes[d]?.title?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')?.includes($(self).text()?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')))[0]
-					}
+			const self = this;
+			const $self = $(self);
+			$self.css('display:inline-block');
+			if($self.hasClass('note-tooltip')){
+				let noteId = $self.attr('data-id');
+				if(noteId.replace(/[-+*&<>]/gi, '') == $self.text().replace(/[-+*&<>\s]/gi, '')){
+					noteId = Object.keys(window.JOURNAL.notes).filter(d=> window.JOURNAL.notes[d]?.title?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')?.includes($self.text()?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')))[0]
+				}
 					
-				$(self).off('click.openNote').on('click.openNote', function(event){
+				$self.off('click.openNote').on('click.openNote', function(event){
 					event.preventDefault();
 					event.stopPropagation();
 					if(noteId != undefined)
@@ -2060,13 +2015,13 @@ class JournalManager{
 
 			
 					let hoverNoteTimer;
-					$(self).on({
+					$self.on({
 						'mouseover': function(e){
 							hoverNoteTimer = setTimeout(function () {
 								build_and_display_sidebar_flyout(e.clientY, async function (flyout) {
 						            flyout.addClass("prevent-sidebar-modal-close"); // clicking inside the tooltip should not close the sidebar modal that opened it
 						            flyout.addClass('note-flyout');
-						            $(self).toggleClass('loading-tooltip', false);
+						            $self.toggleClass('loading-tooltip', false);
 						            const tooltipHtml = $(noteHover);
 									await window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);
 									add_journal_roll_buttons(tooltipHtml);
@@ -2143,22 +2098,123 @@ class JournalManager{
 
 				return;	
 			}
-			
-
-
-			if(!$(self).attr('data-tooltip-href')){
-				
+			const addMonsterButton = function(){
+				if ($self.hasClass('monster-tooltip')) {
+					$self.css('display', 'inline-block')
+					const monsterId = $self.attr('data-tooltip-href').match(/monsters\/(\d+)/i)?.[1];
+					$self.attr('data-monsterid', monsterId);
+					monsterIds.push(monsterId);
+					window.JOURNAL.addTokenDragToMonsterLink(self);
+				}
+			}
+			if(!$self.attr('data-tooltip-href')){
 				if(self.href.match(/\/spells\/[0-9]|\/magic-items\/[0-9]|\/monsters\/[0-9]|\/sources\//gi)){
-					$(self).attr('data-moreinfo', `${self.href}`);
+					$self.attr('data-moreinfo', `${self.href}`);
 				}	
 				window.JOURNAL.getDataTooltip(self.href, function(url, typeClass){
-					$(self).attr('data-tooltip-href', url);
-					$(self).toggleClass(`${typeClass}-tooltip`, true);
-				});
+					$self.attr('data-tooltip-href', url);
+					$self.toggleClass(`${typeClass}-tooltip`, true);
+					addMonsterButton();
+				});	
+			} else{
+				addMonsterButton();
 			}
-		});
-	}
 
+		});
+		if (monsterIds.length>0)
+			fetch_and_cache_monsters(monsterIds);
+	}
+	addTokenDragToMonsterLink(target){
+		const $target = $(target);
+		const monsterId = $target.attr('data-monsterid');
+		if (monsterId) {
+			const defaultSize = window.CURRENT_SCENE_DATA.hpps / 1 / window.ZOOM;
+			const tokenIcon = $(`<span class="material-symbols-outlined" style="user-select: none;display: inline-block;cursor: pointer;font-size: 91%;margin-left: 1px;padding-bottom: 3px;vertical-align: middle;">person_add</span>`)
+			$target.after(tokenIcon);
+			let tokenImgSrc;
+			tokenIcon.off('pointerup.droptoken').on('pointerup.droptoken',function(event){
+				if (window.cached_monster_items[monsterId]){
+					create_and_place_token(window.cached_monster_items[monsterId], event.shiftKey)
+					return;
+				}
+				fetch_and_cache_monsters([monsterId], function () {
+					create_and_place_token(window.cached_monster_items[monsterId], event.shiftKey)
+				});
+			})
+			tokenIcon.draggable({
+				addClasses: false,
+				scroll: true,
+				cursorAt: { left: 0, top: 0 },
+				containment: "#windowContainment",
+				distance: 5,
+				appendTo: 'body',
+				zIndex: 10000000,
+				helper: (event) => {
+					const helper = $(`<img class='draggable-token-creation' style='pointer-events:none;width:${defaultSize}; height:${defaultSize}'; src='${defaultAvatarUrl}'/>`)
+					const setHelper = () => {
+						tokenImgSrc = random_image_for_item(window.cached_monster_items[monsterId]);
+						helper.attr("data-src", tokenImgSrc);
+						if (tokenImgSrc.startsWith('above-bucket-not-a-url')) {
+							getAvttStorageUrl(tokenImgSrc).then((url) => {
+								helper.attr("src", url);
+							})
+						}
+						else {
+							helper.attr("src", tokenImgSrc);
+						}
+						let [helperWidth, helperHeight] = get_helper_size(window.cached_monster_items[monsterId])
+						$(helper).css({
+							'width': `${helperWidth}px`,
+							'height': `${helperHeight}px`
+						});
+					}
+					if (window.cached_monster_items[monsterId]) {
+						setHelper();
+						return helper;
+					}
+					fetch_and_cache_monsters([monsterId], function () {
+						setHelper();
+					});
+					return helper;
+				},
+				start: function (event, ui) {
+					$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));;
+					window.orig_zoom = window.ZOOM;
+				},
+				drag: function (event, ui) {
+					if (event.shiftKey) {	
+						$(ui.helper).css("opacity", 0.5);
+					} else {
+						$(ui.helper).css("opacity", 1);
+					}
+					const setHelperPosition = () => {
+						let [helperWidth, helperHeight] = get_helper_size(window.cached_monster_items[monsterId])
+						ui.position = {
+							left: (ui.position.left - (helperWidth / 2)),
+							top: (ui.position.top - (helperHeight / 2))
+						};
+					}
+					if (window.cached_monster_items[monsterId]) {
+						setHelperPosition();
+						return;
+					}
+				},
+				stop: function (event, ui) {
+					$(".iframeResizeCover").remove();
+					let droppedOn = $(document.elementFromPoint(event.clientX, event.clientY));
+					if (droppedOn.closest('#VTT').length > 0) {
+						if (window.cached_monster_items[monsterId]) {
+							create_and_place_token(window.cached_monster_items[monsterId], event.shiftKey, tokenImgSrc, event.pageX, event.pageY)
+							return;
+						}
+						fetch_and_cache_monsters([monsterId], function () {
+							create_and_place_token(window.cached_monster_items[monsterId], event.shiftKey)
+						});
+					}
+				},
+			})
+		}
+	}
 	async getDataTooltip(url, callback){
 		if(window.spellIdCache == undefined){
 			window.spellIdCache = {};
@@ -2216,7 +2272,7 @@ class JournalManager{
 		const blocks = target.find('img:not(.mon-stat-block__separator-img), .text--quote-box, .rules-text, .block-torn-paper, .read-aloud-text, .dmScreenChunk')
 
 		const sendToGamelogButton = $('<button class="block-send-to-game-log"><span class="material-symbols-outlined">login</span></button>')
-		const container = $(`<div class='note-text' style='position:relative; width:'></div>`)
+		const container = $(`<div class='note-text' style='position:relative; width:fit-content; max-width: 100%'></div>`)
 		
 	
 
@@ -3083,7 +3139,8 @@ class JournalManager{
 		}
 	}
 	edit_note(id, statBlock = false){
-		$(`div.note[data-id='${id}']`)?.dialog("close");
+		$(`.ui-dialog:not(.resize_drag_window) div.note[data-id='${id}']`)?.dialog("close");
+		$(`.resize_drag_window[id="${id}"]`).remove();
 		this.close_all_notes();
 		let self=this;
 		
@@ -3943,40 +4000,6 @@ class JournalManager{
 			    bottom: -3px
 			}
 			@font-face {
-			    font-family: Scala Sans Offc;
-			    font-style: normal;
-			    font-weight: 700;
-			    src: url(https://media.dndbeyond.com/encounter-builder/static/media/ScalaSansOffc-Bold.048d2d142baf798dc56f.ttf) format("truetype")
-			}
-
-			@font-face {
-			    font-family: Scala Sans Offc;
-			    font-style: normal;
-			    font-weight: 400;
-			    src: url(https://media.dndbeyond.com/encounter-builder/static/media/ScalaSansOffc.0eea070d2279b1a6be23.ttf) format("truetype")
-			}
-
-			@font-face {
-			    font-family: Scala Sans Offc;
-			    font-style: italic;
-			    font-weight: 700;
-			    src: url(https://media.dndbeyond.com/encounter-builder/static/media/ScalaSansOffc-BoldIta.740e4d6d85a09a9cd0a0.ttf) format("truetype")
-			}
-
-			@font-face {
-			    font-family: Scala Sans Offc;
-			    font-style: italic;
-			    font-weight: 400;
-			    src: url(https://media.dndbeyond.com/encounter-builder/static/media/ScalaSansOffc-Ita.86c4513e1c4b869189c2.ttf) format("truetype")
-			}
-
-			@font-face {
-			    font-family: MrsEavesSmallCaps;
-			    font-style: normal;
-			    font-weight: 100;
-			    src: url(https://media.dndbeyond.com/encounter-builder/static/media/MrsEavesSmallCaps.1744d7a566b5a2ccca6c.ttf) format("truetype")
-			}
-			@font-face {
 			  font-family: "Tiamat Condensed SC Regular";
 			  src: url("https://www.dndbeyond.com/fonts/tiamatcondensedsc-regular-webfont.woff2") format("woff2");
 			}
@@ -4795,8 +4818,34 @@ function render_source_chapter_in_iframe(url) {
 			iframeContents.find("body").css('background', '#f9f9f9 url(../images/background_texture.png) repeat');
 		}
 
-		iframeContents.find("body").append($(`<style id='ddbSourceStyles'>
+		setTimeout(()=>{
+			const monsterIds = [];
+			iframeContents.find('.monster-tooltip').each((i, ele) => {
+				const $target = $(ele);
+				const monsterId = $target.attr('data-tooltip-href').match(/monsters\/(\d+)/i)?.[1];
+				if(monsterId){
+					monsterIds.push(monsterId);
+					const tokenIcon = $(`<span class="material-symbols-outlined" style="user-select: none;display: inline-block;cursor: pointer;font-size: 91%;margin-left: 1px;padding-bottom: 3px;vertical-align: middle;">person_add</span>`)
+					$target.after(tokenIcon);
+					tokenIcon.off('pointerup.droptoken').on('pointerup.droptoken', function (event) {
+						if (window.top.cached_monster_items[monsterId]) {
+							create_and_place_token(window.cached_monster_items[monsterId], event.shiftKey)
+							return;
+						}
+						fetch_and_cache_monsters([monsterId], function () {
+							create_and_place_token(window.top.cached_monster_items[monsterId], event.shiftKey)
+						});
+					})
+				}
+			})
+			if(monsterIds.length >0)
+				fetch_and_cache_monsters(monsterIds);
+		}, 2000)
 
+		iframeContents.find("head").append('<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons"></link>');
+		iframeContents.find("head").append('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />');
+
+		iframeContents.find("body").append($(`<style id='ddbSourceStyles'>
 		body, html body.responsive-enabled{
 			background: var(--theme-page-bg-color,#f9f9f9) !important;
 			background-position: center 0px !important;

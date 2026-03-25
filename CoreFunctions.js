@@ -29,6 +29,13 @@ $(function() {
   }
 });
 
+class noLogError extends Error{
+  constructor(message, options) {
+    super(message, options); 
+    this.name = "noLogError";
+  }
+}
+
 const async_sleep = m => new Promise(r => setTimeout(r, m));
 
 const charactersPageRegex = /\/characters\/\d+/;
@@ -54,6 +61,7 @@ function getAltKeyName() {
 function getShiftKeyName() {
   return isMac() ? "&#8679;" : "SHIFT";
 }
+
 
 
 function mydebounce(func, timeout = 800){  
@@ -171,6 +179,22 @@ function build_combat_tracker_loading_indicator(subtext = "One moment while we f
   });
   return loadingIndicator.clone();
 }
+function add_dice_stream_gamelog_button(){    
+  if(window.JOINTHEDICESTREAM == undefined){
+    window.JOINTHEDICESTREAM = window.EXPERIMENTAL_SETTINGS['streamDiceRolls'];
+  }
+  if ($('.stream-dice-button').length == 0){
+    $(".glc-game-log>[class*='Container-Flex']").append($(`<div id="stream_dice"><div class='stream-dice-button ${window.EXPERIMENTAL_SETTINGS['streamDiceRolls'] ? `enabled` : ``}'>Dice Stream ${window.EXPERIMENTAL_SETTINGS['streamDiceRolls'] ? `Enabled` : `Disabled`}</div></div>`));
+    $(".stream-dice-button").off().on("click", function () {
+      if (window.JOINTHEDICESTREAM) {
+        update_dice_streaming_feature(false);
+      }
+      else {
+        update_dice_streaming_feature(true);
+      } 
+    })
+  }
+}
 /**
  * Add Dice buttons into sidebar.
  *
@@ -185,7 +209,7 @@ function inject_chat_buttons() {
     // make sure we only ever inject these once. This gets called a lot on the character sheet which is intentional, but just in case we accidentally call it too many times, let's log it, and return
     return;
   }
-
+  add_dice_stream_gamelog_button();
   const chatTextWrapper = $(`<div class='chat-text-wrapper sidebar-hover-text' data-hover="Dice Rolling Format: /cmd diceNotation action  &#xa;
     '/r 1d20'&#xa;
     '/roll 1d4 punch:bludgeoning damage'&#xa;
@@ -792,10 +816,6 @@ function create_update_token(options, save = true) {
 
   if (!(id in window.TOKEN_OBJECTS)) {
     window.TOKEN_OBJECTS[id] = new Token(options);
-
-    window.TOKEN_OBJECTS[id].sync = mydebounce(function(options) {
-      window.MB.sendMessage('custom/myVTT/token', options);
-    }, 300);
   }
 
   if(options.repositionAoe != undefined){
@@ -1438,15 +1458,15 @@ function dropBoxOptions(callback, multiselect = false, fileType=['images', 'vide
 function showErrorMessage(error, ...extraInfo) {
   removeError();
   window.logSnapshot = process_monitored_logs(false);
-
-  console.log("showErrorMessage", ...extraInfo, error.stack);
   if (!(error instanceof Error)) {
     if (typeof error === "object") {
       error = JSON.stringify(error);
     } 
     error = new Error(error?.toString());
   }
+
   const stack = error.stack || new Error().stack;
+  console.error(error, ...extraInfo);
   if(stack.includes('Internal Server Error') && stack.includes('AboveApi.getScene')){
     if(!window.DM){
       extraInfo.push('<br/><b>The last scene players were on may have been deleted by the DM. Ask the DM to click the player button beside an existing scene. Even if one is already highlighted click it again to update the server info.</b>')
@@ -1553,12 +1573,16 @@ function showGoogleDriveWarning(){
  * @param {Error} error an error object to be parsed and displayed
  * @param {string|*[]} extraInfo other relevant information */
 function showError(error, ...extraInfo) {
+  if(error instanceof noLogError) 
+    return;
+  
   if (!(error instanceof Error)) {
     if (typeof error === "object") {
       error = JSON.stringify(error);
     } 
     error = new Error(error?.toString());
   }
+
   $('#loadingStyles').remove(); 
   showErrorMessage(error, ...extraInfo);
 
@@ -1800,7 +1824,15 @@ function my_player_id() {
     return `${window.PLAYER_ID}`;
   }
 }
+function removeUnusedPlayerData(object, isToken = true){
+    const unusedPlayerData = isToken 
+      ? ['image', 'attacks', 'attunedItems', 'campaign', 'campaignSetting', 'castingInfo', 'classes', 'deathSaveInfo', 'decorations', 'extras', 'immunities', 'level', 'passiveInsight', 'passiveInvestigation', 'passivePerception', 'proficiencyBonus', 'proficiencyGroups', 'race', 'readOnlyUrl', 'resistances', 'senses', 'skills', 'speeds', 'vulnerabilities'] 
+      : ['attacks', 'attunedItems', 'campaign', 'campaignSetting', 'classes'];
 
+    for (let i = 0; i < unusedPlayerData.length; i++) {
+      delete object[unusedPlayerData[i]];
+    }
+}
 /** @param {string} idOrSheet the playerId or pc.sheet of the pc you're looking for
  * @param {boolean} useDefault whether to return a generic default object if the pc object is not found
  * @return {object} The window.pcs object that matches the idOrSheet */
@@ -1817,10 +1849,7 @@ function find_pc_by_player_id(idOrSheet, useDefault = true) {
   const regex = new RegExp(regexStr, 'gi');
   const pc = window.pcs.find(pc => pc.sheet.match(regex) || pc.sheet == idOrSheet);
   if (pc) {
-    const unusedPlayerData = ['attacks', 'attunedItems', 'campaign', 'campaignSetting', 'classes'];
-    for (let i = 0; i < unusedPlayerData.length; i++) {
-      delete pc[unusedPlayerData[i]];
-    }
+    removeUnusedPlayerData(pc, false);
     return pc;
   }
   if (useDefault) {
@@ -1859,6 +1888,10 @@ function update_pc_with_data(playerId, data) {
     console.warn("update_pc_with_data was given invalid data", playerId, data);
     return;
   }
+  if(!window.pcs){
+    console.warn('update_pc_with_data called before window.pcs initialized');
+    return;
+  }
   const index = window.pcs.findIndex(pc => pc.sheet.includes(playerId));
   if (index < 0) {
     console.warn("update_pc_with_data could not find pc with id", playerId);
@@ -1880,8 +1913,7 @@ function update_pc_with_data(playerId, data) {
 
 
 const debounce_pc_token_update = mydebounce(() => {  
-  const unusedPlayerData = ['image', 'attacks', 'attunedItems', 'campaign', 'campaignSetting', 'castingInfo', 'classes', 'deathSaveInfo', 'decorations', 'extras', 'immunities', 'level', 'passiveInsight', 'passiveInvestigation', 'passivePerception', 'proficiencyBonus', 'proficiencyGroups', 'race', 'readOnlyUrl', 'resistances', 'senses', 'skills', 'speeds', 'vulnerabilities'];
-      
+  
   window.PC_TOKENS_NEEDING_UPDATES.forEach((playerId) => {
     const pc = find_pc_by_player_id(playerId, false);
     let token = window.TOKEN_OBJECTS[pc?.sheet];     
@@ -1892,9 +1924,7 @@ const debounce_pc_token_update = mydebounce(() => {
       const newImage = (token.options.alternativeImages == undefined || token.options.alternativeImages?.length == 0) ? pc.image : currentImage;
       const options = $.extend(true, {}, token.options, pc, { imgsrc: newImage });
       options.conditions = pc.conditions || [];
-      for (let i = 0; i < unusedPlayerData.length; i++) {
-        delete options[unusedPlayerData[i]];
-      }
+      removeUnusedPlayerData(options);
       token.hp = pc.hitPointInfo.current; // triggers concentration checks
       token.options.hitPointInfo = pc.hitPointInfo;
       token.options = $.extend(true, {}, options, { left: token.options.left, top: token.options.top });
@@ -1914,9 +1944,7 @@ const debounce_pc_token_update = mydebounce(() => {
       const newImage = (crossSceneToken.options.alternativeImages == undefined || crossSceneToken.options.alternativeImages?.length == 0) ? pc.image : currentImage;
       const options = $.extend(true, {}, crossSceneToken.options, pc, { imgsrc: newImage });
       options.conditions = pc.conditions || [];
-      for (let i = 0; i < unusedPlayerData.length; i++) {
-        delete options[unusedPlayerData[i]];
-      }
+      removeUnusedPlayerData(options);
       crossSceneToken.hp = pc.hitPointInfo.current; 
       crossSceneToken.options.hitPointInfo = pc.hitPointInfo;
       crossSceneToken.options = $.extend(true, {}, options);
@@ -2093,15 +2121,15 @@ function projector_scroll_event(event){
 function store_campaign_info() {
   const campaignId = window.gameId;
   const campaignSecret = window.CAMPAIGN_SECRET;
-  if (typeof campaignId !== "string" || campaignId.length < 0) return;
-  if (typeof campaignSecret !== "string" || campaignSecret.length < 0) return;
+  if (typeof campaignId !== "string" || campaignId.length <= 0) return;
+  if (typeof campaignSecret !== "string" || campaignSecret.length <= 0) return;
   localStorage.setItem(`AVTT-CampaignInfo-${campaignId}`, campaignSecret);
 }
 
 /** @param {string} campaignId the DDB id of the campaign
  * @return {string|undefined} the join link secret if it exists */
 function read_campaign_info(campaignId) {
-  if (typeof campaignId !== "string" || campaignId.length < 0) return undefined;
+  if (typeof campaignId !== "string" || campaignId.length <= 0) return undefined;
   const cs = localStorage.getItem(`AVTT-CampaignInfo-${campaignId}`);
   if (typeof cs === "string" && cs.length > 0) return cs;
   return undefined;
@@ -2704,9 +2732,10 @@ function display_url_embeded(url){
   $('body').append(container);
 }
 
-function find_or_create_generic_draggable_window(id, titleBarText, addLoadingIndicator = true, addPopoutButton = false, popoutSelector=``, width='80%', height='80%', top='10%', left='10%', showSlow = true, cancelClasses='', hideOnX = false) {
+function find_or_create_generic_draggable_window(id, titleBarText, addLoadingIndicator = true, addPopoutButton = false, popoutSelector=``, width='80%', height='80%', top='10%', left='10%', showSlow = true, cancelClasses='', hideOnX = false, alwaysDisplayTitle = false) {
   console.log(`find_or_create_generic_draggable_window id: ${id}, titleBarText: ${titleBarText}, addLoadingIndicator: ${addLoadingIndicator}, addPopoutButton: ${addPopoutButton}`);
-  const existing = id.startsWith("#") ? $(id) : $(`#${id}`);
+
+  const existing = $(`[id="${id.replace('#', '')}"]`);
   if (existing.length > 0) {
     return existing;
   }
@@ -2834,7 +2863,8 @@ function find_or_create_generic_draggable_window(id, titleBarText, addLoadingInd
     },
     cancel: cancelClasses
   });
-
+  if(alwaysDisplayTitle)
+    titleBar.prepend(`<div class="title_bar_text">${titleBarText}</div>`);
   titleBar.on('dblclick', function(event) {
     const titleBar = $(event.currentTarget);
     if (titleBar.hasClass("restored")) {
@@ -2855,7 +2885,8 @@ function find_or_create_generic_draggable_window(id, titleBarText, addLoadingInd
 
       titleBar.addClass("minimized");
       titleBar.removeClass("restored");
-      titleBar.prepend(`<div class="title_bar_text">${titleBarText}</div>`);
+      if (!alwaysDisplayTitle)
+        titleBar.prepend(`<div class="title_bar_text">${titleBarText}</div>`);
     } else if(titleBar.hasClass("minimized")) {
       container.data("prev-minimized-top", container.css("top"));
       container.data("prev-minimized-left", container.css("left"));
@@ -2865,7 +2896,8 @@ function find_or_create_generic_draggable_window(id, titleBarText, addLoadingInd
       container.css("left", container.data("prev-left"));
       titleBar.addClass("restored");
       titleBar.removeClass("minimized");
-      titleBar.find(".title_bar_text").remove();
+      if (!alwaysDisplayTitle)
+        titleBar.find(".title_bar_text").remove();
       if(container.find('#sourceChapterIframe').length>0){
         $('#sourceChapterIframe')[0].contentWindow.scrollTo(0, container.data("prev-scroll"));
       }
@@ -2877,7 +2909,7 @@ function find_or_create_generic_draggable_window(id, titleBarText, addLoadingInd
 }
 
 function close_and_cleanup_generic_draggable_window(id) {
-  const container = id.startsWith("#") ? $(id) : $(`#${id}`);
+  const container = $(`[id="${id.replace('#', '')}"]`);
   container.off('dblclick');
   container.off('mousedown');
   container.draggable('destroy');

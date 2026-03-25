@@ -1041,7 +1041,7 @@ function update_pc_token_rows() {
             } else{
                 row.find(".subtitle-attibute[title='Fly Speed']").hide()
             }
-            if(flyingSpeed > 0) {
+            if(swimmingSpeed > 0) {
                 row.find(".subtitle-attibute[title='Swim Speed']").show()
             } else {
                 row.find(".subtitle-attibute[title='Swim Speed']").hide()
@@ -1221,7 +1221,8 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
             break;
         case ItemType.MyToken:
             tokenSizeSetting = options.tokenSize;
-            tokenSize = parseInt(tokenSizeSetting);
+            tokenSize = parseFloat(tokenSizeSetting);
+            console.log("PLACING SIZE1", options.tokenSize, tokenSize)            
             if (tokenSizeSetting === undefined || typeof tokenSizeSetting !== 'number') {
                 tokenSize = 1;
                 // TODO: handle custom sizes
@@ -1273,7 +1274,7 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
             }
           
             tokenSizeSetting = options.tokenSize;
-            tokenSize = parseInt(tokenSizeSetting);
+            tokenSize = parseFloat(tokenSizeSetting);
             if (tokenSizeSetting === undefined || typeof tokenSizeSetting !== 'number') {
                 tokenSize = 1;
                 // TODO: handle custom sizes
@@ -1309,7 +1310,7 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
                 temp: 0
             };
             tokenSizeSetting = options.tokenSize;
-            tokenSize = parseInt(tokenSizeSetting);
+            tokenSize = parseFloat(tokenSizeSetting);
             if (tokenSizeSetting === undefined || typeof tokenSizeSetting !== 'number') {
                 options.sizeId = listItem.monsterData.sizeId;
                 // TODO: handle custom sizes
@@ -1376,7 +1377,7 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
                 temp: 0
             };
             tokenSizeSetting = options.tokenSize;
-            tokenSize = parseInt(tokenSizeSetting);
+            tokenSize = parseFloat(tokenSizeSetting);
             if (tokenSizeSetting === undefined || typeof tokenSizeSetting !== 'number') {
                 options.sizeId = listItem.monsterData.sizeId;
                 // TODO: handle custom sizes
@@ -1412,7 +1413,7 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
             break;
         case ItemType.BuiltinToken:
             tokenSizeSetting = options.tokenSize;
-            tokenSize = parseInt(tokenSizeSetting);
+            tokenSize = parseFloat(tokenSizeSetting);
             if (tokenSizeSetting === undefined || typeof tokenSizeSetting !== 'number') {
                 tokenSize = 1;
                 // TODO: handle custom sizes
@@ -1455,7 +1456,7 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
             // specificImage = options.imgsrc; // force it to use what we just built
             break;
     }
-    if(options.statBlock && window.JOURNAL.notes[options.statBlock]){
+    if(options.statBlock && window.JOURNAL.notes[options.statBlock] != undefined){
         let statText = $(`<div>${window.JOURNAL.notes[options.statBlock].text}</div>`);
         statText.find('style').remove();
         statText=statText[0].innerHTML;
@@ -1539,6 +1540,7 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
             try{
                 const charURLparts = pcURL.match(/.*?\/characters\/([0-9]+)(\/.*?)?/i);
                 const charDetails  = await DDBApi.fetchCharacterDetails([charURLparts[1]]);
+                removeUnusedPlayerData(charDetails[0]);
                 options = $.extend(true, {}, charDetails[0], options);
                 options.customStat = options.abilities;
                 if(!options.customInit){
@@ -1694,114 +1696,43 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
     }
 }
 
-/**
- * determines the size of the token the given item represents
- * @param listItem {SidebarListItem} the item representing a token
- * @returns {number} the tokenSize that corresponds to the token you're looking for
- */
-function token_size_for_item(listItem, selectedTokenImage) {
-    let options;
-    let tokenSizeSetting;
-    let tokenSize;
-    switch (listItem.type) {
-        case ItemType.Folder:
-            return 1;
-        case ItemType.MyToken:
-            options = find_token_options_for_list_item(listItem);
-            if(selectedTokenImage){
-                options = {
-                    ...options,
-                    ...options.alternativeImagesCustomizations[selectedTokenImage]
-                }
-            }
-            tokenSizeSetting = parseFloat(options.tokenSize);
-            if (isNaN(tokenSizeSetting)) {
-                return 1;
-            }
-            tokenSize = Math.round(tokenSizeSetting * 2) / 2; // round to the nearest 0.5; ex: everything between 0.25 and 0.74 round to 0.5; below .025 rounds to 0, and everything above 0.74 rounds to 1
-            if (tokenSize < 0.5) {
-                return 0.5;
-            }
-            return tokenSize;
-        case ItemType.PC:
-            options = find_token_options_for_list_item(listItem);
-             if(selectedTokenImage){
-                options = {
-                    ...options,
-                    ...options.alternativeImagesCustomizations[selectedTokenImage]
-                }
-            }
-            tokenSizeSetting = parseFloat(options.tokenSize);
-            if (isNaN(tokenSizeSetting)) {
-                return 1;
-            }
-            tokenSize = Math.round(tokenSizeSetting * 2) / 2; // round to the nearest 0.5; ex: everything between 0.25 and 0.74 round to 0.5; below .025 rounds to 0, and everything above 0.74 rounds to 1
-            if (tokenSize < 0.5) {
-                return 0.5;
-            }
-            return tokenSize;
-        case ItemType.DDBToken:
-            options = find_token_options_for_list_item(listItem);
-            if(selectedTokenImage){
-                options = {
-                    ...options,
-                    ...options.alternativeImagesCustomizations[selectedTokenImage]
-                }
-            }
-            tokenSizeSetting = parseFloat(options.tokenSize);
-            if (isNaN(tokenSizeSetting)) {
-                return 1;
-            }
-            tokenSize = Math.round(tokenSizeSetting * 2) / 2; // round to the nearest 0.5; ex: everything between 0.25 and 0.74 round to 0.5; below .025 rounds to 0, and everything above 0.74 rounds to 1
-            if (tokenSize < 0.5) {
-                return 0.5;
-            }
-            return tokenSize;
+const token_size_for_item = function () {
+    // round to nearest hundreth with default (ADJUST SIZE ROUNDING HERE)
+    function roundTokenSize(s, defaultSize = 1) {
+        return isNaN(s) ? defaultSize : Math.max(0.5, +s.toFixed(2));
+    }
+    function tokenSizeDefault(type, sizeId) {
+        switch(type) {
         case ItemType.Monster:
         case ItemType.Open5e:
-            options = find_token_options_for_list_item(listItem);
-            if(selectedTokenImage){
-                options = {
-                    ...options,
-                    ...options.alternativeImagesCustomizations[selectedTokenImage]
-                }
+            switch (sizeId) {
+            case 5: return 2;
+            case 6: return 3;
+            case 7: return 4;
+            default: return 1;
             }
-            tokenSizeSetting = parseFloat(options.tokenSize);
-            if (isNaN(tokenSizeSetting)) {
-                switch (listItem.monsterData.sizeId) {
-                    case 5: return 2;
-                    case 6: return 3;
-                    case 7: return 4;
-                    default: return 1;
-                }
-            }
-            tokenSize = Math.round(tokenSizeSetting * 2) / 2; // round to the nearest 0.5; ex: everything between 0.25 and 0.74 round to 0.5; below .025 rounds to 0, and everything above 0.74 rounds to 1
-            if (tokenSize < 0.5) {
-                return 0.5;
-            }
-            return tokenSize;
-            
-        case ItemType.BuiltinToken:
-            options = find_token_options_for_list_item(listItem);
-            if(selectedTokenImage){
-                options = {
-                    ...options,
-                    ...options.alternativeImagesCustomizations[selectedTokenImage]
-                }
-            }
-            tokenSizeSetting = parseFloat(options.tokenSize);
-            if (isNaN(tokenSizeSetting)) {
-                return 1;
-            }
-            tokenSize = Math.round(tokenSizeSetting * 2) / 2; // round to the nearest 0.5; ex: everything between 0.25 and 0.74 round to 0.5; below .025 rounds to 0, and everything above 0.74 rounds to 1
-            if (tokenSize < 0.5) {
-                return 0.5;
-            }
-            return tokenSize;
+        default: return 1;
+        }
+    }
+    /**
+     * determines the size of the token the given item represents
+     * @param listItem {SidebarListItem} the item representing a token
+     * @returns {number} the tokenSize that corresponds to the token you're looking for
+     */
+    return function(listItem, selectedTokenImage) {
+        switch (listItem.type) {
+        case ItemType.Folder:
+            return 1;
         case ItemType.Aoe:
             return listItem.size;
+        default:
+            const options = find_token_options_for_list_item(listItem);
+            const tokenSize = parseFloat((selectedTokenImage && options.alternativeImagesCustomizations[selectedTokenImage]?.tokenSize) || options.tokenSize);
+            return roundTokenSize(parseFloat(tokenSize),
+                tokenSizeDefault(listItem.type, listItem?.monsterData?.sizeId));
+        }
     }
-}
+}();
 
 /**
  * finds and returns alternative images for the given listItem.
@@ -1947,6 +1878,7 @@ function register_token_row_context_menu() {
                         for (let i = 0; i < selectedItems.length; i++) {
                             let selectedRow = $(selectedItems[i]);
                             let selectedItem = find_sidebar_list_item(selectedRow);
+                            listItemArray.push(selectedItem);
                         }
                         if (listItemArray.length < 10 || confirm(`This will add ${listItemArray.length} tokens which could lead to unexpected results. Are you sure you want to add all of these tokens?`)) {
                             let distanceFromCenter = window.CURRENT_SCENE_DATA.hpps * window.ZOOM * (listItemArray.length / 8);
@@ -2917,11 +2849,13 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
         editNoteButton.off().on("click", function(){
             if (!(customization.id in window.JOURNAL.notes)) {
                 window.JOURNAL.notes[customization.id] = {
-                    title: customization.tokenOptions.name,
+                    title: listItem.name,
                     text: '',
                     plain: '',
                     player: true
                 }     
+            }else{
+                window.JOURNAL.notes[customization.id].title = listItem.name;
             }
             if(customization.tokenOptions.statBlock != customization.id){
                 customization.tokenOptions.statBlock = customization.id;
@@ -2958,12 +2892,13 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
     // token size
     let tokenSizes = [];
     if (placedToken) {
-        tokenSizes.push(placedToken.numberOfGridSpacesWide());
-        tokenSizes.push(placedToken.numberOfGridSpacesTall());
+        tokenSizes.push(... Object.values(placedToken.numberOfGridSpaces()));
     } else {
         tokenSizes.push(token_size_for_item(listItem, selectedTokenImage))
     }
-    let tokenSizeInput = build_token_size_input(tokenSizes, function (newSize) {
+     console.log("TOKENSIZES", tokenSizes);
+     let tokenSizeInput = build_token_size_input(tokenSizes, function (newSize) {
+              console.log("TOKEN NEW SIZES", newSize);
         customization.setTokenOption("tokenSize", newSize);
         persist_token_customization(customization);
         decorate_modal_images(sidebarPanel, listItem, placedToken);
@@ -3009,7 +2944,7 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
     });
     inputWrapper.append(imageZoomWrapper);
 
-    let startingTokenFlip = targetOptions.targetFlip || 0;
+    let startingTokenFlip = targetOptions.tokenFlip || 0;
     let tokenFlipWrapper = build_token_flip_input(startingTokenFlip, function (tokenFlip) { 
         customization.setTokenOption("tokenFlip", tokenFlip);
         persist_token_customization(customization);
@@ -4801,7 +4736,7 @@ const fetch_and_cache_scene_monster_items = mydebounce( () => {
     });
 });
 
-const fetch_and_cache_monsters = mydebounce( (monsterIds, callback, open5e) => {
+const fetch_and_cache_monsters = mydebounce( (monsterIds, callback=()=>{}, open5e) => {
     if(open5e){
         const cachedIds = Object.keys(cached_open5e_items);
         const monstersToFetch = monsterIds.filter(id => !cachedIds.includes(id) && id != 'customStat');
@@ -4818,7 +4753,6 @@ const fetch_and_cache_monsters = mydebounce( (monsterIds, callback, open5e) => {
             if (response !== false) {
                 update_monster_item_cache(response.map(m => SidebarListItem.Monster(m)), function(){callback()});
             }
- 
         });
     }
     

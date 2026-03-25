@@ -953,10 +953,54 @@ select#doorTypeSelectUVTT{
     filter: drop-shadow(0px 0px 2px #000) blur(1px); /*fill in fog gaps on player view*/
     opacity: 1;
 }
-#groupRotationGrabber,
-#rotationGrabber {
-    scale: min(4, max(1, calc(0.5 / var(--window-zoom))))
+#dragbox {
+  position: absolute;
+  overflow: visible;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  transform: scale(var(--scene-scale));
+  display: block;
+  pointer-events: none;
+  z-index: 1000000;
 }
+#dragbox .drag-box-b {
+  stroke: black;
+  stroke-width: calc(1.5px / var(--scene-scale) / var(--window-zoom));
+  stroke-linecap: square;
+  vector-effect: non-scaling-stroke;
+  overflow: visible !important;
+}
+#dragbox .drag-box-w {
+  fill: rgba(0, 255, 255, 0.1);
+  stroke: white;
+  stroke-width: calc(1.5px / var(--scene-scale) / var(--window-zoom));
+  stroke-dasharray: calc(4px / var(--scene-scale) / var(--window-zoom)) calc(4px / var(--scene-scale) / var(--window-zoom));
+  stroke-linecap: square;
+  vector-effect: non-scaling-stroke;
+  transition: fill 0.2s;
+  overflow: visible !important;
+}
+#dragbox .sel-box {
+  fill: rgba(0, 255, 255, 0.1);
+  stroke: white;
+  stroke-width: calc(1.5px / var(--scene-scale) / var(--window-zoom));
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+#dragbox .grabber {
+  cursor: alias;
+  pointer-events: auto;
+}
+
+/*adjust grabber scale 1.2 here:*/
+#dragbox .grabber-icon-r {
+  transform: scale(calc(1.2 / var(--scene-scale) / var(--window-zoom))) translate(0px, -25px);
+}
+#dragbox .grabber-icon-c {
+  transform: translate(0px, -10px) scale(calc(1.2 / var(--scene-scale)  / var(--window-zoom))) translate(-12.5px, -25px);
+}
+
 #fog_overlay,
 #draw_overlay_under_fog_darkness,
 #draw_overlay{
@@ -3154,6 +3198,24 @@ button.roll-button-mod.adv {
     justify-content: center;
     align-items: center; 
 }
+.moveableWindow .note{
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: block;
+}
+.moveableWindow .note > .note-text {
+    overflow: auto;
+    height: calc(100% - 68px);
+    width: 100%;
+}
+.body-rpgcharacter-sheet .moveableWindow .note > .note-text {
+    height: calc(100% - 25px);
+}
+ .moveableWindow .note > .note-text *{
+    overscroll-behavior: auto;
+}  
+
 body .note-visibility-toggle-container {
     position:fixed;
     background:#fff;
@@ -3600,9 +3662,6 @@ body .note-visibility-toggle-container {
 .token.notVisible *{
     visibility: hidden !important; 
     pointer-events: none !important;
-}
-div#selectedTokensBorder {
-    pointer-events: none;
 }
 
 #conditions-flyout li,
@@ -6410,8 +6469,6 @@ button.avtt-roll-formula-button {
     width: unset;
 }
 .MuiModal-root,
-div#selectedTokensBorder,
-div#selectedTokensBorderRotationGrabberConnector,
 #sounds-panel .volume-control {
     width: 50%;
     float: right;
@@ -8946,15 +9003,7 @@ body.color-blind-avtt {
 .mfp-wrap{
     z-index: 1000000 !important;
 }
-[role='dialog']>.note>.note-text {
-    min-height: 450px;
-    position: relative;
-    height: 100%;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-}
+
 .ui-front{
     z-index: 100000;
 }
@@ -14730,41 +14779,7 @@ button#displayedDiceFormulaExit:hover {
 }
 
 
-/***Font Faces*****/
-@font-face {
-    font-family: Scala Sans Offc;
-    font-style: normal;
-    font-weight: 700;
-    src: url(https://media.dndbeyond.com/encounter-builder/static/media/ScalaSansOffc-Bold.048d2d142baf798dc56f.ttf) format("truetype")
-}
 
-@font-face {
-    font-family: Scala Sans Offc;
-    font-style: normal;
-    font-weight: 400;
-    src: url(https://media.dndbeyond.com/encounter-builder/static/media/ScalaSansOffc.0eea070d2279b1a6be23.ttf) format("truetype")
-}
-
-@font-face {
-    font-family: Scala Sans Offc;
-    font-style: italic;
-    font-weight: 700;
-    src: url(https://media.dndbeyond.com/encounter-builder/static/media/ScalaSansOffc-BoldIta.740e4d6d85a09a9cd0a0.ttf) format("truetype")
-}
-
-@font-face {
-    font-family: Scala Sans Offc;
-    font-style: italic;
-    font-weight: 400;
-    src: url(https://media.dndbeyond.com/encounter-builder/static/media/ScalaSansOffc-Ita.86c4513e1c4b869189c2.ttf) format("truetype")
-}
-
-@font-face {
-    font-family: MrsEavesSmallCaps;
-    font-style: normal;
-    font-weight: 100;
-    src: url(https://media.dndbeyond.com/encounter-builder/static/media/MrsEavesSmallCaps.1744d7a566b5a2ccca6c.ttf) format("truetype")
-}
 @font-face {
   font-family: "Tiamat Condensed SC Regular";
   src: url("https://www.dndbeyond.com/fonts/tiamatcondensedsc-regular-webfont.woff2") format("woff2");

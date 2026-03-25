@@ -127,6 +127,128 @@ const buffsDebuffs = {
       "check": "0",
       "type": "spell"
   },
+  
+  "Exhaustion": {
+    "multiOptions": {
+      "-2": {
+        "tohit": "0",
+        "dmg": "0",
+        "save": "0",
+        "check": "0",
+        "replace": /^1d20/gi,
+        "newRoll": '1d20-2',
+      },
+      "-4": {
+        "tohit": "0",
+        "dmg": "0",
+        "save": "0",
+        "check": "0",
+        "replace": /^1d20/gi,
+        "newRoll": '1d20-4',
+      },
+      "-6": {
+        "tohit": "0",
+        "dmg": "0",
+        "save": "0",
+        "check": "0",
+        "replace": /^1d20/gi,
+        "newRoll": '1d20-6',
+      },
+      "-8": {
+        "tohit": "0",
+        "dmg": "0",
+        "save": "0",
+        "check": "0",
+        "replace": /^1d20/gi,
+        "newRoll": '1d20-8',
+      },
+      "-10": {
+        "tohit": "0",
+        "dmg": "0",
+        "save": "0",
+        "check": "0",
+        "replace": /^1d20/gi,
+        "newRoll": '1d20-10',
+      }
+    },
+    "type": "2024condition",
+  },
+  "Blinded": {
+    "tohit": "0",
+    "dmg": "0",
+    "save": "0",
+    "check": "0",
+    "replace": /^1d20/gi,
+    "replaceType": {
+      "tohit": "button",
+    },
+    "newRoll": '2d20kl1',
+    "type": "2024condition",
+  },
+  "Frightened": {
+    "tohit": "0",
+    "dmg": "0",
+    "save": "0",
+    "check": "0",
+    "replace": /^1d20/gi,
+    "replaceType": {
+      "tohit": "button",
+      "check": "button",
+    },
+    "newRoll": '2d20kl1',
+    "type": "2024condition",
+  },
+  "Invisible": {
+    "tohit": "0",
+    "dmg": "0",
+    "save": "0",
+    "check": "0",
+    "replace": /^1d20/gi,
+    "replaceType": {
+      "tohit": "button",
+      "check": ".ct-combat__summary-group--initiative button",
+    },
+    "newRoll": '2d20kl1',
+    "type": "2024condition",
+  },
+  "Poisoned": {
+    "tohit": "0",
+    "dmg": "0",
+    "save": "0",
+    "check": "0",
+    "replace": /^1d20/gi,
+    "replaceType": {
+      "tohit": "button",
+      "check": "button",
+    },
+    "newRoll": '2d20kl1',
+    "type": "2024condition",
+  },
+  "Prone": {
+    "tohit": "0",
+    "dmg": "0",
+    "save": "0",
+    "check": "0",
+    "replace": /^1d20/gi,
+    "replaceType": {
+      "tohit": "button",
+    },
+    "newRoll": '2d20kl1',
+    "type": "2024condition",
+  },
+  "Restrained" :{
+    "tohit": "0",
+    "dmg": "0",
+    "save": "0",
+    "check": "0",
+    "replace": /^1d20/gi,
+    "replaceType": {
+      "tohit": "button",
+      "save": '.ddbc-saving-throws-summary__ability--dex' 
+    },
+    "newRoll": '2d20kl1',
+    "type": "2024condition",
+  },
   "Rage": {
     "multiOptions": {
       "+2": {
@@ -199,10 +321,15 @@ const buffsDebuffs = {
   },
   "Great Weapon Master (2024)": {
     "tohit": "0",
-    "dmg": "+PB",
+    "dmg": "0",
     "save": "0",
     "check": "0",
     "type": "feat",
+    "replace": /(.)$/gi,//last character
+    "replaceType": {
+      "damage": '[class*="styles_attack"]:has(.ddbc-note-components__component:contains("Heavy"))' //looks for Heavy trait in item note
+    },
+    "newRoll": '$1+PB', //add proficiency
   },
   "Reroll damage 1's": {
     "tohit": "0",
@@ -849,7 +976,7 @@ function read_temp_hp(container = $(document)) {
   }
   if (container.find(`.ct-status-summary-mobile__hp--has-temp`).length) {
     if(container.find('.ct-health-manager__health-item--temp').length){
-        return parseInt(('.ct-health-manager__health-item--temp .ct-health-manager__input').val()); // if hp side panel is open check this for temp hp
+        return parseInt($('.ct-health-manager__health-item--temp .ct-health-manager__input').val()); // if hp side panel is open check this for temp hp
       }
     // DDB doesn't display the temp value on mobile layouts so just set it to 1, so we can at least show that there is temp hp. See `read_current_hp` for the other side of this
     return 1;
@@ -1323,6 +1450,7 @@ function rebuild_buffs(fullBuild = false){
     </ul>      
     <ul id='spellBuffs'><li>Spells</li></ul>
     <ul id='featBuffs'><li>Feats</li></ul>
+    <ul id='2024conditionBuffs'><li>Conditions</li></ul>
   `
   if(fullBuild){
     avttBuffSelect = $(`<div id="avtt-buff-options" class="dropdown-check-list">

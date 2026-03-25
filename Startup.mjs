@@ -24,10 +24,21 @@ $(function() {
       .then((databases)=> {
         window.gameIndexedDb = databases[0];
         window.globalIndexedDB = databases[1];
-        const campaignSettings = JSON.parse(localStorage.getItem(`ExperimentalSettings${window.gameId}`)) || {};
-        const globalSettings = JSON.parse(localStorage.getItem(`ExperimentalSettingsGlobal`)) || {}; ;
+        let campaignSettings = {};
+        try {
+          campaignSettings = JSON.parse(localStorage.getItem(`ExperimentalSettings${window.gameId}`)) || {};
+        } catch (e) {
+          console.warn(`Failed to parse campaign settings for game ${window.gameId}, using defaults`, e);
+          localStorage.removeItem(`ExperimentalSettings${window.gameId}`);
+        }
+        let globalSettings = {};
+        try {
+          globalSettings = JSON.parse(localStorage.getItem(`ExperimentalSettingsGlobal`)) || {};
+        } catch (e) {
+          console.warn(`Failed to parse global settings, using defaults`, e);
+          localStorage.removeItem(`ExperimentalSettingsGlobal`);
+        }
         window.EXPERIMENTAL_SETTINGS = {...campaignSettings, ...globalSettings};
-        delete window.EXPERIMENTAL_SETTINGS.streamDiceRolls;
         if (is_release_build()) {
           // in case someone left this on during beta testing, we should not allow it here
           set_avtt_setting_value("aggressiveErrorMessages", false);
@@ -46,7 +57,23 @@ $(function() {
       .then(harvest_campaign_secret)  // find our join link
       .then(set_campaign_secret)      // set it to window.CAMPAIGN_SECRET
       .then(async () => {
-        window.CAMPAIGN_INFO = await DDBApi.fetchCampaignInfo(window.gameId)
+        const maxRetries = 5
+        const baseDelay = 500
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            window.CAMPAIGN_INFO = await DDBApi.fetchCampaignInfo(window.gameId)
+            break
+          } catch (error) {
+            if (attempt < maxRetries) {
+              const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 10000)
+              console.warn(`Failed to fetch campaign info (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`, error)
+              await new Promise(resolve => setTimeout(resolve, delay))
+            } else {
+              showError(error, `Failed to fetch campaign info after ${maxRetries} attempts. This is likely temporary — please refresh the page. If the issue persists, D&D Beyond may be experiencing outages.`)
+              throw new noLogError(error.message, error.options)
+            }
+          }
+        }
         window.AVTT_CAMPAIGN_INFO = await AboveApi.getCampaignData();
         return window.CAMPAIGN_INFO.dmId;
       })
@@ -105,16 +132,8 @@ $(function() {
 
         window.STREAMPEERS = {};
         window.MYSTREAMID = uuid();
-        window.JOINTHEDICESTREAM = false; //window.EXPERIMENTAL_SETTINGS['streamDiceRolls'];
-        
-        const allDiceRegex = /\d+d(?:100|20|12|10|8|6|4)((?:kh|kl|ro(<|<=|>|>=|=)|min)\d+)*/gi; // ([numbers]d[diceTypes]kh[numbers] or [numbers]d[diceTypes]kl[numbers]) or [numbers]d[diceTypes]
-        const validExpressionRegex = /^[dkhlro<=>\s\d+\-\(\)]*$/gi; // any of these [d, kh, kl, spaces, numbers, +, -] // Should we support [*, /] ?
-        const validModifierSubstitutions = /(?<!\w)(str|dex|con|int|wis|cha|pb)(?!\w)/gi // case-insensitive shorthand for stat modifiers as long as there are no letters before or after the match. For example `int` and `STR` would match, but `mint` or `strong` would not match.
-        const diceRollCommandRegex = /^\/(r|roll|save|hit|dmg|skill|heal)\s/gi; // matches only the slash command. EG: `/r 1d20` would only match `/r`
-        const multiDiceRollCommandRegex = /\/(ir|r|roll|save|hit|dmg|skill|heal) [^\/]*/gi; // globally matches the full command. EG: `note: /r 1d20 /r2d4` would find ['/r 1d20', '/r2d4']
-        const allowedExpressionCharactersRegex = /^(d\d|\d+d\d+|kh\d+|kl\d+|ro(<|<=|>|>=|=)\d+|min\d+|\+|-|\d+|\s+|STR|DEX|CON|INT|WIS|CHA|PB)*/gi; // this is explicitly different from validExpressionRegex. This matches an expression at the beginning of a string while validExpressionRegex requires the entire string to match. It is also explicitly declaring the modifiers as case-sensitive because we can't search the entire thing as case-insensitive because the `d` in 1d20 needs to be lowercase.
-
-        if(window.EXPERIMENTAL_SETTINGS['streamDiceRolls']){
+        window.JOINTHEDICESTREAM = window.EXPERIMENTAL_SETTINGS['streamDiceRolls'];
+        if(window.JOINTHEDICESTREAM){
           enable_dice_streaming_feature(window.JOINTHEDICESTREAM );
         }
 		if(window.godice.dicebar){
@@ -1067,17 +1086,7 @@ async function start_above_vtt_for_players() {
     if(!window.CURRENT_SCENE_DATA.is_video || !window.CURRENT_SCENE_DATA.player_map.includes('youtu')){
       $("#youtube_controls_button").css('visibility', 'hidden');
     }
-    if ($('.stream-dice-button').length == 0){
-      $(".glc-game-log>[class*='Container-Flex']").append($(`<div id="stream_dice"><div class='stream-dice-button ${window.JOINTHEDICESTREAM ? `enabled` : ``}'>Dice Stream ${window.JOINTHEDICESTREAM ? `Enabled` : `Disabled`}</div></div>`));
-      $(".stream-dice-button").off().on("click", function () {
-        if (window.JOINTHEDICESTREAM) {
-          update_dice_streaming_feature(false);
-        }
-        else {
-          update_dice_streaming_feature(true);
-        }
-      })
-    }
+    add_dice_stream_gamelog_button()
      
   });
 
