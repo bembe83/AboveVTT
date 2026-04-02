@@ -133,13 +133,13 @@ $(function() {
         window.STREAMPEERS = {};
         window.MYSTREAMID = uuid();
         window.JOINTHEDICESTREAM = window.EXPERIMENTAL_SETTINGS['streamDiceRolls'];
-        if(window.JOINTHEDICESTREAM){
-          enable_dice_streaming_feature(window.JOINTHEDICESTREAM );
-        }
+		enable_dice_streaming_feature(window.JOINTHEDICESTREAM);
+		
 		if(window.godice.dicebar){
 			window.godice.dicebar.enable(window.EXPERIMENTAL_SETTINGS['godiceRoller'] );
 			window.godice.dicebar.render();
 		}
+       
         tabCommunicationChannel.addEventListener ('message', (event) => {
           if(event.data.msgType == 'CharacterData' && !find_pc_by_player_id(event.data.characterId, false))
             return;
@@ -158,7 +158,7 @@ $(function() {
                   "character",
                   event.data.msg.playerId,
                   event.data.msg.sendToOverride
-                ), event.data.multiroll, event.data.critRange, event.data.critType, event.data.msg.rollData.spellSave, event.data.msg.rollData.damageType);
+                ), event.data.multiroll, event.data.critRange, event.data.critType, event.data.msg.rollData.spellSave, event.data.msg.rollData.damageType, event.data.forceCritType);
               }
             }       
             return;

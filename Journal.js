@@ -2272,7 +2272,7 @@ class JournalManager{
 		const blocks = target.find('img:not(.mon-stat-block__separator-img), .text--quote-box, .rules-text, .block-torn-paper, .read-aloud-text, .dmScreenChunk')
 
 		const sendToGamelogButton = $('<button class="block-send-to-game-log"><span class="material-symbols-outlined">login</span></button>')
-		const container = $(`<div class='note-text' style='position:relative; width:fit-content; max-width: 100%'></div>`)
+
 		
 	
 
@@ -2342,12 +2342,15 @@ class JournalManager{
 		
 		const allDiceRegex = /(\d+)?d(?:100|20|12|10|8|6|4)((?:kh|kl|ro(<|<=|>|>=|=)|min=)\d+)*/g; // ([numbers]d[diceTypes]kh[numbers] or [numbers]d[diceTypes]kl[numbers]) or [numbers]d[diceTypes]
        	
-   		blocks.wrap(function(){
-			if(this instanceof HTMLImageElement){
-				container.css('min-width', 'fit-content');
+   		blocks.wrap(function(i){
+			const container = $(`<div class='note-text' style='position:relative;max-width: 100%;'></div>`)
+			if(blocks[i] instanceof HTMLImageElement){
+				container.css({
+					'min-width': 'fit-content',
+					'width': 'fit-content'
+				});
 				$(this).attr('href', $(this).attr('src'));
 			}
-
 			return container;
 		});
 		sendToGamelogButton.clone(true, true).insertAfter(blocks);
@@ -2478,7 +2481,7 @@ class JournalManager{
 			return [];
 		}
 		for (const entry of entries) {
-			const keyValue = typeof entry === 'string' ? entry : entry?.Key || entry?.key || '';
+			const keyValue = typeof entry === 'string' ? entry : entry?.Key || '';
 			if (!keyValue) {
 				continue;
 			}
@@ -2670,22 +2673,22 @@ class JournalManager{
             );
             // Search for spell casting section
             const spellcasting = lines.findIndex((l) =>
-                l.match(/Spellcasting([^.]+)?./g)
+                l.match(/(?<!<[^>]+)Spellcasting([^.]+)?./g)
             );
             // If we find the section, loop through the levels
             if (
                 spellcasting >= 0 &&
                 spellcasting < li &&
-                (input.match(/At will:/gi) ||
-                    input.match(/Cantrips \(at will\):/gi) ||
-                    input.match(/(\d+\/day( each)?|\d+\w+ level \(\d slots?\))\:/gi))
+                (input.match(/(?<!<[^>]+)At will:/gi) ||
+                    input.match(/(?<!<[^>]+)Cantrips \(at will\):/gi) ||
+                    input.match(/(?<!<[^>]+)(\d+\/day( each)?|\d+\w+ level \(\d slots?\))\:/gi))
             ) {
-            	let eachNumberFound = (input.match(/\d+\/day( each)?/gi)) ? parseInt(input.match(/[0-9]+(?![0-9]?px)/gi)[0]) : undefined;
-            	let slotsNumberFound = (input.match(/\d+\w+ level \(\d slots?\)\:/gi)) ? parseInt(input.match(/[0-9]+/gi)[1]) : undefined;
+            	let eachNumberFound = (input.match(/(?<!<[^>]+)\d+\/day( each)?/gi)) ? parseInt(input.match(/(?<!<[^>]+)[0-9]+(?![0-9]?px)/gi)[0]) : undefined;
+            	let slotsNumberFound = (input.match(/(?<!<[^>]+)\d+\w+ level \(\d slots?\)\:/gi)) ? parseInt(input.match(/(?<!<[^>]+)[0-9]+/gi)[1]) : undefined;
             	let spellLevelFound = (slotsNumberFound) ? input.match(/\d+\w+ level/gi)[0] : undefined;
-                let parts = input.split(/(:\s(?<!(left:\s?|style="[\s\S]+?))|:(?<!(left:\s?|style="[\s\S]+?))<\/strong>(\s)?)/gi);
+                let parts = input.split(/((?<!<[^>]+):\s)/gi);
                 let i = parts.length - 1;
-                parts[i] = parts[i].split(/,\s(?![^(]*\))/gm);
+                parts[i] = parts[i].split(/(?<!<[^>]+),\s(?![^(]*\))/gm);
                 for (let p in parts[i]) {
 
                 	if(parts[i][p].match(/^((\s+?)?(<a|<span))/gi) && $(parts[i][p])?.is('a, span[data-spell]'))
@@ -4371,7 +4374,7 @@ class JournalManager{
 				},
 			],
 		  	table_grid: false,
-			toolbar: 'undo styleselect template | horizontalrules | bold italic underline strikethrough | alignleft aligncenter alignright justify| outdent indent | bullist numlist | forecolor backcolor | fontsizeselect | link unlink | image media filePickers table tableCustom | code',
+			toolbar: 'undo styleselect template | horizontalrules | bold italic underline strikethrough | alignleft aligncenter alignright justify| outdent indent | bullist numlist | fontsizeinput forecolor backcolor | link unlink | image media filePickers table tableCustom | code',
 			image_class_list: [
 				{title: 'Magnify', value: 'magnify'},
 			],
@@ -4383,7 +4386,27 @@ class JournalManager{
 			   {title: 'DDB Tooltip Link (Spells, Monsters, Magic Items, Source)', value: 'tooltip-hover no-border ignore-abovevtt-formating'}
 			],
 			valid_children : '+body[style]',
+			
 			setup: function (editor) { 
+				editor.addButton('fontsizeinput', {
+					type: 'container',
+					html: '<input type="number" id="mce-custom-font-size" style="width: 40px;height: 16px;text-align:right;padding: 4px 1px;" placeholder="px"> px',
+					onPostRender: function() {
+						let input = document.getElementById('mce-custom-font-size');
+						input.addEventListener('change', function(e) {
+							let size = this.value;
+							if (size) {
+								editor.execCommand('FontSize', false, size + 'px');
+							}
+						});
+						input.addEventListener('keypress', function(e) {
+							if(e.key === 'Enter') {
+								e.preventDefault();
+								this.blur();
+							}
+						});
+					}
+				});
 				editor.on("keydown", function (e) {
 					if (e.which == "13" || e.keyCode == "13") {
 						
@@ -4415,6 +4438,7 @@ class JournalManager{
 						
 					}
 				});
+
 				editor.addButton('horizontalrules', {
 					  type: 'splitbutton',
 				      text: '',
@@ -4622,8 +4646,11 @@ class JournalManager{
 
 					editor.execCommand('setAvttImageSrc', e);
 				});
-
 				editor.on('NodeChange', async function (e) {
+					const currentFontSize = editor.dom.getStyle(e.element, 'font-size', true);
+					if (currentFontSize) {
+						$("#mce-custom-font-size").val(parseInt(currentFontSize));
+					}
 					// When an image is inserted into the editor
 				    if (e.element.tagName === "IMG") { 
 				    	let url = e.element.getAttribute('src');

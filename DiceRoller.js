@@ -735,7 +735,8 @@ class DiceRoller {
                           msg: msgdata,
                           multiroll: multiroll,
                           critRange: critRange,
-                          critType: critType
+                          critType: critType,
+                          forceCritType: forceCritType
                         });
                     self.#resetVariables();
                     self.nextRoll(undefined, critRange, critType)
@@ -966,7 +967,7 @@ class DiceRoller {
                         let cleanerString = currentRoll.toString()
                             .replace("[", "(")    // swap square brackets with parenthesis
                             .replace("]", ")")    // swap square brackets with parenthesis
-                            .replace("d", "")     // remove all drop notations
+                            .replace(/d/g, "")     // remove all drop notations
                             .replace(/\s+/g, ''); // remove all whitespace
                         convertedExpression.push(cleanerString);
                     } else {
