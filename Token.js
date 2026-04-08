@@ -691,7 +691,7 @@ class Token {
 	moveUpLeft()    { this.moveDirection(-1, -1); }
 	moveDownLeft()  { this.moveDirection( 1, -1); }
 	// grid move; dy/dx in abstract grid coords units	
-        moveDirection(dy,dx) {
+	moveDirection(dy,dx) {
 		const gridType = window.CURRENT_SCENE_DATA.gridType;
 		const grsize = grid_size(false,true);
 		let tmpx = parseFloat(this.options.left);
@@ -3736,12 +3736,11 @@ function snap_point_to_grid(mapX, mapY, forceSnap = false, tinyToken = false, to
 		const offsetx = parseFloat(scene.offsetx);
 		const offsety = parseFloat(scene.offsety);
 
-		const currentGridX = (mapX - offsetx) / gridWidth;
-		const currentGridY = (mapY - offsety) / gridHeight;
+		const currentGridX = Math.floor((mapX - offsetx) / gridWidth);
+		const currentGridY = Math.floor((mapY - offsety) / gridHeight);
 		return {
-			//floor is needed as long as we add `mapX += gridWidth/2;` above, if we subtract ceil
-			x: Math.floor(currentGridX) * gridWidth + offsetx,
-			y: Math.floor(currentGridY) * gridHeight + offsety
+			x: currentGridX * gridWidth + offsetx,
+			y: currentGridY * gridHeight + offsety
 		}
 	} else {
 		return { x: mapX, y: mapY };
@@ -4778,6 +4777,8 @@ function grouprotate_create() {
 		
 		centerPointRotateOrigin = { x: (furthest_coord.left + furthest_coord.right)/2 + (widthAdded*dir.x/2),
 					    y: (furthest_coord.top + furthest_coord.bottom)/2 + (widthAdded*dir.y/2) };
+
+
 	} else {
 		centerPointRotateOrigin = { x: (furthest_coord.left + furthest_coord.right)/2,
 					    y: (furthest_coord.top + furthest_coord.bottom)/2 };
@@ -4912,12 +4913,14 @@ async function do_draw_selected_token_bounding_box() {
 			bottom = bottom + borderOffset;
 			let width = right - left;
 			let height = bottom - top;
-
-			const isGroupSelect = window.CURRENTLY_SELECTED_TOKENS.length > 1 || (window.CURRENTLY_SELECTED_TOKENS.length == 1 && window.TOKEN_OBJECTS[window.CURRENTLY_SELECTED_TOKENS[0]].isAoe());
+			const singleAoe = window.CURRENTLY_SELECTED_TOKENS.length == 1 && window.TOKEN_OBJECTS[window.CURRENTLY_SELECTED_TOKENS[0]].isAoe();
+			const isGroupSelect = window.CURRENTLY_SELECTED_TOKENS.length > 1;
+			
 			// draw the bounding box
-			draw_select_box(left, top, width, height, false, true, isGroupSelect);
-			throttleLight();
-		})			      
+			draw_select_box(left, top, width, height, false, true, isGroupSelect, singleAoe);
+		})	
+		
+	throttleLight();
 }
 
 
@@ -5153,12 +5156,15 @@ function paste_selected_walls(x, y) {
 		window.selectedWalls.push({pt1: pt1, pt2: pt2, wall: wall, tokenId: doorTokenId, drawIndex: drawIndex})
 	}
 
-	window.wallUndo.push({undo: [...undoArray], selectedWalls: originalSelected});
+	pushWallUndo({undo: [...undoArray], selectedWalls: originalSelected});
 	
-	redraw_light_walls();
-	redraw_drawn_light();
+	redraw_light_walls({wallsChanged: true});
+	redraw_drawn_light(); // could limit this to point line of sight tool drawings
+	redraw_drawings(); // could limit this to point line of sight tool drawings
+	redraw_fog(); // could limit this to point line of sight tool drawings
+	redraw_elev(); // could limit this to point line of sight tool drawings
 	redraw_light();
-	sync_drawings();
+	sync_drawings({wallsChanged: true});
 
 }
 function copy_selected_tokens(teleporterTokenId=undefined) {
@@ -5292,12 +5298,15 @@ function delete_selected_walls() {
 				window.TOKEN_OBJECTS[tokenId].delete();
 			}
 		}
-		window.wallUndo.push({redo: [...redoArray], selectedWalls: originalSelected});
+		pushWallUndo({redo: [...redoArray], selectedWalls: originalSelected});
 		window.selectedWalls =[];
-		redraw_light_walls();
-		redraw_drawn_light();
+		redraw_light_walls({wallsChanged: true});
+		redraw_drawn_light(); // could limit this to point line of sight tool drawings
+		redraw_drawings(); // could limit this to point line of sight tool drawings
+		redraw_fog(); // could limit this to point line of sight tool drawings
+		redraw_elev(); // could limit this to point line of sight tool drawings
 		redraw_light();
-		sync_drawings();
+		sync_drawings({wallsChanged: true});
 	}
 }
 function delete_selected_tokens() {

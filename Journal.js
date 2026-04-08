@@ -573,7 +573,6 @@ class JournalManager{
 		journalPanel.body.append(chapter_list);
 		let chaptersWithLaterParents = [];
 
-		console.log('window',window);
 		let relevantNotes = {};
 		let relevantChapters = [];
 
@@ -1845,7 +1844,7 @@ class JournalManager{
 		let noteAlreadyOpen = $(`div.note[data-id='${id}']`).length>0;
 		
 		let note= noteAlreadyOpen ? $(`div.note[data-id='${id}']`) : $(`<div class='note' data-id='${id}'></div>`);
-		const note_container = find_or_create_generic_draggable_window(`noteWindow_${id}`, self.notes[id].title, false, true, `div.note[data-id='${id}']`, "860px", "600px", undefined, undefined, false, undefined, false, true)
+		const note_container = find_or_create_generic_draggable_window(`noteWindow_${id}`, self.notes[id].title, false, true, `div.note[data-id='${id}']`, "860px", "600px", undefined, undefined, false, 'input, button, .note-text', false, true)
 		//to do adjust so these attr/classes are no longer needed - they are hold over from when we used dialog instead of our own draggable window
 		note_container.attr("role", "dialog");
 		note_container.addClass(['ui-dialog', 'ui-corner-all', 'ui-widget', 'ui-widget-content', 'ui-front', 'ui-draggable', 'ui-resizable'])
@@ -1978,7 +1977,7 @@ class JournalManager{
 		$(target).find('.tooltip-hover').each(function(){
 			const self = this;
 			const $self = $(self);
-			$self.css('display:inline-block');
+			$self.css('display', 'inline-block');
 			if($self.hasClass('note-tooltip')){
 				let noteId = $self.attr('data-id');
 				if(noteId.replace(/[-+*&<>]/gi, '') == $self.text().replace(/[-+*&<>\s]/gi, '')){
@@ -3065,7 +3064,11 @@ class JournalManager{
 				const name = $(this).closest('tr').find('.item-link-cell a').text();
 				
 				const itemData = find_items_in_cache_by_id_and_name([{id, name}]);
-				
+				if (itemData.length === 0) {
+					console.warn("Item not found", [{id, name}]);
+					return;
+				}
+
 				console.log(`[PartyLoot] Adding ${quantity} of item ${name} to queue`);
 				
 				if (quantity > 10){
