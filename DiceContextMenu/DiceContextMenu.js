@@ -5,6 +5,11 @@ function gamelog_send_to_text() {
     if (expectedButtonText !== undefined && expectedButtonText.length > 0) {
         return expectedButtonText.replace(/\s+/g, '');
     }
+    const lastSendToDefault = localStorage.getItem(`${window.gameId != undefined ? window.gameId : window.myUser}-sendToDefault`);
+
+    if (lastSendToDefault != null) {
+        return lastSendToDefault;
+    }
     if (is_characters_page()) {
         return "Everyone"
     }
@@ -81,7 +86,7 @@ function standard_dice_context_menu(expression, modifierString = "", action = un
     return menu;
 }
 
-function damage_dice_context_menu(diceExpression, modifierString = "", action = undefined, rollType = undefined, name = undefined, avatarUrl = undefined, entityType = undefined, entityId = undefined, damageType = undefined) {
+function damage_dice_context_menu(diceExpression, modifierString = "", action = undefined, rollType = undefined, name = undefined, avatarUrl = undefined, entityType = undefined, entityId = undefined, damageType = undefined, spellSave = undefined) {
     if (typeof modifierString !== "string") {
         modifierString = "";
     }
@@ -131,6 +136,7 @@ function damage_dice_context_menu(diceExpression, modifierString = "", action = 
             }
              else { // not possible
                 console.warn("DiceContextMenu unexpectedly gave an  invalid row index for section 1! rollAsIndex: ", rollAsIndex, ", dcm: ", dcm);
+                return;
             }
 
 
@@ -145,7 +151,7 @@ function damage_dice_context_menu(diceExpression, modifierString = "", action = 
 
             const doubleDamage = rollAsIndex === 2 ? 3 : undefined;
 
-            window.diceRoller.roll(diceRoll, undefined, rollAsIndex == 2 ? 3 : undefined, undefined, undefined, damageType, doubleDamage);
+            window.diceRoller.roll(diceRoll, undefined, rollAsIndex == 2 ? 3 : undefined, undefined, spellSave, damageType, doubleDamage);
             
         });
 

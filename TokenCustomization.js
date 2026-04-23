@@ -537,7 +537,7 @@ class TokenCustomization {
         } else if (RootFolder.allIds().includes(this.id)) {
             n = RootFolder.findById(this.id).name;
         } else if (RootFolder.allPaths().map(p => path_to_html_id(p)).includes(this.id)) {
-            n = RootFolder.allPaths().map(p => path_to_html_id(p)).name;
+            n = RootFolder.allValues().find(f => path_to_html_id(f.path) === this.id)?.name;
         } else {
             n = this.tokenOptions?.name;
             if (!n) {
@@ -939,7 +939,7 @@ function persist_token_customization(customization, callback) {
             if(window.TOKEN_OBJECTS[customization.id]){
                 token.options = $.extend(true, {}, token.options, customization.tokenOptions);
                 token.place();
-                token.sync($.extend(true, {}, token.options));
+                token.sync();
             }
         }
         else if (customization.tokenType == ItemType.Folder && customization.rootId == RootFolder.Players.id){
@@ -959,7 +959,7 @@ function persist_token_customization(customization, callback) {
                if (window.TOKEN_OBJECTS[listItem.id]) {
                    token.options = $.extend(true, {}, token.options, newOptions);
                    token.place();
-                   token.sync($.extend(true, {}, token.options));
+                   token.sync();
                }
            }
         }

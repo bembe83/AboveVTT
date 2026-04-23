@@ -9,7 +9,7 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 		let grid_5 = function() {
 			$("#scene_selector_toggle").show();
 			$("#tokens").show();
-			window.WIZARDING = false;
+			
 			window.CURRENT_SCENE_DATA = {
 				...window.CURRENT_SCENE_DATA,
 				upsq: "ft",
@@ -27,102 +27,6 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 			$("#darkness_layer").css('visibility', 'visible');
 		};
 
-		let grid_10 = function() {
-			$("#wizard_popup").empty().append("Do you want me to subdivide the map grid in 2 so you can get correct token size? <button id='grid_divide'>Yes</button> <button id='grid_nodivide'>No</button>");
-
-			$("#grid_divide").click(function() {
-				window.WIZARDING = false;
-				$("#scene_selector_toggle").show();
-				$("#tokens").show();
-				$("#wizard_popup").empty().append("You're good to go! AboveVTT is now super-imposing a grid that divides the original grid map in half. If you want to hide this grid just edit the manual grid data.");
-				window.CURRENT_SCENE_DATA = {
-					...window.CURRENT_SCENE_DATA,
-					hpps: window.CURRENT_SCENE_DATA.hpps/2,
-					vpps: window.CURRENT_SCENE_DATA.vpps/2,
-					upsq: "ft",
-					fpsq: "5",
-					grid_subdivided: "1"
-				}
-				consider_upscaling(window.CURRENT_SCENE_DATA);
-				$("#exitWizard").remove();
-				$("#wizard_popup").delay(5000).animate({ opacity: 0 }, 4000, function() {
-					$("#wizard_popup").remove();
-				});
-				window.ScenesHandler.persist_current_scene();
-				$("#light_container").css('visibility', 'visible');
-				$("#darkness_layer").css('visibility', 'visible');
-			});
-
-			$("#grid_nodivide").click(function() {
-				window.WIZARDING = false;
-				$("#scene_selector_toggle").show();
-				$("#tokens").show();
-				window.CURRENT_SCENE_DATA= {
-					...window.CURRENT_SCENE_DATA,
-					upsq: "ft",
-					fpsq: "10",
-					grid_subdivided: "0",
-					snap: "1",
-					grid: "0"
-				}
-				consider_upscaling(window.CURRENT_SCENE_DATA);
-				window.ScenesHandler.persist_current_scene();
-				$("#exitWizard").remove();
-				$("#wizard_popup").empty().append("You're good to go! Medium token will match the original grid size");
-				$("#wizard_popup").delay(5000).animate({ opacity: 0 }, 4000, function() {
-					$("#wizard_popup").remove();
-				});
-				$("#light_container").css('visibility', 'visible');
-				$("#darkness_layer").css('visibility', 'visible');
-			});
-		}
-
-		let grid_15 = function() {
-			window.WIZARDING = false;
-			$("#scene_selector_toggle").show();
-			$("#tokens").show();
-			$("#wizard_popup").empty().append("You're good to go! Token will be of the correct scale. We don't currently support overimposing a grid in this scale..'");
-			window.CURRENT_SCENE_DATA = {
-				...window.CURRENT_SCENE_DATA,
-				hpps: window.CURRENT_SCENE_DATA.hpps/3,
-				vpps: window.CURRENT_SCENE_DATA.vpps/3,
-				upsq: "ft",
-				fpsq: "5",
-				grid_subdivided: "0"
-			}
-			consider_upscaling(window.CURRENT_SCENE_DATA);
-			$("#wizard_popup").delay(5000).animate({ opacity: 0 }, 4000, function() {
-				$("#wizard_popup").remove();
-			});
-			window.ScenesHandler.persist_current_scene();
-			$("#exitWizard").remove();
-			$("#light_container").css('visibility', 'visible');
-			$("#darkness_layer").css('visibility', 'visible');
-		}
-
-
-		let grid_20 = function() {
-			window.WIZARDING = false;
-			$("#scene_selector_toggle").show();
-			$("#tokens").show();
-			$("#wizard_popup").empty().append("You're good to go! Token will be of the correct scale.");
-			window.CURRENT_SCENE_DATA = {
-				...window.CURRENT_SCENE_DATA,
-				hpps: window.CURRENT_SCENE_DATA.hpps/4,
-				vpps: window.CURRENT_SCENE_DATA.vpps/4,
-				upsq: "ft",
-				fpsq: "5",
-				grid_subdivided: "0"
-			}
-			consider_upscaling(window.CURRENT_SCENE_DATA);
-			$("#wizard_popup").delay(5000).animate({ opacity: 0 }, 4000, function() {
-				$("#wizard_popup").remove();
-			});
-			window.ScenesHandler.persist_current_scene();
-			$("#exitWizard").remove();
-			$("#light_container").css('visibility', 'visible');
-			$("#darkness_layer").css('visibility', 'visible');
-		}
 
 		let align_grid = function(square = false, just_rescaling = true, copiedSceneData) {
 
@@ -138,8 +42,8 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 			aligner1.height(59);
 			aligner1.css("position", "absolute");
 			aligner1.css("border-radius", "50%");
-			aligner1.css("top", Math.floor($("#scene_map").height() / copiedSceneData.vpps) / 2 * copiedSceneData.vpps + copiedSceneData.offsety - 29 + "px");
-			aligner1.css("left", Math.floor($("#scene_map").width() / copiedSceneData.hpps) / 2  * copiedSceneData.hpps + copiedSceneData.offsetx - 29 + "px");
+			aligner1.css("top", `${Math.floor($("#scene_map").height() / 60) / 2 * 60 - 29}px`);
+			aligner1.css("left", `${Math.floor($("#scene_map").width() / 60) / 2 * 60 - 29}px`);
 			aligner1.css("z-index", 40);
 
 			let drawX = function(canvas) {
@@ -177,14 +81,11 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 			aligner2.height(59);
 			aligner2.css("position", "absolute");
 			aligner2.css("border-radius", "50%");
-			if (!just_rescaling) {
-				aligner2.css("top", parseFloat(aligner1.css('top')) + copiedSceneData.vpps*3 + "px");
-				aligner2.css("left", parseFloat(aligner1.css('left')) + copiedSceneData.hpps*3  + "px");
-			}
-			else {
-				aligner2.css("top", parseFloat(aligner1.css('top')) + copiedSceneData.vpps*3 + "px");
-				aligner2.css("left", parseFloat(aligner1.css('left')) + copiedSceneData.hpps*3 + "px");
-			}
+			
+			aligner2.css("top", `${parseFloat(aligner1.css('top')) + 180}px`);
+			aligner2.css("left", `${parseFloat(aligner1.css('left')) + 180}px`);
+			
+			
 			aligner2.css("z-index", 40);
 
 			let canvas2 = aligner2.get(0);
@@ -301,20 +202,12 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 					width = 2;
 				else
 					width = 1;
-				const dash = [30, 5]
-				const color = "rgba(255, 0, 0,0.5)";
+				const dash = [30, 5];
+				const color = "rgba(255, 0, 0, 1)";
 				// nulls will take the window.current_scene_data from above
 				window.CURRENT_SCENE_DATA.gridType = $('#gridType input:checked').val();
-				if(window.CURRENT_SCENE_DATA.gridType == 1){
-					redraw_grid(null,null,null,null,color,width,null,dash)
-				}
-				else if(window.CURRENT_SCENE_DATA.gridType == 2){
-					redraw_hex_grid(null,null,null,null,color,width,null,dash,false)
-				}
-				else if(window.CURRENT_SCENE_DATA.gridType == 3){
-					redraw_hex_grid(null,null,null,null,color,width,null,dash,true)
-				}
-				
+				window.CURRENT_SCENE_DATA.gridOver = 1;
+				redraw_grid(null,null,null,null,color,width,null,dash)
 			};
 
 			let click2 = {
@@ -506,13 +399,8 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 		scene.offsetx = parseFloat(scene.offsetx);
 		scene.offsety = parseFloat(scene.offsety);
 
-		let copiedSceneData = {
-			...$.extend(true, {}, window.CURRENT_SCENE_DATA),
-			hpps: window.CURRENT_SCENE_DATA.hpps,
-			vpps: window.CURRENT_SCENE_DATA.vpps,
-			offsetx: window.CURRENT_SCENE_DATA.offsetx,
-			offsety: window.CURRENT_SCENE_DATA.offsety
-		}
+		let copiedSceneData = $.extend(true, {}, window.CURRENT_SCENE_DATA);
+		
 
 		scene.scale_factor = 1;
 		scene.grid_subdivided = '0';
@@ -523,9 +411,7 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 		scene['scaleY'] = (60.0 / parseInt(scene['vpps'])); // for backward compatibility, this will be horizonat sca
 
 		$("#tokens").show();
-		$("#grid_overlay").show();
-
-
+		$(".alphaNumGrid").remove();
 
 		window.FOG_OF_WAR = true;
 		window.REVEALED = [[0, 0, 0, 0, 2, 0]].concat(self.scene.reveals);
@@ -551,10 +437,11 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 		}
 
 		//This is still used for grid wizard loading since we load so many times -- it is not used for other scene loading though. You can find that in message broker handleScene
-		load_scenemap(map_url, map_is_video, window.CURRENT_SCENE_DATA.width, window.CURRENT_SCENE_DATA.height, window.CURRENT_SCENE_DATA.UVTTFile, function() {
+		load_scenemap(map_url, map_is_video, window.CURRENT_SCENE_DATA.width, window.CURRENT_SCENE_DATA.height, window.CURRENT_SCENE_DATA.UVTTFile, async function() {
 			$("#scene_map").off("load");
-			reset_canvas();
-			set_default_vttwrapper_size()
+			delete window.LOADING;
+			await reset_canvas();
+			await set_default_vttwrapper_size()
 			align_grid(false, false, copiedSceneData);
 			window.WeatherOverlay.stop();
 		});
@@ -594,7 +481,7 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 				let keyword = url.replaceAll(/https:\/\/www\.dndbeyond\.com|^\/?sources\/|/gi, '');
 
 				if (keyword in self.sources){ // OBJECT ALREADY EXISTS... evito di riscrivere per non perdere i dati
-					scraped_sources[keyword]=self.sources.keyword;
+					scraped_sources[keyword]=self.sources[keyword];
 					return;
 				}
 				scraped_sources[keyword] = {
@@ -615,7 +502,7 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 							return ((scraped_sources[a].title == scraped_sources[b].title) ? 0 : ((scraped_sources[a].title > scraped_sources[b].title) ? 1 : -1));
 						}
 						else {
-							return (a.ddbtype == "Adventures") ? 1 : -1;
+							return (scraped_sources[a].ddbtype == "Adventures") ? 1 : -1;
 						}
 					}
 				)
@@ -739,7 +626,9 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 				dm_map_usable: "0",
 				thumb: thumb,
 				tokens: {},
-			});		
+			});
+			callback();
+			return;
 		}
 
 		let f = $("<iframe src='" + chapter_url + "'></iframe>");
@@ -979,10 +868,6 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 
 		if (!(id in window.TOKEN_OBJECTS)) {
 			window.TOKEN_OBJECTS[id] = new Token(options);
-
-			window.TOKEN_OBJECTS[id].sync = mydebounce(function(options) {
-				window.MB.sendMessage('custom/myVTT/token', options);
-			}, 300);
 		}
 
 		if(options.repositionAoe != undefined){
@@ -1058,7 +943,7 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 				window.MB.sendMessage("custom/myVTT/switch_scene", { sceneId: window.splitPlayerScenes});
 			}, 100)
 		}
-		
+		did_update_scenes();
 		
 	}
 
@@ -1107,6 +992,8 @@ function folder_path_of_scene(scene) {
 	}
 }
 function find_parent_of_scene(scene) {
+	if(scene.parentId == undefined)
+		return false;
 	return window.ScenesHandler.scenes.find(s => s.id === scene.parentId);
 }
 function find_ancestors_of_scene(scene, found = []) {

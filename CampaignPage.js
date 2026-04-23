@@ -16,7 +16,7 @@ $(function() {
       .then(harvest_campaign_secret)  // find our join link
       .then(set_campaign_secret)      // set it to window.CAMPAIGN_SECRET
       .then(store_campaign_info)      // store gameId and campaign secret in localStorage for use on other pages   
-      .then(() => {window.CAMPAIGN_INFO = DDBApi.fetchCampaignInfo(window.gameId)})  
+      .then(async () => {window.CAMPAIGN_INFO = await DDBApi.fetchCampaignInfo(window.gameId)})
       .then(() => {
          openCampaignDB(async function() {
           if (is_gamelog_popout()) {
@@ -231,15 +231,7 @@ function inject_dm_join_button() {
       }, 2000);
     }   
     catch(error) {
-      if (error.message && error.message.includes("EncounterLimitException")) {
-        showErrorMessage(
-          error,
-          "It looks like you have too many encounters. DndBeyond limits free accounts to 8 encounters, and AboveVTT requires 1 encounter to run. Try deleting a few encounters, and then try again.",
-          `<a href="https://www.dndbeyond.com/my-encounters" target="_blank">My Encounters</a>`
-        );
-      } else {
-        showError(error, "Failed to start AboveVTT from dm join button");
-      }
+      showError(error, "Failed to start AboveVTT from dm join button"); 
     }
       
       

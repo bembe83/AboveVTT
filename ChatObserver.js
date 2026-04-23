@@ -19,12 +19,28 @@ class ChatObserver {
                     return;
                 }
                 let slashCommandMatch = value.match(diceRollCommandRegex);
+                const timerCommandRegex = /^\/timer\s([\p{L}\p{N}\p{M}\p{P}\s]+\s)?(\d+):(\d+)/giu;  
+                let timerCommandMatch = timerCommandRegex.exec(value);
                 if (slashCommandMatch !== null) {
                     if (self.#parseSlashCommand(value)) {
                         self.#didSubmit(input, value);
                     } else {
                         self.#shake(input);
                     }
+                } else if(timerCommandMatch !== null){
+                    const message = timerCommandMatch[1]?.trim() || "";
+                    const minutes = parseInt(timerCommandMatch[2]);
+                    const seconds = parseInt(timerCommandMatch[3]);
+                    const duration = (minutes * 60 + seconds) * 1000;
+                    const startTime = Date.now();
+                    window.MB.sendMessage("custom/myVTT/createTimer", {
+                        type: "gamelog",
+                        message,
+                        duration,
+                        startTime
+                    });
+                    create_gamelog_timer(message, duration, startTime);
+                    self.#didSubmit(input, value);
                 } else {
                     self.#sendChatMessage(value);
                     self.#didSubmit(input, value);
@@ -66,11 +82,9 @@ class ChatObserver {
         if (didSend === false) {
             // it was too complex so try to send it through rpgDiceRoller
             let expression = text.replace(diceRollCommandRegex, "").match(allowedExpressionCharactersRegex)?.[0];
-            didSend = send_rpg_dice_to_ddb(expression, window.pc?.name, window.pc?.image);
+            didSend = window.diceRoller.send_ddb_dice_message(expression, window.pc?.name, window.pc?.image);
         }
         return didSend;
-        
-
     }
 
     async #sendChatMessage(text) {
@@ -90,15 +104,18 @@ class ChatObserver {
 
         };
 
-        if(data.img.startsWith('above-bucket-not-a-url')){
+        if(data.img?.startsWith('above-bucket-not-a-url')){
             data.img = await getAvttStorageUrl(data.img, true);
         }
 
         if (text.startsWith("/w")) {
             let matches = text.match(/\[(.*?)] (.*)/);
-            if (matches.length === 3) {
+            if (matches !== null && matches.length === 3) {
                 data.whisper = matches[1]
                 data.text = `<div class="custom-gamelog-message"style="position: relative;margin-bottom: 12px;"><span style='font-size: 9px;position: absolute;bottom: -18px;left: 0px;opacity: 0.5;margin-top: 10px;'><b>To: ${matches[1]}</b></span>${matches[2]}</div>`;
+            } else{
+                chat_command_error(`Invalid whisper command. Format: /w [player name] message`);
+                return;
             }
         } 
         else if(text.startsWith("/dm")){     

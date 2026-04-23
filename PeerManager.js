@@ -82,7 +82,7 @@ class PeerManager {
       });
       conn.on("error", (error) => {
         console.error("PeerManager connection error", error);
-        // should we call rebuild_peerManager() here?
+        window.PeerManager.disconnectFromPeer(conn.peer);
       });
     });
     this.peer.on('error', function (error) {
@@ -92,6 +92,8 @@ class PeerManager {
   }
 
   tearDown() {
+    clearInterval(this.staleConnectionTimerId);
+    this.staleConnectionTimerId = undefined;
     this.disconnectAllPeers();
     this.peer.disconnect();
     this.peer.destroy();
@@ -381,6 +383,7 @@ class PeerManager {
 
   /** Checks for and cleans up stale connections */
   checkForStaleConnections() {
+    if (!this.peer || this.peer.destroyed) return;
     try {
       let attemptReconnect = false;
       // first let's clean up everything that we actually know about

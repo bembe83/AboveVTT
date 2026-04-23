@@ -126,7 +126,7 @@ function token_setting_options() {
 				{ value: false, label: "Above darkness", description: "The token will appear above darkness/light" }
 			],
 			defaultValue: false,
-			menuPosition: '12',
+			menuPosition: '14',
 			player: true
 		},
 		{
@@ -168,7 +168,7 @@ function token_setting_options() {
 				{ value: false, label: 'Border', description: "The token has a border around it." }
 			],
 			defaultValue: false,
-			menuPosition: '11',
+			menuPosition: '13',
 			player: true
 		},
 		{
@@ -317,17 +317,7 @@ function token_setting_options() {
 
 function avtt_settings() {
 	let settings = [
-		{
-			name: 'alwaysShowSplash',
-			label: 'Always show splash screen',
-			type: 'toggle',
-			options: [
-				{ value: true, label: "Always", description: `You will always see the splash screen on startup.` },
-				{ value: false, label: "Only When New", description: `You will only see the splash screen on startup after updating to a new version.` }
-			],
-			defaultValue: true,
-			class: 'ui'
-		},
+
 		{
 			name: "iconUi",
 			label: "Mobile/Icon UI",
@@ -337,7 +327,8 @@ function avtt_settings() {
 				{ value: false, label: "Disable", description: `` }
 			],
 			defaultValue: true,
-			class: 'ui'
+			class: 'ui',
+			global: 1
 		},
 		{
 			name: 'allowTokenMeasurement',
@@ -348,8 +339,32 @@ function avtt_settings() {
 				{ value: false, label: "Not Measuring", description: `Enable this to automatically measure the distance that you drag a token. When enabled, dropping the token and picking it back up will create a waypoint in the measurement. Clicking anywhere else, or dragging another token will stop the measurement.` }
 			],
 			defaultValue: false,
-			class: 'ui'
+			class: 'ui',
+			global: 1
 		},	
+		{
+			name: "dragLight",
+			label: "Vision check while token moves",
+			type: "toggle",
+			options: [
+				{ value: true, label: "Enable", description: `While moving a token vision will update` },
+				{ value: false, label: "Disable", description: `Vision will only update on drop of a token` }
+			],
+			defaultValue: false,
+			class: 'ui',
+			global: 1
+		},
+		{	
+			name: "gridZoomConversion",
+			label: "Store grid size based on current view",
+			buttonText: "Store",
+			type: "customButton",
+			customFunction: function (clickEvent, body) {
+				set_avtt_setting_value('gridZoomConversion', window.ZOOM*parseFloat(window.CURRENT_SCENE_DATA.hpps));
+				showTempMessage(`Grid visual size stored`, { fadeDelay: 600, fadeTime: 400 });
+			},
+			class: 'ui'
+		},
 		{
 			name: "disableCombatText",
 			label: "Disable DM Damage Button Text",
@@ -359,7 +374,8 @@ function avtt_settings() {
 				{ value: false, label: "Disable", description: `If enabled removes the scrolling text on tokens displayed to DM when using gamelog damage buttons.` }
 			],
 			defaultValue: false,
-			class: 'ui'
+			class: 'ui',
+			global: 1
 		},
 		{
 			name: 'streamDiceRolls',
@@ -395,15 +411,16 @@ function avtt_settings() {
 			class: 'stream'
 		},
 		{
-			name: "dragLight",
-			label: "Vision check while token moves",
-			type: "toggle",
+			name: 'alwaysShowSplash',
+			label: 'Always show splash screen',
+			type: 'toggle',
 			options: [
-				{ value: true, label: "Enable", description: `While moving a token vision will update` },
-				{ value: false, label: "Disable", description: `Vision will only update on drop of a token` }
+				{ value: true, label: "Always", description: `You will always see the splash screen on startup.` },
+				{ value: false, label: "Only When New", description: `You will only see the splash screen on startup after updating to a new version.` }
 			],
-			defaultValue: false,
-			class: 'ui'
+			defaultValue: true,
+			class: 'ui',
+			global: 1
 		},
 		{
 			name: "alwaysHideScrollbar",
@@ -414,7 +431,8 @@ function avtt_settings() {
 				{ value: false, label: "Disable", description: `Scrollbar is allowed` }
 			],
 			defaultValue: false,
-			class: 'ui'
+			class: 'ui',
+			global: 1
 		}
 	];
 
@@ -576,7 +594,8 @@ function avtt_settings() {
 			{ value: false, label: "DDB Dice", description: `Defaults to DDB dice` }
 		],
 		defaultValue: false,
-		class: 'performance'
+		class: 'performance',
+		global: 1
 	})
 	settings.push({
 		name: "colorBlindText",
@@ -587,7 +606,8 @@ function avtt_settings() {
 			{ value: false, label: "Disable", description: `If enabled adjusts green text to yellow` }
 		],
 		defaultValue: false,
-		class: 'ui'
+		class: 'ui',
+		global: 1
 	})
 	settings.push(
 	{
@@ -623,7 +643,8 @@ function avtt_settings() {
 			{ value: false, label: "Enabled", description: `All animations will be enabled` }
 		],
 		defaultValue: false,
-		class: 'performance'
+		class: 'performance',
+		global: 1
 	})
 	settings.push(
 	{
@@ -648,7 +669,8 @@ function avtt_settings() {
 			{ value: 2, label: "Always 2024", description: `Will always display in 2024 style` },
 		],
 		defaultValue: false,
-		class: 'ui'
+		class: 'ui',
+		global: 1
 	})
 	settings.push(
 	{
@@ -837,6 +859,31 @@ function scene_setting_options(){
 			defaultValue: false
 		},
 		{
+			name: 'grid_color',
+			label: 'Grid Color',
+			type: 'colorSelect',
+			defaultValue: '#000'
+		},
+		{
+			name: 'gridOver',
+			label: 'Grid Layer',
+			type: 'dropdown',
+			options: [
+				{ value: 0, label: "Under Darkness/Fog", description: "Grid will be drawn under darkness/fog" },
+				{ value: 1, label: "Over Darkness/Fog", description: "Grid will be drawn over darkness/fog" }
+			],
+			defaultValue: false
+		},
+		{
+			name: 'grid_line_width',
+			label: 'Grid Line Width',
+			type: 'rangeInput',
+			options: [
+				{ min: 0.5, max: 10, step: 0.5, description: "Grid line width" },
+			],
+			defaultValue: 1
+		},
+		{
 			name: 'snap',
 			label: 'Snap to Grid',
 			type: 'toggle',
@@ -909,7 +956,9 @@ function get_avtt_setting_value(name) {
 			return get_avtt_setting_default_value(name);
 	}
 }
-
+function get_avtt_setting_is_global(name) {
+	return avtt_settings().find(s => s.name === name)?.global === 1;
+}
 function set_avtt_setting_value(name, newValue) {
 	console.log(`set_avtt_setting_value ${name} is now ${newValue}`);
 
@@ -1121,11 +1170,11 @@ function init_settings() {
 	body.append(`
 		<br />
 		<h3 class="token-image-modal-footer-title no-bottom-margin-setting" >AboveVTT Settings</h3>
-		<div class="sidebar-panel-header-explanation"><b>Some settings can have an impact on performance.</b></div>
+		<div class="sidebar-panel-header-explanation"><b>Some settings can have an impact on performance. Settings are saved per campaign unless indicated otherwise</b></div>
 		<div class='avtt-settings-section avtt-settings-defaults'><h4 class="token-image-modal-footer-title">Default Settings</h4></div>
-		<div class='avtt-settings-section avtt-settings-ui'><h4 class="token-image-modal-footer-title">UI</h4></div>
+		<div class='avtt-settings-section avtt-settings-ui'><h4 class="token-image-modal-footer-title">UI</h4><div class='global-setting'><h5 class="token-image-modal-footer-title">Global</h5></div><div class='campaign-setting'><h5 class="token-image-modal-footer-title">Campaign</h5></div></div>
 		<div class='avtt-settings-section avtt-settings-stream'><h4 class="token-image-modal-footer-title">Streaming/P2P</h4></div>
-		<div class='avtt-settings-section avtt-settings-performance'><h4 class="token-image-modal-footer-title">Performance</h4><div class="sidebar-panel-header-explanation"><b>These settings can improve performance</b></div></div>
+		<div class='avtt-settings-section avtt-settings-performance'><h4 class="token-image-modal-footer-title">Performance</h4><div class="sidebar-panel-header-explanation"><b>These settings can improve performance and are stored globally</b></div></div>
 		<div class='avtt-settings-section avtt-settings-debug'><h4 class="token-image-modal-footer-title">Debugging</h4><div class="sidebar-panel-header-explanation"><b>These settings can be used to debug issues or as last resorts when defaults aren't working</b></div></div>
 	`);
 	for(let i = 0; i < experimental_features.length; i++) {	
@@ -1191,7 +1240,11 @@ function init_settings() {
 				break;
 		}
 		if (inputWrapper) {
-			body.find(`.avtt-settings-${setting.class}`).append(inputWrapper);
+			body.find(`.avtt-settings-${setting.class}${setting.class == 'ui' ? 
+					setting.global == 1 ? 
+						' .global-setting' : 
+						' .campaign-setting' : 
+					''}`).append(inputWrapper);
 		}
 	}
 
@@ -1569,18 +1622,9 @@ function update_token_base_visibility(container) {
 function enable_dice_streaming_feature(enabled){
 	if(enabled)
 	{
-		if($(".stream-dice-button").length>0)
-			return;
-		$(".glc-game-log>[class*='Container-Flex']").append($(`<div  id="stream_dice"><div class='stream-dice-button'>Dice Stream Disabled</div></div>`));
+		window.JOINTHEDICESTREAM = true;
+		add_dice_stream_gamelog_button();
 		update_dice_streaming_feature(window.JOINTHEDICESTREAM);
-		$(".stream-dice-button").off().on("click", function(){
-			if(window.JOINTHEDICESTREAM){
-				update_dice_streaming_feature(false);
-			}
-			else {
-				update_dice_streaming_feature(true);
-			}
-		})
 	}
 	else{
 		$(".stream-dice-button").remove();
@@ -1607,7 +1651,7 @@ function update_dice_streaming_feature(enabled, sendToText=gamelog_send_to_text(
 						streamid: diceplayer_id
 					});
 				}
-				else if($(this).text() == "Dungeon Master"){
+				else if ($(this).text() == "Dungeon Master" || $(this).text() == "DM"){
 					window.MB.sendMessage("custom/myVTT/showonlytodmdicestream",{
 						streamid: diceplayer_id
 					});
@@ -1619,13 +1663,10 @@ function update_dice_streaming_feature(enabled, sendToText=gamelog_send_to_text(
 				}
 			});
 		});
-
-
 		if (window.JOINTHEDICESTREAM) {
-
 			joinDiceRoom();
 			setTimeout(function(){
-				if(sendToText == "Dungeon Master"){
+				if (sendToText == "Dungeon Master" || sendToText == "DM"){
 					window.MB.sendMessage("custom/myVTT/showonlytodmdicestream",{
 						streamid: diceplayer_id
 					});
@@ -1662,6 +1703,13 @@ function persist_token_settings(settings){
 
 
 function persist_experimental_settings(settings) {
+	const globalSettings = {};
+	for(let item in settings){
+		if (get_avtt_setting_is_global(item)){
+			globalSettings[item] = settings[item];
+		}
+	}
+	localStorage.setItem("ExperimentalSettingsGlobal", JSON.stringify(globalSettings));
 	const gameid = find_game_id();
 	localStorage.setItem("ExperimentalSettings" + gameid, JSON.stringify(settings));
 }
@@ -1685,7 +1733,6 @@ function export_current_scene(){
 		journalchapters: [],
 		soundpads: {}
 	};
-	delete DataFile.scenes[0].itemType;
 	delete DataFile.scenes[0].map;
 	for(tokenID in window.TOKEN_OBJECTS){
 		let statBlockID = window.TOKEN_OBJECTS[tokenID].options.statBlock
@@ -1721,7 +1768,6 @@ async function export_scene_context(sceneId){
 		journalchapters: [],
 		soundpads: {}
 	};
-	delete DataFile.scenes[0].itemType;
 	let tokensObject = {}
 	for(let token in scene.data.tokens){
 

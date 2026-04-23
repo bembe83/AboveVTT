@@ -27,7 +27,9 @@ class DDBApi {
       return response;
     }
     if(response.status == 410){
-      showError(new Error(`DDB 410 Error`), `<b>Try clearing <div style="backdrop-filter: brightness(0.8);padding: 0px 3px;display: inline-block;border-radius: 5px;">${navigator.userAgent.indexOf("Firefox") != -1 ? `temporary cached files and pages` : `cached images and files`}</div> and restarting the browser.</b>`, `<br/><b>As long as you do <span style='color: #900;'>not</span> clear <div style="backdrop-filter: brightness(0.8);padding: 0px 3px;display: inline-block;border-radius: 5px;">cookies and other site data</div> this should not remove any AboveVTT data.`);
+      const error = new Error(`DDB 410 Error`);
+      showError(error, `<b>Try clearing <div style="backdrop-filter: brightness(0.8);padding: 0px 3px;display: inline-block;border-radius: 5px;">${navigator.userAgent.indexOf("Firefox") != -1 ? `temporary cached files and pages` : `cached images and files`}</div> and restarting the browser.</b>`, `<br/><b>As long as you do <span style='color: #900;'>not</span> clear <div style="backdrop-filter: brightness(0.8);padding: 0px 3px;display: inline-block;border-radius: 5px;">cookies and other site data</div> this should not remove any AboveVTT data.`);
+      throw noLogError(error);
     }
     else{
       // We have an error so let's try to parse it
@@ -36,11 +38,8 @@ class DDBApi {
         .catch(parsingError => console.error("DDBApi.lookForErrors Failed to parse json", response, parsingError));
       const type = responseJson?.type || `Unknown Error ${response.status}`;
       const messages = responseJson?.errors?.message?.join("; ") || "";
-      console.error(`DDB API Error: ${type} ${messages}`);
-      if(type == 'EncounterLimitException'){
-        alert("Encounter limit reached. AboveVTT needs 1 encounter slot free to join as DM. If you are on a free DDB account you are limited to 8 encounter slots. Please try deleting an encounter.")
-      }
-      showError(new Error(`DDB API Error: ${type} ${messages}`));
+      const error = new Error(`DDB API Error: ${type} ${messages}`);
+      throw error;
     }
 
   }
@@ -223,6 +222,8 @@ class DDBApi {
   }
 
   static async fetchCampaignInfo(campaignId) {
+    if(!campaignId)
+      return;
     console.log("DDBApi.fetchCampaignInfo");
     const url = `https://www.dndbeyond.com/api/campaign/stt/active-campaigns/${campaignId}`;
     const response = await DDBApi.fetchJsonWithToken(url);
@@ -294,27 +295,40 @@ class DDBApi {
       return characterIds;
     }
 
-
-    try {
-      window.playerUsers = await DDBApi.fetchCampaignCharacters(campaignId);
-      characterIds = window.playerUsers.map(c => c.id);
-    } 
-    catch (error) {
+    const maxRetries = 3;
+    const baseDelay = 1000;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // This is what the campaign page calls
-        window.playerUsers = await DDBApi.fetchActiveCharacters(campaignId);
-        window.playerUsers.forEach(c => {
-          if (!characterIds.includes(c.id)) {
-            characterIds.push(c.id);
-          }
-        });
-      } 
+        window.playerUsers = await DDBApi.fetchCampaignCharacters(campaignId);
+        characterIds = window.playerUsers.map(c => c.id);
+        break;
+      }
       catch (error) {
-        console.warn("fetchCampaignCharacterIds caught an error trying to collect ids from fetchActiveCharacters", error);
-      } 
+        try {
+          // This is what the campaign page calls
+          window.playerUsers = await DDBApi.fetchActiveCharacters(campaignId);
+          window.playerUsers.forEach(c => {
+            if (!characterIds.includes(c.id)) {
+              characterIds.push(c.id);
+            }
+          });
+          break;
+        }
+        catch (fallbackError) {
+          if (attempt < maxRetries) {
+            const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 8000);
+            console.warn(`fetchCampaignCharacterIds: both endpoints failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`, fallbackError);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+            console.warn("fetchCampaignCharacterIds: failed to fetch campaign characters after all retries", fallbackError);
+            showError(fallbackError, "Failed to load campaign characters. Please refresh the page.");
+            return characterIds;
+          }
+        }
+      }
     }
     let playerUser = window.playerUsers.filter(d=> d.id == window.PLAYER_ID)[0]?.userId;
-    window.myUser = playerUser ? playerUser : 'THE_DM'; 
+    window.myUser = playerUser ? playerUser : window.CAMPAIGN_INFO.dmId;
     return characterIds;
   }
 

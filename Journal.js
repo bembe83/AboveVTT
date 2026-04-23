@@ -10,7 +10,6 @@ cached_journal_items = {};
 
 const AVTT_JOURNAL_CHUNK_SIZE = 100000;
 const AVTT_JOURNAL_CHUNK_STRATEGY = "chunked-json";
-
 function avttPromisifyIdbRequest(request) {
 	if (!request) {
 		return Promise.reject(new Error("Missing IDB request"));
@@ -574,7 +573,6 @@ class JournalManager{
 		journalPanel.body.append(chapter_list);
 		let chaptersWithLaterParents = [];
 
-		console.log('window',window);
 		let relevantNotes = {};
 		let relevantChapters = [];
 
@@ -642,7 +640,7 @@ class JournalManager{
 
 			
 			filteredChapters.forEach(chapter => {
-				chapter.notes.forEach(note_id => {
+				chapter.notes.forEach(note_id => { 
 					if(!relevantNotes[note_id]){
 						relevantNotes[note_id] = self.notes[note_id];
 					}
@@ -655,14 +653,14 @@ class JournalManager{
 
 		for(let i=0; i<self.chapters.length;i++){
 			// Check if the chapter is in relevantChapters - if not, don't render it or any children of
-			if(relevantChapters.find(d => d.id == self.chapters[i].id)){
-		
-				if(!self.chapters[i].id){
-					self.chapters[i].id = uuid();
+			const currChapter = self.chapters[i];
+			if(relevantChapters.find(d => d.id == currChapter.id)){
+				if(!currChapter.id){
+					currChapter.id = uuid();
 				}
 				// A chapter title can be clicked to expand/collapse the chapter notes
 				let section_chapter=$(`
-					<div data-index='${i}' data-id='${self.chapters[i].id}' class='sidebar-list-item-row list-item-identifier folder ${self.chapters[i]?.collapsed ? 'collapsed' : ''}'></div>
+					<div data-index='${i}' data-id='${currChapter.id}' class='sidebar-list-item-row list-item-identifier folder ${currChapter?.collapsed ? 'collapsed' : ''}'></div>
 				`);
 
 				// Create a sortale list of notes
@@ -728,13 +726,13 @@ class JournalManager{
 								self.chapters.splice(new_index, 0, self.chapters.splice(old_index, 1)[0]);
 							}
 							else{
-								const old_index = self.chapters[i].notes.findIndex(function(note) {
+								const old_index = currChapter.notes.findIndex(function(note) {
 									return note == ui.item.attr('data-id')
 								});
 								// Find the new index of the dragged element
 								const new_index = ui.item.index();
 								// Move the dragged element to the new index
-								self.chapters[i].notes.splice(new_index, 0, self.chapters[i].notes.splice(old_index, 1)[0]);
+								currChapter.notes.splice(new_index, 0, currChapter.notes.splice(old_index, 1)[0]);
 							}
 							self.persist();
 							window.MB.sendMessage('custom/myVTT/JournalChapters',{
@@ -749,15 +747,15 @@ class JournalManager{
 					
 				let row_chapter_title=$("<div class='row-chapter'></div>");
 				
-				let prependIcon = (self.chapters[i].shareWithPlayer && window.DM) ? $(`<span class="material-symbols-outlined" style='font-size:12px; margin-right: 5px;'>share</span>`) : '';
+				let prependIcon = (currChapter.shareWithPlayer && window.DM) ? $(`<span class="material-symbols-outlined" style='font-size:12px; margin-right: 5px;'>share</span>`) : '';
 					
-				let chapter_title=$(`<div class='journal-chapter-title' title='${self.chapters[i].title}'/>`);
-				chapter_title.text(self.chapters[i].title);
+				let chapter_title=$(`<div class='journal-chapter-title' title='${currChapter.title}'/>`);
+				chapter_title.text(currChapter.title);
 
 				// If the user clicks the chapter title, expand/collapse the chapter notes
 				chapter_title.click(function(){
 					section_chapter.toggleClass('collapsed');
-					self.chapters[i].collapsed = !self.chapters[i].collapsed;
+					currChapter.collapsed = !currChapter.collapsed;
 					self.persist();
 				});
 				
@@ -780,7 +778,7 @@ class JournalManager{
 								player: false,
 								plain: ""
 							};
-							self.chapters[i].notes.push(new_noteid);
+							currChapter.notes.push(new_noteid);
 							window.MB.sendMessage('custom/myVTT/JournalChapters',{
 								chapters: self.chapters
 							});
@@ -812,6 +810,114 @@ class JournalManager{
 
 					input_add_note.focus();
 				});
+			
+
+				const dropboxOptions = dropBoxOptions(function (links) {
+					for (let j = 0; j < links.length; j++) {
+						const link = links[j].link;
+						const new_note_title = links[j].name;
+						const new_noteid = uuid();
+						self.notes[new_noteid] = {
+							title: new_note_title,
+							text: `<p><span class=\"journal-site-embed\">${link}</span><p>`,
+							player: false,
+							plain: `${link}`
+						};
+						currChapter.notes.push(new_noteid);
+					}
+					self.persist();
+					self.build_journal(searchText);
+				}, true, ['images', 'video', 'audio', 'document', 'text']);
+				const dropboxButton = createCustomDropboxChooser('', dropboxOptions);
+				dropboxButton.addClass('token-row-button');
+				
+
+				const avttFilePickerButton = createCustomAvttChooser('', async function (files) {
+					try {
+						if (!currChapter.id) {
+							currChapter.id = uuid();
+						}
+						
+						const processFilesAndFolders = async (fileList, parentChapterId) => {
+							const createdNoteIds = [];
+							
+							for (let j = 0; j < fileList.length; j++) {
+								const new_note_title = fileList[j].name;
+								
+								if(fileList[j].type == 'FOLDER'){
+									const newFolderID = uuid();
+									const newFolder = {
+										title: new_note_title,
+										collapsed: false,
+										notes: [],
+										parentID: parentChapterId,
+										id: newFolderID
+									};
+									self.chapters.push(newFolder);
+
+									try {
+										const folderContents = await self.avttJournalCollectAssets(fileList[j].path);
+										if(folderContents && folderContents.length > 0) {
+											await processFilesAndFolders(folderContents, newFolderID);
+										}
+									} catch (error) {
+										console.warn('Failed to load folder contents', fileList[j].path, error);
+									}
+									continue;
+								}
+								
+
+								const link = fileList[j].link;
+								const new_noteid = uuid();
+								self.notes[new_noteid] = {
+									title: new_note_title,
+									text: `<p><span class=\"journal-site-embed\">${link}</span><p>`,
+									player: false,
+									plain: `${link}`
+								};
+								createdNoteIds.push(new_noteid);
+							}
+							
+							const parentChapter = self.chapters.find(ch => ch.id === parentChapterId);
+							if(parentChapter) {
+								parentChapter.notes.push(...createdNoteIds);
+							}
+							
+							return createdNoteIds;
+						};
+						
+						await processFilesAndFolders(files, currChapter.id);
+						
+						self.persist();
+						self.build_journal(searchText);
+					} catch (error) {
+						console.error("Failed to import from AVTT File Picker selection", error);
+						alert(error?.message || "Failed to import selection from AVTT. See console for details.");
+					}
+				});
+				avttFilePickerButton.addClass('token-row-button');
+
+				const onedriveButton = createCustomOnedriveChooser('', function (links) {
+					for (let j = 0; j < links.length; j++) {
+						const link = links[j].link;
+						const new_note_title = links[j].name;
+						const new_noteid = uuid();
+						self.notes[new_noteid] = {
+							title: new_note_title,
+							text: `<p><span class=\"journal-site-embed\">${link}</span><p>`,
+							player: false,
+							plain: `${link}`
+						};
+						currChapter.notes.push(new_noteid);
+					}
+					self.persist();
+					self.build_journal(searchText);
+				}, 'multiple', ['files'])
+				onedriveButton.addClass('token-row-button');
+				
+				let addJournalMenu = $(`<div class='addTokenMenu'></div>`)
+				addJournalMenu.append(add_note_btn, dropboxButton, avttFilePickerButton, onedriveButton);
+				
 				let add_fold_btn=$("<button class='token-row-button'><span class='material-icons'>create_new_folder</span></button>");
 				add_fold_btn.click(function(){
 
@@ -864,7 +970,7 @@ class JournalManager{
 							
 							visibility_row.append(visibility_toggle)
 
-							visibility_toggle.prop("checked",(self.chapters[i]?.shareWithPlayer instanceof Array && self.chapters[i]?.shareWithPlayer.includes(`${window.playerUsers[j].userId}`)));
+							visibility_toggle.prop("checked",(currChapter?.shareWithPlayer instanceof Array && currChapter?.shareWithPlayer.includes(`${window.playerUsers[j].userId}`)));
 							
 							visibility_toggle.change(function(){
 								let sharedUsers = toggle_container.find(`input:checked:not([name='allPlayers'])`).toArray().map(d => d.name);
@@ -877,7 +983,7 @@ class JournalManager{
 						}
 					}
 
-					visibility_toggle.prop("checked",self.chapters[i].shareWithPlayer == true);
+					visibility_toggle.prop("checked",currChapter.shareWithPlayer == true);
 						
 					if(visibility_toggle.is(":checked"))
 						toggle_container.find(`input:not([name='allPlayers'])`).prop('disabled', true);
@@ -896,18 +1002,18 @@ class JournalManager{
 				
 				row_chapter_title.append(folderIcon, prependIcon, chapter_title);	
 				if(window.DM) {
-					row_chapter_title.append(add_note_btn, add_fold_btn, share_fold_btn);
+					row_chapter_title.append(addJournalMenu,add_fold_btn, share_fold_btn);
 				}	
 
 				let containsPlayerNotes = false;
-				for(let n=0; n<self.chapters[i].notes.length;n++){
-					let note_id=self.chapters[i].notes[n];
+				for(let n=0; n<currChapter.notes.length;n++){
+					let note_id=currChapter.notes[n];
 					if(self.notes[note_id]?.player == true || (self.notes[note_id]?.player instanceof Array && self.notes[note_id].player?.includes(`${window.myUser}`))){
 						containsPlayerNotes = true;
 						break;
 					} 
 				}
-				const sharedFolder = (self.chapters[i].shareWithPlayer == true || (self.chapters[i].shareWithPlayer instanceof Array && self.chapters[i].shareWithPlayer.includes(`${window.myUser}`)));
+				const sharedFolder = (currChapter.shareWithPlayer == true || (currChapter.shareWithPlayer instanceof Array && currChapter.shareWithPlayer.includes(`${window.myUser}`)));
 				section_chapter.toggleClass('shared-folder', sharedFolder);
 				if(window.DM || containsPlayerNotes || sharedFolder) {
 					section_chapter.append(row_chapter_title);
@@ -918,15 +1024,15 @@ class JournalManager{
 
 				let sharedParentFolder = false;
 
-				if(!self.chapters[i].parentID){
+				if(!currChapter.parentID){
 					chapter_list.append(section_chapter);
 				}
 				else{		
-					let parentFolder = chapter_list.find(`.folder[data-id='${self.chapters[i].parentID}']`);
-					let parentID = self.chapters[i]?.parentID
+					let parentFolder = chapter_list.find(`.folder[data-id='${currChapter.parentID}']`);
+					let parentID = currChapter?.parentID
 					sharedParentFolder = parentFolder.closest('.shared-folder').length>0;
-					if(self.chapters[i].id == self.chapters.filter(d => d.id == parentID)[0].parentID){
-						delete self.chapters[i].parentID
+					if(currChapter.id == self.chapters.filter(d => d.id == parentID)[0].parentID){
+						delete currChapter.parentID
 					}
 					if(parentFolder.length == 0){
 						self.chapters.splice(self.chapters.length-1, 0, self.chapters.splice(i, 1)[0]);
@@ -934,8 +1040,8 @@ class JournalManager{
 						continue;
 					}	
 					let containsPlayerNotes = false;
-					for(let n=0; n<self.chapters[i].notes.length;n++){
-						let note_id=self.chapters[i].notes[n];
+					for(let n=0; n<currChapter.notes.length;n++){
+						let note_id=currChapter.notes[n];
 						if(self.notes[note_id]?.player == true || (self.notes[note_id]?.player instanceof Array && self.notes[note_id]?.player.includes(`${window.myUser}`))){
 							containsPlayerNotes = true;
 						} 
@@ -957,15 +1063,15 @@ class JournalManager{
 				journalPanel.body.append(chapter_list);
 
 
-				for(let n=0; n<self.chapters[i].notes.length;n++){
+				for(let n=0; n<currChapter.notes.length;n++){
 
-					let note_id=self.chapters[i].notes[n];
+					let note_id=currChapter.notes[n];
 					
 					// Check if the note is in relevantNotes - if not, don't render it
 					if(! (note_id in self.notes && note_id in relevantNotes ))
 						continue;
 						
-					if( (! window.DM) && (!sharedParentFolder) && (self.notes[note_id]?.player == false || (self.notes[note_id]?.player instanceof Array && !self.notes[note_id]?.player.includes(`${window.myUser}`))) && !(self.chapters[i]?.shareWithPlayer == true || (self.chapters[i]?.shareWithPlayer instanceof Array && self.chapters[i]?.shareWithPlayer.includes(`${window.myUser}`))))
+					if( (! window.DM) && (!sharedParentFolder) && (self.notes[note_id]?.player == false || (self.notes[note_id]?.player instanceof Array && !self.notes[note_id]?.player.includes(`${window.myUser}`))) && !(currChapter?.shareWithPlayer == true || (currChapter?.shareWithPlayer instanceof Array && currChapter?.shareWithPlayer.includes(`${window.myUser}`))))
 						continue;
 					
 					let prependIcon = (self.notes[note_id].player && window.DM) ? $(`<span class="material-symbols-outlined" style='font-size:12px'>share</span>`) : '';
@@ -1234,18 +1340,18 @@ class JournalManager{
 
 		            let menuItems = {};
 
-		           	let i = window.JOURNAL.chapters.findIndex(d=>d.id==$(element).closest('[data-id]').attr('data-id'))
-							
+					let i = self.chapters.findIndex(d=>d.id==$(element).closest('[data-id]').attr('data-id'))
+					const currChapter = self.chapters[i];
 
 		            menuItems["rename"] = {
 		                name: "Rename",
 		                callback: function(itemKey, opt, originalEvent) {
-		                    let input_chapter_title=$(`<input type='text' class='input-add-chapter' value='${self.chapters[i].title}'>`);
+		                    let input_chapter_title=$(`<input type='text' class='input-add-chapter' value='${currChapter.title}'>`);
 	
 							input_chapter_title.keypress(function(e){
 								
 								if (e.which == 13 && input_chapter_title.val() !== "") {
-									self.chapters[i].title = input_chapter_title.val();
+									currChapter.title = input_chapter_title.val();
 									window.MB.sendMessage('custom/myVTT/JournalChapters',{
 										chapters: self.chapters
 									});
@@ -1299,9 +1405,10 @@ class JournalManager{
 
 
 	                            for(let i = 0; i<self.chapters.length; i++){
-	                                if(self.chapters[i].parentID == chapterId){
-	                                   exportNoteChapters(self.chapters[i].id, chaptertoExport);
-	                                   chaptertoExport.push(self.chapters[i]);
+									const currChapter = self.chapters[i];
+	                                if(currChapter.parentID == chapterId){
+	                                   exportNoteChapters(currChapter.id, chaptertoExport);
+	                                   chaptertoExport.push(currChapter);
 	                                }
 	                            }
 	                        };
@@ -1335,12 +1442,12 @@ class JournalManager{
 	                    callback: function(itemKey, opt, originalEvent) {
                         	if(confirm("Delete this chapter and all the contained notes?")){
                         		
-                        		for(let k=0;k<self.chapters[i].notes.length;k++){
-									let nid=self.chapters[i].notes[k];
+                        		for(let k=0;k<currChapter.notes.length;k++){
+									let nid=currChapter.notes[k];
 									delete self.notes[nid];
 								}
 								
-								self.chapters = self.chapters.filter(d => d.id != self.chapters[i].id)
+								self.chapters = self.chapters.filter(d => d.id != currChapter.id)
 								
 								$(element).closest('.folder').find('.folder').each(function(){
 									let folderId = $(this).attr('data-id');
@@ -1381,8 +1488,9 @@ class JournalManager{
 		            let menuItems = {};
 
 		           	let note_id = $(element).closest('[data-id]').attr('data-id');
-					let i = window.JOURNAL.chapters.findIndex(d=>d.id==$(element).closest('.folder[data-id]').attr('data-id'))
-					let note_index =window.JOURNAL.chapters[i].notes.indexOf(note_id)
+					let i = self.chapters.findIndex(d=>d.id==$(element).closest('.folder[data-id]').attr('data-id'));
+					const currChapter = self.chapters[i];
+					let note_index = currChapter.notes.indexOf(note_id)
 							
 
 		            menuItems["rename"] = {
@@ -1481,7 +1589,7 @@ class JournalManager{
 	                    callback: function(itemKey, opt, originalEvent) {
                         	if(confirm("Delete this note?")){
                         		console.log("deleting note_index"+note_index);
-                        		self.chapters[i].notes.splice(note_index,1);
+                        		currChapter.notes.splice(note_index,1);
                         		delete self.notes[note_id];
                         		self.build_journal(searchText);
                         		self.persist();
@@ -1503,6 +1611,74 @@ class JournalManager{
 		    });
 		}
 	}
+
+	addTrackedInputs(target, id = {noteId: undefined, token: undefined}){
+		let numberFound = target.attr('data-number');
+		const spellName = target.attr('data-spell');
+		const remainingText = target.hasClass('each') ? '' : `${spellName} slots remaining`
+		const {noteId, token} = id;
+
+		const track_ability = function (key, updatedValue) {
+			if(noteId != undefined){
+				if (window.JOURNAL.notes[noteId].abilityTracker === undefined) {
+					window.JOURNAL.notes[noteId].abilityTracker = {};
+				}
+				const asNumber = parseInt(updatedValue);
+				window.JOURNAL.notes[noteId].abilityTracker[key] = asNumber;
+				window.JOURNAL.persist();
+				debounceSendNote(noteId, window.JOURNAL.notes[noteId])
+			}
+			else if(token != undefined){
+				if (token.options.abilityTracker?.[spellName] >= 0) {
+					numberFound = token.options.abilityTracker[spellName]
+				} else {
+					token.track_ability(spellName, numberFound)
+				}
+				
+			}
+		}
+		if (noteId && window.JOURNAL.notes[noteId].abilityTracker?.[spellName] >= 0) {
+			numberFound = window.JOURNAL.notes[noteId].abilityTracker[spellName]
+		}
+		else if(token && token.options.abilityTracker?.[spellName] >= 0){
+			numberFound = token.options.abilityTracker[spellName]
+		}
+		else if(token){
+			token.track_ability(spellName, numberFound)
+		}
+		else {
+			track_ability(spellName, numberFound)
+		}
+		const trackerTarget = token || window.JOURNAL.notes[noteId];
+		const trackFunction = noteId ? track_ability : undefined;
+		let input = createCountTracker(trackerTarget, spellName, numberFound, remainingText, "", trackFunction);
+		const playerDisabled = target.hasClass('player-disabled');
+		if (!window.DM && playerDisabled) {
+			input.prop('disabled', true);
+		}
+		const partyLootTable = target.closest('.party-item-table');
+		if (partyLootTable.length > 0) {
+			if (partyLootTable.hasClass('shop') && numberFound > 0) {
+				target.closest('tr').find('td>.item-quantity-take-input').val(1);
+			}
+			else {
+				target.closest('tr').find('td>.item-quantity-take-input').val(numberFound);
+			}
+		}
+		target.find('p').remove();
+		target.after(input)
+
+		const parentLink = input.closest('a');
+		if (parentLink.length > 0) {
+			parentLink.on('click', function (e) {
+				if (e.target === input[0]) {
+					e.preventDefault();
+					e.stopPropagation();
+				}
+			});
+		};
+	}
+
 	
 	positionNotePins(id, note_text){
 		let pins = $(note_text).find(`.note-pin`);
@@ -1582,99 +1758,72 @@ class JournalManager{
 			$(this).on({
 					'mouseover': function(e){
 						hoverNoteTimer = setTimeout(function () {
-			            	build_and_display_sidebar_flyout(e.clientY, function (flyout) {
+			            	build_and_display_sidebar_flyout(e.clientY, async function (flyout) {
 					            flyout.addClass("prevent-sidebar-modal-close"); // clicking inside the tooltip should not close the sidebar modal that opened it
 					            flyout.addClass('note-flyout');
 					            const tooltipHtml = $(noteHover);
-								window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);	
+								await window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);
 								add_journal_roll_buttons(tooltipHtml);
 								window.JOURNAL.add_journal_tooltip_targets(tooltipHtml);
 								add_stat_block_hover(tooltipHtml);
 								add_aoe_statblock_click(tooltipHtml);
 
-								$(tooltipHtml).find('.add-input').each(function(){
-								    let numberFound = $(this).attr('data-number');
-								    const spellName = $(this).attr('data-spell');
-								    const remainingText = $(this).hasClass('each') ? '' : `${spellName} slots remaining`
-									
-								    const track_ability = function(key, updatedValue){	    	
-										if (window.JOURNAL.notes[noteId].abilityTracker === undefined) {
-											window.JOURNAL.notes[noteId].abilityTracker = {};
-										}
-										const asNumber = parseInt(updatedValue); 
-										window.JOURNAL.notes[noteId].abilityTracker[key] = asNumber;
-										window.JOURNAL.persist();
-										debounceSendNote(noteId, window.JOURNAL.notes[noteId])
-							    	}
-								    if (window.JOURNAL.notes[noteId].abilityTracker?.[spellName]>= 0){
-							    		numberFound = window.JOURNAL.notes[noteId].abilityTracker[spellName]
-							    	} 
-							    	else{
-								    	track_ability(spellName, numberFound)
-								    }
+								$(tooltipHtml).find('.add-input').each(function(){window.JOURNAL.addTrackedInputs($(this), {noteId})})
+								flyout.append(tooltipHtml);
+								let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
+								sendToGamelogButton.css({ "float": "right" });
+								sendToGamelogButton.on("click", function (ce) {
+									ce.stopPropagation();
+									ce.preventDefault();
 
-								    let input = createCountTracker(window.JOURNAL.notes[noteId], spellName, numberFound, remainingText, "", track_ability);
-									const playerDisabled = $(this).hasClass('player-disabled');
-									if (!window.DM && playerDisabled) {
-										input.prop('disabled', true);
-									}
-									const partyLootTable = $(this).closest('.party-item-table');
-									if(partyLootTable.length > 0){
-										if (partyLootTable.hasClass('shop') && numberFound > 0){
-											$(this).closest('tr').find('td>.item-quantity-take-input').val(1);
-										}
-										else{
-											$(this).closest('tr').find('td>.item-quantity-take-input').val(numberFound);
-										}
-									}
-									$(this).find('p').remove();
-								    $(this).after(input)
-							    })
-					            flyout.append(tooltipHtml);
-					            let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
-					            sendToGamelogButton.css({ "float": "right" });
-					            sendToGamelogButton.on("click", function(ce) {
-					                ce.stopPropagation();
-					                ce.preventDefault();
-									
-					                send_html_to_gamelog(noteHover);
-					            });
-					            let flyoutLeft = e.clientX+20
-					            if(flyoutLeft + 400 > window.innerWidth){
-					            	flyoutLeft = window.innerWidth - 420
-					            }
-					            flyout.css({
-					            	left: flyoutLeft,
-					            	width: '400px'
-					            })
+									send_html_to_gamelog(noteHover);
+								});
+								let flyoutLeft = e.clientX + 20
+								if (flyoutLeft + 400 > window.innerWidth) {
+									flyoutLeft = window.innerWidth - 420
+								}
+								flyout.css({
+									left: flyoutLeft,
+									width: '400px'
+								})
+								let flyoutTop = e.clientY;
+								let flyoutHeight = flyout.height() + 25;
+								let bottom = (e.clientY + flyoutHeight);
 
-					            const buttonFooter = $("<div></div>");
-					            buttonFooter.css({
-					                height: "40px",
-					                width: "100%",
-					                position: "relative",
-					                background: "#fff"
-					            });
-					            window.JOURNAL.block_send_to_buttons(flyout);
-					            flyout.append(buttonFooter);
-					            buttonFooter.append(sendToGamelogButton);
-					            flyout.find("a").attr("target","_blank");
-					      		flyout.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function(event){
+								if (bottom > window.innerHeight) {
+									flyoutTop = flyoutTop - (bottom - window.innerHeight) - 25;
+								}
+								flyout.css('top', flyoutTop);
+
+								const buttonFooter = $("<div></div>");
+								buttonFooter.css({
+									height: "40px",
+									width: "100%",
+									position: "relative",
+									background: "#fff"
+								});
+								window.JOURNAL.block_send_to_buttons(flyout);
+								flyout.append(buttonFooter);
+								buttonFooter.append(sendToGamelogButton);
+								flyout.find("a").attr("target", "_blank");
+								flyout.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function (event) {
 									event.preventDefault();
 									render_source_chapter_in_iframe(event.target.href);
 								});
+
+
+								flyout.hover(function (hoverEvent) {
+									if (hoverEvent.type === "mouseenter") {
+										clearTimeout(removeToolTipTimer);
+										removeToolTipTimer = undefined;
+									} else {
+										remove_tooltip(500);
+									}
+								});
+
+								flyout.css("background-color", "#fff");
 								
 
-					            flyout.hover(function (hoverEvent) {
-					                if (hoverEvent.type === "mouseenter") {
-					                    clearTimeout(removeToolTipTimer);
-					                    removeToolTipTimer = undefined;
-					                } else {
-					                    remove_tooltip(500);
-					                }
-					            });
-
-					            flyout.css("background-color", "#fff");
 					        });
 			        	}, 500);		
 					
@@ -1689,12 +1838,19 @@ class JournalManager{
 
 		})
 	}
+	
 	display_note(id, statBlock = false){
 		let self=this;
 		let noteAlreadyOpen = $(`div.note[data-id='${id}']`).length>0;
 		
 		let note= noteAlreadyOpen ? $(`div.note[data-id='${id}']`) : $(`<div class='note' data-id='${id}'></div>`);
-		
+		const note_container = find_or_create_generic_draggable_window(`noteWindow_${id}`, self.notes[id].title, false, true, `div.note[data-id='${id}']`, "860px", "600px", undefined, undefined, false, 'input, button, .note-text', false, true)
+		//to do adjust so these attr/classes are no longer needed - they are hold over from when we used dialog instead of our own draggable window
+		note_container.attr("role", "dialog");
+		note_container.addClass(['ui-dialog', 'ui-corner-all', 'ui-widget', 'ui-widget-content', 'ui-front', 'ui-draggable', 'ui-resizable'])
+		note_container.find('.title_bar').off('dblclick.adjustClasses').on('dblclick.adjustClasses', function (event) {
+			note_container.toggleClass(['ui-dialog', 'ui-corner-all', 'ui-widget', 'ui-widget-content', 'ui-front', 'ui-draggable', 'ui-resizable']);
+		});
 		if(!noteAlreadyOpen){
 			note.attr('title',self.notes[id].title);
 			if(window.DM){
@@ -1778,7 +1934,7 @@ class JournalManager{
 				
 				let edit_btn=$("<button>Edit</button>");
 				edit_btn.click(function(){
-					note.remove();
+					note_container.remove();
 					window.JOURNAL.edit_note(id, statBlock);
 				});
 				
@@ -1788,133 +1944,47 @@ class JournalManager{
 				
 			}
 		}
-		
 		let note_text= noteAlreadyOpen ? note.find('.note-text') : $("<div class='note-text'/>");
 		if(noteAlreadyOpen){
 			note_text.empty();
 		}
 		note_text.append(self.notes[id].text); // valid tags are controlled by tinyMCE.init()
-		
-		this.translateHtmlAndBlocks(note_text, id);	
-		add_journal_roll_buttons(note_text);
-		this.add_journal_tooltip_targets(note_text);
-		this.block_send_to_buttons(note_text);
-		add_stat_block_hover(note_text);
-		add_aoe_statblock_click(note_text);
-		$(note_text).find('.add-input').each(function(){
-		    let numberFound = $(this).attr('data-number');
-		    const spellName = $(this).attr('data-spell');
-		    const remainingText = $(this).hasClass('each') ? '' : `${spellName} slots remaining`
-		    const track_ability = function(key, updatedValue){	    	
-				if (self.notes[id].abilityTracker === undefined) {
-					self.notes[id].abilityTracker = {};
-				}
-				const asNumber = parseInt(updatedValue); 
-				self.notes[id].abilityTracker[key] = asNumber;
-				window.JOURNAL.persist();
-				debounceSendNote(id, self.notes[id])
-	    	}
-		    if (self.notes[id].abilityTracker?.[spellName]>= 0){
-	    		numberFound = self.notes[id].abilityTracker[spellName]
-	    	} 
-	    	else{
-		    	track_ability(spellName, numberFound)
-		    }
+		this.translateHtmlAndBlocks(note_text, id).then(() => {	
+			add_journal_roll_buttons(note_text);
+			this.add_journal_tooltip_targets(note_text);
+			this.block_send_to_buttons(note_text);
+			add_stat_block_hover(note_text);
+			add_aoe_statblock_click(note_text);
+			$(note_text).find('.add-input').each(function(){window.JOURNAL.addTrackedInputs($(this), {noteId: id})})
 
-		    let input = createCountTracker(self.notes[id], spellName, numberFound, remainingText, "", track_ability);
-			const playerDisabled = $(this).hasClass('player-disabled');
-			if (!window.DM && playerDisabled) {
-				input.prop('disabled', true);
+			if (!noteAlreadyOpen) {
+				note.append(note_text);
 			}
-			const partyLootTable = $(this).closest('.party-item-table');
-			if (partyLootTable.hasClass('shop') && numberFound > 0) {
-				$(this).closest('tr').find('td>.item-quantity-take-input').val(1);
-			}
-			else {
-				$(this).closest('tr').find('td>.item-quantity-take-input').val(numberFound);
-			}
-		    $(this).find('p').remove();
-		    $(this).after(input)
-	    })
-
-		if(!noteAlreadyOpen){
-			note.append(note_text);
-		}
-		note.find("a").attr("target","_blank");
-		if(!noteAlreadyOpen){
-			note.dialog({
-				draggable: true,
-				width: 860,
-				height: 600,
-				position:{
-				   my: "center",
-				   at: "center-200",
-				   of: window
-				},
-				close: function( event, ui ) {
-					$(this).remove();
-					}
-				});	
-			$("[role='dialog']").draggable({
-				containment: "#windowContainment",
-				start: function () {
-					$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
-				},
-				stop: function () {
-					$('.iframeResizeCover').remove();			
-				}
-			});
-			$("[role='dialog']").resizable({
-				start: function () {
-					$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
-				},
-				stop: function () {
-					$('.iframeResizeCover').remove();			
-				}
-			});
-
-			note.parent().mousedown(function() {
-				frame_z_index_when_click($(this));
-			});		
-			let btn_popout=$(`<div class="popout-button journal-button"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"></path><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"></path></svg></div>"`);
-			note.parent().append(btn_popout);
-			btn_popout.click(function(){	
-				let uiId = $(this).siblings(".note").attr("id");
-				let journal_text = $(`#${uiId}.note .note-text`)
-				let title = self.notes[id]?.title?.trim() || $("#resizeDragMon .avtt-stat-block-container .mon-stat-block__name-link").text();
-				popoutWindow(title, note, journal_text.width(), journal_text.height());
-				removeFromPopoutWindow(title, ".visibility-container");
-				removeFromPopoutWindow(title, ".ui-resizable-handle");
-				$(window.childWindows[title].document).find("head").append(`<style id='noteStyles'>
-					body div.note[id^="ui-id"]{
-						height: 100% !important;
-					    max-height: 100% !important;
-					    overflow: auto !important;
-					}
-				</stlye>`);
-				if(!window.DM)
-					$(window.childWindows[title].document).find("body").addClass('body-rpgcharacter-sheet');
-				
-				$(this).siblings(".ui-dialog-titlebar").children(".ui-dialog-titlebar-close").click();
-			});
-			note.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function(event){
+			note.find("a").attr("target", "_blank");
+			note_container.append(note);
+			
+			note.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function (event) {
 				event.preventDefault();
 				render_source_chapter_in_iframe(event.target.href);
 			});
-			note.parent().css('height', '600px');
-		}
-		this.positionNotePins(id, note_text);
+		
+			this.positionNotePins(id, note_text);
+		});	
+		
 	}
 	add_journal_tooltip_targets(target){
+		const monsterIds = [];
 		$(target).find('.tooltip-hover').each(function(){
-			let self = this;
-			if($(self).hasClass('note-tooltip')){
-					let noteId = $(self).attr('data-id');
-					if(noteId.replace(/[-+*&<>]/gi, '') == $(self).text().replace(/[-+*&<>\s]/gi, '')){
-						noteId = Object.keys(window.JOURNAL.notes).filter(d=> window.JOURNAL.notes[d]?.title?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')?.includes($(self).text()?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')))[0]
-					}
+			const self = this;
+			const $self = $(self);
+			$self.css('display', 'inline-block');
+			if($self.hasClass('note-tooltip')){
+				let noteId = $self.attr('data-id');
+				if(noteId.replace(/[-+*&<>]/gi, '') == $self.text().replace(/[-+*&<>\s]/gi, '')){
+					noteId = Object.keys(window.JOURNAL.notes).filter(d=> window.JOURNAL.notes[d]?.title?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')?.includes($self.text()?.trim()?.toLowerCase()?.replace(/[-+*&<>\s]/gi, '')))[0]
+				}
 					
-				$(self).off('click.openNote').on('click.openNote', function(event){
+				$self.off('click.openNote').on('click.openNote', function(event){
 					event.preventDefault();
 					event.stopPropagation();
 					if(noteId != undefined)
@@ -1944,64 +2014,74 @@ class JournalManager{
 
 			
 					let hoverNoteTimer;
-					$(self).on({
+					$self.on({
 						'mouseover': function(e){
 							hoverNoteTimer = setTimeout(function () {
-				            	build_and_display_sidebar_flyout(e.clientY, function (flyout) {
+								build_and_display_sidebar_flyout(e.clientY, async function (flyout) {
 						            flyout.addClass("prevent-sidebar-modal-close"); // clicking inside the tooltip should not close the sidebar modal that opened it
 						            flyout.addClass('note-flyout');
-						            $(self).toggleClass('loading-tooltip', false);
+						            $self.toggleClass('loading-tooltip', false);
 						            const tooltipHtml = $(noteHover);
-									window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);	
+									await window.JOURNAL.translateHtmlAndBlocks(tooltipHtml, noteId);
 									add_journal_roll_buttons(tooltipHtml);
 									window.JOURNAL.add_journal_tooltip_targets(tooltipHtml);
 									add_stat_block_hover(tooltipHtml);
 									add_aoe_statblock_click(tooltipHtml);
-						            flyout.append(tooltipHtml);
-						            let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
-						            sendToGamelogButton.css({ "float": "right" });
-						            sendToGamelogButton.on("click", function(ce) {
-						                ce.stopPropagation();
-						                ce.preventDefault();
-										
-						                send_html_to_gamelog(noteHover);
-						            });
-						            let flyoutLeft = e.clientX+20
-						            if(flyoutLeft + 400 > window.innerWidth){
-						            	flyoutLeft = window.innerWidth - 420
-						            }
-						            flyout.css({
-						            	left: flyoutLeft,
-						            	width: '400px'
-						            })
+									flyout.append(tooltipHtml);
+									let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
+									sendToGamelogButton.css({ "float": "right" });
+									sendToGamelogButton.on("click", function (ce) {
+										ce.stopPropagation();
+										ce.preventDefault();
 
-						            const buttonFooter = $("<div></div>");
-						            buttonFooter.css({
-						                height: "40px",
-						                width: "100%",
-						                position: "relative",
-						                background: "#fff"
-						            });
-						            window.JOURNAL.block_send_to_buttons(flyout);
-						            flyout.append(buttonFooter);
-						            buttonFooter.append(sendToGamelogButton);
-						            flyout.find("a").attr("target","_blank");
-						      		flyout.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function(event){
+										send_html_to_gamelog(noteHover);
+									});
+									let flyoutLeft = e.clientX + 20
+									if (flyoutLeft + 400 > window.innerWidth) {
+										flyoutLeft = window.innerWidth - 420
+									}
+									flyout.css({
+										left: flyoutLeft,
+										width: '400px'
+									})
+									let flyoutTop = e.clientY;
+									let flyoutHeight = flyout.height() + 25;
+									let bottom = (e.clientY + flyoutHeight);
+
+									if (bottom > window.innerHeight) {
+										flyoutTop = flyoutTop - (bottom - window.innerHeight) - 25;
+									}
+									flyout.css('top', flyoutTop);
+
+									const buttonFooter = $("<div></div>");
+									buttonFooter.css({
+										height: "40px",
+										width: "100%",
+										position: "relative",
+										background: "#fff"
+									});
+									window.JOURNAL.block_send_to_buttons(flyout);
+									flyout.append(buttonFooter);
+									buttonFooter.append(sendToGamelogButton);
+									flyout.find("a").attr("target", "_blank");
+									flyout.off('click').on('click', '.tooltip-hover[href*="https://www.dndbeyond.com/sources/dnd/"], .int_source_link ', function (event) {
 										event.preventDefault();
 										render_source_chapter_in_iframe(event.target.href);
 									});
-									
 
-						            flyout.hover(function (hoverEvent) {
-						                if (hoverEvent.type === "mouseenter") {
-						                    clearTimeout(removeToolTipTimer);
-						                    removeToolTipTimer = undefined;
-						                } else {
-						                    remove_tooltip(500);
-						                }
-						            });
 
-						            flyout.css("background-color", "#fff");
+									flyout.hover(function (hoverEvent) {
+										if (hoverEvent.type === "mouseenter") {
+											clearTimeout(removeToolTipTimer);
+											removeToolTipTimer = undefined;
+										} else {
+											remove_tooltip(500);
+										}
+									});
+
+									flyout.css("background-color", "#fff");
+										
+
 						        });
 				        	}, 500);		
 						
@@ -2017,22 +2097,123 @@ class JournalManager{
 
 				return;	
 			}
-			
-
-
-			if(!$(self).attr('data-tooltip-href')){
-				
+			const addMonsterButton = function(){
+				if ($self.hasClass('monster-tooltip')) {
+					$self.css('display', 'inline-block')
+					const monsterId = $self.attr('data-tooltip-href').match(/monsters\/(\d+)/i)?.[1];
+					$self.attr('data-monsterid', monsterId);
+					monsterIds.push(monsterId);
+					window.JOURNAL.addTokenDragToMonsterLink(self);
+				}
+			}
+			if(!$self.attr('data-tooltip-href')){
 				if(self.href.match(/\/spells\/[0-9]|\/magic-items\/[0-9]|\/monsters\/[0-9]|\/sources\//gi)){
-					$(self).attr('data-moreinfo', `${self.href}`);
+					$self.attr('data-moreinfo', `${self.href}`);
 				}	
 				window.JOURNAL.getDataTooltip(self.href, function(url, typeClass){
-					$(self).attr('data-tooltip-href', url);
-					$(self).toggleClass(`${typeClass}-tooltip`, true);
-				});
+					$self.attr('data-tooltip-href', url);
+					$self.toggleClass(`${typeClass}-tooltip`, true);
+					addMonsterButton();
+				});	
+			} else{
+				addMonsterButton();
 			}
-		});
-	}
 
+		});
+		if (monsterIds.length>0)
+			fetch_and_cache_monsters(monsterIds);
+	}
+	addTokenDragToMonsterLink(target){
+		const $target = $(target);
+		const monsterId = $target.attr('data-monsterid');
+		if (monsterId) {
+			const defaultSize = window.CURRENT_SCENE_DATA.hpps / 1 / window.ZOOM;
+			const tokenIcon = $(`<span class="material-symbols-outlined" style="user-select: none;display: inline-block;cursor: pointer;font-size: 91%;margin-left: 1px;padding-bottom: 3px;vertical-align: middle;">person_add</span>`)
+			$target.after(tokenIcon);
+			let tokenImgSrc;
+			tokenIcon.off('pointerup.droptoken').on('pointerup.droptoken',function(event){
+				if (window.cached_monster_items[monsterId]){
+					create_and_place_token(window.cached_monster_items[monsterId], event.shiftKey)
+					return;
+				}
+				fetch_and_cache_monsters([monsterId], function () {
+					create_and_place_token(window.cached_monster_items[monsterId], event.shiftKey)
+				});
+			})
+			tokenIcon.draggable({
+				addClasses: false,
+				scroll: true,
+				cursorAt: { left: 0, top: 0 },
+				containment: "#windowContainment",
+				distance: 5,
+				appendTo: 'body',
+				zIndex: 10000000,
+				helper: (event) => {
+					const helper = $(`<img class='draggable-token-creation' style='pointer-events:none;width:${defaultSize}; height:${defaultSize}'; src='${defaultAvatarUrl}'/>`)
+					const setHelper = () => {
+						tokenImgSrc = random_image_for_item(window.cached_monster_items[monsterId]);
+						helper.attr("data-src", tokenImgSrc);
+						if (tokenImgSrc.startsWith('above-bucket-not-a-url')) {
+							getAvttStorageUrl(tokenImgSrc).then((url) => {
+								helper.attr("src", url);
+							})
+						}
+						else {
+							helper.attr("src", tokenImgSrc);
+						}
+						let [helperWidth, helperHeight] = get_helper_size(window.cached_monster_items[monsterId])
+						$(helper).css({
+							'width': `${helperWidth}px`,
+							'height': `${helperHeight}px`
+						});
+					}
+					if (window.cached_monster_items[monsterId]) {
+						setHelper();
+						return helper;
+					}
+					fetch_and_cache_monsters([monsterId], function () {
+						setHelper();
+					});
+					return helper;
+				},
+				start: function (event, ui) {
+					$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));;
+					window.orig_zoom = window.ZOOM;
+				},
+				drag: function (event, ui) {
+					if (event.shiftKey) {	
+						$(ui.helper).css("opacity", 0.5);
+					} else {
+						$(ui.helper).css("opacity", 1);
+					}
+					const setHelperPosition = () => {
+						let [helperWidth, helperHeight] = get_helper_size(window.cached_monster_items[monsterId])
+						ui.position = {
+							left: (ui.position.left - (helperWidth / 2)),
+							top: (ui.position.top - (helperHeight / 2))
+						};
+					}
+					if (window.cached_monster_items[monsterId]) {
+						setHelperPosition();
+						return;
+					}
+				},
+				stop: function (event, ui) {
+					$(".iframeResizeCover").remove();
+					let droppedOn = $(document.elementFromPoint(event.clientX, event.clientY));
+					if (droppedOn.closest('#VTT').length > 0) {
+						if (window.cached_monster_items[monsterId]) {
+							create_and_place_token(window.cached_monster_items[monsterId], event.shiftKey, tokenImgSrc, event.pageX, event.pageY)
+							return;
+						}
+						fetch_and_cache_monsters([monsterId], function () {
+							create_and_place_token(window.cached_monster_items[monsterId], event.shiftKey)
+						});
+					}
+				},
+			})
+		}
+	}
 	async getDataTooltip(url, callback){
 		if(window.spellIdCache == undefined){
 			window.spellIdCache = {};
@@ -2090,7 +2271,7 @@ class JournalManager{
 		const blocks = target.find('img:not(.mon-stat-block__separator-img), .text--quote-box, .rules-text, .block-torn-paper, .read-aloud-text, .dmScreenChunk')
 
 		const sendToGamelogButton = $('<button class="block-send-to-game-log"><span class="material-symbols-outlined">login</span></button>')
-		const container = $(`<div class='note-text' style='position:relative; width:'></div>`)
+
 		
 	
 
@@ -2160,12 +2341,15 @@ class JournalManager{
 		
 		const allDiceRegex = /(\d+)?d(?:100|20|12|10|8|6|4)((?:kh|kl|ro(<|<=|>|>=|=)|min=)\d+)*/g; // ([numbers]d[diceTypes]kh[numbers] or [numbers]d[diceTypes]kl[numbers]) or [numbers]d[diceTypes]
        	
-   		blocks.wrap(function(){
-			if(this instanceof HTMLImageElement){
-				container.css('width', 'fit-content');
+   		blocks.wrap(function(i){
+			const container = $(`<div class='note-text' style='position:relative;max-width: 100%;'></div>`)
+			if(blocks[i] instanceof HTMLImageElement){
+				container.css({
+					'min-width': 'fit-content',
+					'width': 'fit-content'
+				});
 				$(this).attr('href', $(this).attr('src'));
 			}
-
 			return container;
 		});
 		sendToGamelogButton.clone(true, true).insertAfter(blocks);
@@ -2204,8 +2388,139 @@ class JournalManager{
         });
 	}
 
+	/**
+	 * Import files and folders from AVTT file picker into journal
+	 * Recursively processes folders and creates chapters with notes
+	 * @param {Array} files - Array of file/folder objects from AVTT file picker
+	 * @param {string} parentChapterId - Optional parent chapter ID, defaults to current chapter
+	 */
+	importFilesAndFolders = async function (files, parentChapterId = null) {
+		const self = this;
 
+		let targetParentId = parentChapterId;
+		if (!targetParentId) {
+			const importedFilesChapter = {
+				title: 'Imported Files',
+				collapsed: false,
+				notes: [],
+				id: uuid()
+			};
+			self.chapters.push(importedFilesChapter);
+			targetParentId = importedFilesChapter.id;
+		}
 
+		const processFilesAndFolders = async (fileList, parentId) => {
+			const createdNoteIds = [];
+
+			for (let j = 0; j < fileList.length; j++) {
+				const file = fileList[j];
+				const new_note_title = file.name;
+
+				if (file.type === 'FOLDER') {
+					const newFolderID = uuid();
+					const newFolder = {
+						title: new_note_title,
+						collapsed: false,
+						notes: [],
+						parentID: parentId,
+						id: newFolderID
+					};
+					self.chapters.push(newFolder);
+
+					try {
+						const folderContents = await self.avttJournalCollectAssets(file.path);
+						if (folderContents && folderContents.length > 0) {
+							await processFilesAndFolders(folderContents, newFolderID);
+						}
+					} catch (error) {
+						console.warn('Failed to load folder contents', file.path, error);
+					}
+					continue;
+				}
+
+				const link = file.link;
+				const new_noteid = uuid();
+				self.notes[new_noteid] = {
+					title: new_note_title,
+					text: `<p><span class=\"journal-site-embed\">${link}</span><p>`,
+					player: false,
+					plain: `${link}`
+				};
+				createdNoteIds.push(new_noteid);
+			}
+
+			// Add all created note IDs to parent chapter
+			const parentChapter = self.chapters.find(ch => ch.id === parentId);
+			if (parentChapter) {
+				parentChapter.notes.push(...createdNoteIds);
+			}
+
+			return createdNoteIds;
+		};
+
+		await processFilesAndFolders(files, targetParentId);
+
+		self.persist();
+		self.build_journal();
+	}
+	avttJournalCollectAssets = async function (folderRelativePath) {
+		const normalizedBase = avttNormalizeRelativePath(folderRelativePath);
+		if (!normalizedBase) {
+			return [];
+		}
+		const immediateChildren = [];
+		let entries;
+		try {
+			entries = await avttGetFolderListingCached(normalizedBase);
+		} catch (error) {
+			console.warn('Failed to load AVTT journal folder listing', normalizedBase, error);
+			return [];
+		}
+		if (!Array.isArray(entries)) {
+			return [];
+		}
+		for (const entry of entries) {
+			const keyValue = typeof entry === 'string' ? entry : entry?.Key || '';
+			if (!keyValue) {
+				continue;
+			}
+			let relativeKey = keyValue;
+			if (typeof avttExtractRelativeKey === 'function') {
+				relativeKey = avttExtractRelativeKey(keyValue);
+			} else {
+				const prefix = `${window.PATREON_ID}/`;
+				relativeKey = keyValue.startsWith(prefix) ? keyValue.slice(prefix.length) : keyValue;
+			}
+			if (!relativeKey || !relativeKey.startsWith(normalizedBase)) {
+				continue;
+			}
+			const isFolder = relativeKey.endsWith('/');
+			const remainingPath = relativeKey.slice(normalizedBase.length).replace(/^\//, '').replace(/\/+$/, '');
+			if (!remainingPath) {
+				continue;
+			}
+			if (remainingPath.includes('/')) {
+				continue;
+			}
+			const link = `above-bucket-not-a-url/${window.PATREON_ID}/${relativeKey}`;
+			let displayName = "";
+			if (isFolder) {
+				const trimmed = relativeKey.replace(/\/+$/, "");
+				const folderName = trimmed.split("/").filter(Boolean).pop() || trimmed;
+				displayName = decodeURIComponent(folderName);
+			} else {
+				const fileName = relativeKey.split("/").filter(Boolean).pop() || relativeKey;
+				displayName = decodeURIComponent(fileName.replace(/\.[^.]+$/, ""));
+			}
+			immediateChildren.push({
+				link,
+				name: displayName,
+				path: relativeKey,
+				type: (isFolder ? "FOLDER" : "")
+			});
+		}
+		return immediateChildren;
+	}
 	async translateHtmlAndBlocks(target, displayNoteId, isStatBlock=true) {
     	let pastedButtons = target.find('.avtt-roll-button, [data-rolltype="recharge"], .integrated-dice__container, span[data-dicenotation]');
     	target.find('>style:first-of-type, >style#contentStyles').remove();
@@ -2222,7 +2537,9 @@ class JournalManager{
 
 		const trackerSpans = target.find('.note-tracker');
 		for(let i=0; i<trackerSpans.length; i++){
-			$(trackerSpans[i]).replaceWith(`[track]${$(trackerSpans[i]).text()}[/track]`);
+			const currentSpan = $(trackerSpans[i]);
+			const trackText = `[track]${trackerSpans[i].innerHTML}[/track]`
+			currentSpan.html(trackText);
 		}
 		const embededIframes = target.find('iframe');
 		for(let i=0; i<embededIframes.length; i++){
@@ -2355,28 +2672,28 @@ class JournalManager{
             );
             // Search for spell casting section
             const spellcasting = lines.findIndex((l) =>
-                l.match(/Spellcasting([^.]+)?./g)
+                l.match(/(?<!<[^>]+)Spellcasting([^.]+)?./g)
             );
             // If we find the section, loop through the levels
             if (
                 spellcasting >= 0 &&
                 spellcasting < li &&
-                (input.match('At will:') ||
-                    input.match(/Cantrips \(at will\):/gi) ||
-                    input.match(/(\d+\/day( each)?|\d+\w+ level \(\d slots?\))\:/gi))
+                (input.match(/(?<!<[^>]+)At will:/gi) ||
+                    input.match(/(?<!<[^>]+)Cantrips \(at will\):/gi) ||
+                    input.match(/(?<!<[^>]+)(\d+\/day( each)?|\d+\w+ level \(\d slots?\))\:/gi))
             ) {
-            	let eachNumberFound = (input.match(/\d+\/day( each)?/gi)) ? parseInt(input.match(/[0-9]+(?![0-9]?px)/gi)[0]) : undefined;
-            	let slotsNumberFound = (input.match(/\d+\w+ level \(\d slots?\)\:/gi)) ? parseInt(input.match(/[0-9]+/gi)[1]) : undefined;
+            	let eachNumberFound = (input.match(/(?<!<[^>]+)\d+\/day( each)?/gi)) ? parseInt(input.match(/(?<!<[^>]+)[0-9]+(?![0-9]?px)/gi)[0]) : undefined;
+            	let slotsNumberFound = (input.match(/(?<!<[^>]+)\d+\w+ level \(\d slots?\)\:/gi)) ? parseInt(input.match(/(?<!<[^>]+)[0-9]+/gi)[1]) : undefined;
             	let spellLevelFound = (slotsNumberFound) ? input.match(/\d+\w+ level/gi)[0] : undefined;
-                let parts = input.split(/(:\s(?<!(left:\s?|style="[\s\S]+?))|:(?<!(left:\s?|style="[\s\S]+?))<\/strong>(\s)?)/gi);
+                let parts = input.split(/((?<!<[^>]+):\s)/gi);
                 let i = parts.length - 1;
-                parts[i] = parts[i].split(/,\s(?![^(]*\))/gm);
+                parts[i] = parts[i].split(/(?<!<[^>]+),\s(?![^(]*\))/gm);
                 for (let p in parts[i]) {
 
                 	if(parts[i][p].match(/^((\s+?)?(<a|<span))/gi) && $(parts[i][p])?.is('a, span[data-spell]'))
                 		continue;
                 	parts[i][p] = parts[i][p].replace(/<(\/)?em>|<(\/)?b>|<(\/)?strong>/gi, '')
-                	let spellName = (parts[i][p].startsWith('<a')) ? $(parts[i][p]).text() : parts[i][p].replace(/<\/?p[a-zA-z'"0-9\s]+?>/g, '').replace(/\s?\[spell\]\s?|\s?\[\/spell\]\s?/g, '').replace('[/spell]', '').replace(/\s|&nbsp;/g, '');
+                	let spellName = (parts[i][p].match(/^<a|ignore-abovevtt-formating/gi)) ? $(parts[i][p]).text() : parts[i][p].replace(/<\/?p[a-zA-z'"0-9\s]+?>/g, '').replace(/\s?\[spell\]\s?|\s?\[\/spell\]\s?/g, '').replace('[/spell]', '').	replace(/\s|&nbsp;/g, '');
 
                    	if( !(parts[i][p].startsWith('<') || parts[i][p].startsWith('[spell]')) && parts[i][p] && typeof parts[i][p] === 'string') {
                         parts[i][p] = parts[i][p].split('<')[0]
@@ -2469,8 +2786,27 @@ class JournalManager{
                 return `<a class="tooltip-hover source-tooltip" href="${sourceUrl}" aria-haspopup="true" target="_blank">${source}</a>`
             })
 
-            input = input.replace(/\[track\]([a-zA-Z\s]+)([\d]+)\[\/track\]/g, function(m, m1, m2){
-                return `<span>${m1}</span><span class="add-input each" data-number="${m2}" data-spell="${m1}"></span>`
+            input = input.replace(/\[track\](.*?[a-zA-Z\s]+.*?[\d]+.*?)\[\/track\]/g, function(m, m1){
+				const currentSpan = $(`<div>${m1}</div>`);
+				currentSpan.find('a.ignore-abovevtt-formating, .ignore-abovevtt-formating:has(a)').removeClass('ignore-abovevtt-formating');
+				const trackText = currentSpan.text().replace(/([a-zA-Z\s]+)([\d]+)/gi, function(m, m1, m2){
+					return `<span>${m1}</span><span class="add-input each" data-number="${m2}" data-spell="${m1}"></span>`
+				})
+				const children = currentSpan.find('*');
+				if (children.length>0) {
+					currentSpan.contents().each(function () {
+						if (this.nodeType === 3) { // Text node
+							$(this).remove();
+						}
+					});
+					children.last().empty()
+					children.last().append(trackText);
+				}
+				else{
+					currentSpan.empty();
+					currentSpan.append(trackText);
+				}
+				return currentSpan[0].innerHTML;
             })		
  
             input = input.replace(/\&nbsp\;/g, ' ');
@@ -2490,12 +2826,11 @@ class JournalManager{
 		const aboveSrc = $newHTML.find(`[src*='above-bucket']:not([src*='?src=above-bucket']), [href*='above-bucket']`);
 		for (let i = 0; i < aboveSrc.length; i++) {
 			const currTarget = aboveSrc[i];
-			const src = decodeURI(currTarget.src);
-			const href = decodeURI(currTarget.href);
-
+			const src = decodeURI(currTarget.src).replaceAll("’", "'");
+			const href = decodeURI(currTarget.href).replaceAll("’", "'");
 			if (src?.match(/.*?above-bucket-not-a-url\/(.*?)/gi)) {
 				let url = src.replace(/.*?above-bucket-not-a-url\/(.*?)/gi, '$1')
-				url = await getAvttStorageUrl(url);
+				url = await getAvttStorageUrl(url, true);
 				if ($(currTarget).is('source') && $(currTarget).parent().is('video')) {
 					const parentVideo = $(currTarget).parent('video');
 					parentVideo.attr('src', url);
@@ -2509,14 +2844,14 @@ class JournalManager{
 			}
 			else if (href?.match(/.*?above-bucket-not-a-url\/(.*?)/gi)) {
 				let url = href.replace(/.*?above-bucket-not-a-url\/(.*?)/gi, '$1')
-				url = await getAvttStorageUrl(decodeURI(url));
+				url = await getAvttStorageUrl(decodeURI(url), true);
 				$(currTarget).attr('href', url);
 			}
 		}
 
 		const iframes = $newHTML.find('.journal-site-embed')
 		for (let i = 0; i < iframes.length; i++) {
-			let url = $(iframes[i]).text();
+			let url = $(iframes[i]).text().replaceAll("’", "'");
 			if (url?.includes('dropbox.com')) {
 				url = url.replace('dl=0', 'raw=1')
 			}
@@ -2526,9 +2861,9 @@ class JournalManager{
 				url = url.replace("youtube.com", "youtube-nocookie.com");
 				url = url.replace(/watch\?v=(.*)/gi, 'embed/$1');
 			} else if (url?.startsWith('above-bucket-not-a-url')) {
-				url = await getAvttStorageUrl(url);
+				url = await getAvttStorageUrl(url, true);
 			}
-			encodeURI(url);
+			
 			const newFrame = $(`<iframe class='journal-site-embed'
 						src='${window.EXTENSION_PATH}iframe.html?src=${encodeURIComponent(url)}'
 						allowfullscreen
@@ -2538,7 +2873,7 @@ class JournalManager{
 		}
 		const avttIframes = $newHTML.find('iframe[src*="src=above-bucket-not-a-url"]');
 		for (let i = 0; i < avttIframes.length; i++) {
-			const currSrc = avttIframes[i].src;
+			const currSrc = avttIframes[i].src.replaceAll("’", "'");
 			const urlParams = new URLSearchParams(currSrc.split('?')[1]);
 			const origSrc = urlParams.get('src');
 			const src = await getAvttStorageUrl(origSrc, true);
@@ -2547,7 +2882,8 @@ class JournalManager{
 		const avttImages = $newHTML.find('img[data-src*="above-bucket-not-a-url"]')
 
 		for(let i = 0; i < avttImages.length; i++){
-			const src = await getAvttStorageUrl(avttImages[i].getAttribute('data-src'), true);
+			const dataSrc = avttImages[i].getAttribute('data-src').replaceAll("’", "'")
+			const src = await getAvttStorageUrl(dataSrc, true);
 			avttImages[i].src = src;
 			avttImages[i].href = src;
 		}
@@ -2637,7 +2973,7 @@ class JournalManager{
 						const descriptionCell = $(this).find('.item-description-cell');
 						descriptionCell.html(itemData[0].description);
 						if(link.length == 0){
-							const itemLink = $(`<a href=${targetLink?.match(/https.*\/\d*?\-.*?$/i)?.[0]}" class='tooltip-hover no-border ignore-abovevtt-formating'>${itemData[0].name}</a>`);
+							const itemLink = $(`<a href="${targetLink?.match(/https.*\/\d*?\-.*?$/i)?.[0]}" class='tooltip-hover no-border ignore-abovevtt-formating'>${itemData[0].name}</a>`);
 							$(this).find('.item-link-cell').empty().append(itemLink);
 						}
 						
@@ -2728,7 +3064,11 @@ class JournalManager{
 				const name = $(this).closest('tr').find('.item-link-cell a').text();
 				
 				const itemData = find_items_in_cache_by_id_and_name([{id, name}]);
-				
+				if (itemData.length === 0) {
+					console.warn("Item not found", [{id, name}]);
+					return;
+				}
+
 				console.log(`[PartyLoot] Adding ${quantity} of item ${name} to queue`);
 				
 				if (quantity > 10){
@@ -2805,7 +3145,8 @@ class JournalManager{
 		}
 	}
 	edit_note(id, statBlock = false){
-		$(`div.note[data-id='${id}']`)?.dialog("close");
+		$(`.ui-dialog:not(.resize_drag_window) div.note[data-id='${id}']`)?.dialog("close");
+		$(`.resize_drag_window[id="${id}"]`).remove();
 		this.close_all_notes();
 		let self=this;
 		
@@ -2868,9 +3209,7 @@ class JournalManager{
 				$('.iframeResizeCover').remove();			
 			}
 		});
-		note.parent().mousedown(function() {
-			frame_z_index_when_click($(this));
-		});
+		frame_z_index_when_click(note.parent(), true);
 		
 		const debounceNoteSave = mydebounce(function(e, editor){
 		    if(editor.isDirty()){
@@ -2902,7 +3241,7 @@ class JournalManager{
 				 background: url('https://media-waterdeep.cursecdn.com/file-attachments/0/579/stat-block-header-bar.svg') center center no-repeat 
 			}
 			.dm-eyes-only{
-				 border: 1px solid #000;
+				 border: 1px solid var(--border-color, #000);
 				 border-radius: 5px;
 				 background: var(--background-color, #f5f5f5);
 				 padding: 0px 5px;
@@ -2917,7 +3256,7 @@ class JournalManager{
 				 top: -10px;
 				 right: 2px;
 				 float:right;
-				 border:1px #000 solid;
+				 border:1px var(--border-color, #000); solid;
 				 border-radius:5px;
 				 background: var(--background-color, #f5f5f5);
 				 font-weight: bold;
@@ -2947,6 +3286,9 @@ class JournalManager{
 			}
 			.ignore-abovevtt-formating{
 				 border: 2px dotted #b100ff;
+			}
+			.dmScreenChunk{
+				border: 2px dotted #880000;	
 			}
 			.ignore-abovevtt-formating.no-border{
 				border: none;
@@ -3415,7 +3757,7 @@ class JournalManager{
 				 margin-bottom: 0;
 				 padding-top: 0 
 			}
-			.stat-block .monster-header {
+			.monster-header {
 				 padding-top: 4px;
 				 letter-spacing: .35px;
 				 font-weight: 500;
@@ -3425,7 +3767,7 @@ class JournalManager{
 				 border-bottom: 2px solid var(--monster-header-underline,#7a3c2f);
 				 font-variant: small-caps; 
 			}
-			.stat-block .monster-header+p {
+			.monster-header+p {
 				 break-before: avoid 
 			}
 			.stat-block .stats {
@@ -3664,40 +4006,6 @@ class JournalManager{
 			    bottom: -3px
 			}
 			@font-face {
-			    font-family: Scala Sans Offc;
-			    font-style: normal;
-			    font-weight: 700;
-			    src: url(https://media.dndbeyond.com/encounter-builder/static/media/ScalaSansOffc-Bold.048d2d142baf798dc56f.ttf) format("truetype")
-			}
-
-			@font-face {
-			    font-family: Scala Sans Offc;
-			    font-style: normal;
-			    font-weight: 400;
-			    src: url(https://media.dndbeyond.com/encounter-builder/static/media/ScalaSansOffc.0eea070d2279b1a6be23.ttf) format("truetype")
-			}
-
-			@font-face {
-			    font-family: Scala Sans Offc;
-			    font-style: italic;
-			    font-weight: 700;
-			    src: url(https://media.dndbeyond.com/encounter-builder/static/media/ScalaSansOffc-BoldIta.740e4d6d85a09a9cd0a0.ttf) format("truetype")
-			}
-
-			@font-face {
-			    font-family: Scala Sans Offc;
-			    font-style: italic;
-			    font-weight: 400;
-			    src: url(https://media.dndbeyond.com/encounter-builder/static/media/ScalaSansOffc-Ita.86c4513e1c4b869189c2.ttf) format("truetype")
-			}
-
-			@font-face {
-			    font-family: MrsEavesSmallCaps;
-			    font-style: normal;
-			    font-weight: 100;
-			    src: url(https://media.dndbeyond.com/encounter-builder/static/media/MrsEavesSmallCaps.1744d7a566b5a2ccca6c.ttf) format("truetype")
-			}
-			@font-face {
 			  font-family: "Tiamat Condensed SC Regular";
 			  src: url("https://www.dndbeyond.com/fonts/tiamatcondensedsc-regular-webfont.woff2") format("woff2");
 			}
@@ -3784,7 +4092,8 @@ class JournalManager{
 			menubar: false,
 			end_container_on_empty_block: true,
 			style_formats:  [
-				 { title: 'Headers', items: [
+				{ title: 'Headers', items: [
+				  { title: 'Statblock Header', block: 'p', classes: 'monster-header' },
 			      { title: 'h1', block: 'h1' },
 			      { title: 'h2', block: 'h2' },
 			      { title: 'h3', block: 'h3' },
@@ -3800,7 +4109,8 @@ class JournalManager{
 			      { title: 'Stat Block Paper (1 Column)', block: 'div', wrapper: true, classes: 'Basic-Text-Frame stat-block-background one-column-stat' },
 			      { title: 'Stat Block Paper (2 Column)', block: 'div', wrapper: true, classes: 'Basic-Text-Frame stat-block-background' },
 			      { title: 'For DM Eyes Online', block: 'div', wrapper: true, classes: 'dm-eyes-only' },
-			      { title: 'Add Ability Tracker; Format: "Wild Shape 2"', inline: 'span', wrapper:true, classes: 'note-tracker'},
+				  { title: 'DM Screen Chunk - won\'t be auto split into columns when used with the DM Screen', block: 'div', wrapper: true, classes: 'dmScreenChunk' },
+				  { title: 'Add Ability Tracker; Format: "Wild Shape 2"', inline: 'span', wrapper:true, classes: 'note-tracker'},
 			      { title: 'Ignore AboveVTT auto formating', inline: 'span', wrapper: true, classes: 'ignore-abovevtt-formating' },
 			      { title: 'Embed Site in Journal', inline: 'span', wrapper: true, classes: 'journal-site-embed'}
 			    ] },
@@ -4067,7 +4377,7 @@ class JournalManager{
 				},
 			],
 		  	table_grid: false,
-			toolbar: 'undo styleselect template | horizontalrules | bold italic underline strikethrough | alignleft aligncenter alignright justify| outdent indent | bullist numlist | forecolor backcolor | fontsizeselect | link unlink | image media filePickers table tableCustom | code',
+			toolbar: 'undo styleselect template | horizontalrules | bold italic underline strikethrough | alignleft aligncenter alignright justify| outdent indent | bullist numlist | fontsizeinput forecolor backcolor | link unlink | image media filePickers table tableCustom | code',
 			image_class_list: [
 				{title: 'Magnify', value: 'magnify'},
 			],
@@ -4079,7 +4389,59 @@ class JournalManager{
 			   {title: 'DDB Tooltip Link (Spells, Monsters, Magic Items, Source)', value: 'tooltip-hover no-border ignore-abovevtt-formating'}
 			],
 			valid_children : '+body[style]',
+			
 			setup: function (editor) { 
+				editor.addButton('fontsizeinput', {
+					type: 'container',
+					html: '<input type="number" id="mce-custom-font-size" style="width: 40px;height: 16px;text-align:right;padding: 4px 1px;" placeholder="px"> px',
+					onPostRender: function() {
+						let input = document.getElementById('mce-custom-font-size');
+						input.addEventListener('change', function(e) {
+							let size = this.value;
+							if (size) {
+								editor.execCommand('FontSize', false, size + 'px');
+							}
+						});
+						input.addEventListener('keypress', function(e) {
+							if(e.key === 'Enter') {
+								e.preventDefault();
+								this.blur();
+							}
+						});
+					}
+				});
+				editor.on("keydown", function (e) {
+					if (e.which == "13" || e.keyCode == "13") {
+						
+						if(!e.shiftKey){
+							const currentNode = editor.selection.getNode();
+							/* Do no copy elements can be 0 size when pasted from elsewhere and can lead to enter not adding a line. Insert <p> element instead.
+							   We also want to run default behaviour on empty lines so it breaks out of containers.*/
+							const doNotCopyElement = ['DIV', 'BLOCKQUOTE'];
+							const skipInsertP = !doNotCopyElement.includes(currentNode.tagName) || 
+												currentNode.textContent.trim() == ""
+
+							if (skipInsertP)
+								return;
+							e.preventDefault();
+
+							editor.insertContent('<p id="temp_new_p"></p>')
+							
+							
+							setTimeout(() => {
+								let newP = editor.dom.get('temp_new_p');
+								if (newP) {
+									editor.focus();
+									editor.selection.setCursorLocation(newP, 0);
+									editor.dom.setAttrib(newP, 'id', null);
+								}
+							}, 0)
+							
+						}
+						
+					}
+				});
+
 				editor.addButton('horizontalrules', {
 					  type: 'splitbutton',
 				      text: '',
@@ -4287,8 +4649,11 @@ class JournalManager{
 
 					editor.execCommand('setAvttImageSrc', e);
 				});
-
 				editor.on('NodeChange', async function (e) {
+					const currentFontSize = editor.dom.getStyle(e.element, 'font-size', true);
+					if (currentFontSize) {
+						$("#mce-custom-font-size").val(parseInt(currentFontSize));
+					}
 					// When an image is inserted into the editor
 				    if (e.element.tagName === "IMG") { 
 				    	let url = e.element.getAttribute('src');
@@ -4335,6 +4700,13 @@ class JournalManager{
 				self.notes[note_id].plain = tinymce.activeEditor.getContent({ format: 'text' });
 				self.notes[note_id].statBlock = statBlock;
 				self.persist();
+				const dmScreenPageOpen = $('#dmScreenCustomBlock');
+				if(dmScreenPageOpen.length > 0){
+					const openNoteId = dmScreenPageOpen.attr('data-note-id');
+					if(openNoteId == note_id){
+						$(`.dmScreenCustomDropdownItem[data-id='${note_id}']`).trigger('click');
+					}
+				}
 				if(note_id in window.TOKEN_OBJECTS){
 					window.TOKEN_OBJECTS[note_id].place(); // trigger display of the "note" condition
 				}
@@ -4476,8 +4848,34 @@ function render_source_chapter_in_iframe(url) {
 			iframeContents.find("body").css('background', '#f9f9f9 url(../images/background_texture.png) repeat');
 		}
 
-		iframeContents.find("body").append($(`<style id='ddbSourceStyles'>
+		setTimeout(()=>{
+			const monsterIds = [];
+			iframeContents.find('.monster-tooltip').each((i, ele) => {
+				const $target = $(ele);
+				const monsterId = $target.attr('data-tooltip-href').match(/monsters\/(\d+)/i)?.[1];
+				if(monsterId){
+					monsterIds.push(monsterId);
+					const tokenIcon = $(`<span class="material-symbols-outlined" style="user-select: none;display: inline-block;cursor: pointer;font-size: 91%;margin-left: 1px;padding-bottom: 3px;vertical-align: middle;">person_add</span>`)
+					$target.after(tokenIcon);
+					tokenIcon.off('pointerup.droptoken').on('pointerup.droptoken', function (event) {
+						if (window.top.cached_monster_items[monsterId]) {
+							create_and_place_token(window.cached_monster_items[monsterId], event.shiftKey)
+							return;
+						}
+						fetch_and_cache_monsters([monsterId], function () {
+							create_and_place_token(window.top.cached_monster_items[monsterId], event.shiftKey)
+						});
+					})
+				}
+			})
+			if(monsterIds.length >0)
+				fetch_and_cache_monsters(monsterIds);
+		}, 2000)
 
+		iframeContents.find("head").append('<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons"></link>');
+		iframeContents.find("head").append('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />');
+
+		iframeContents.find("body").append($(`<style id='ddbSourceStyles'>
 		body, html body.responsive-enabled{
 			background: var(--theme-page-bg-color,#f9f9f9) !important;
 			background-position: center 0px !important;
@@ -4492,3 +4890,6 @@ function render_source_chapter_in_iframe(url) {
 
 	iframe.attr('src', url);
 }
+
+
+

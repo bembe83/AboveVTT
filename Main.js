@@ -15,75 +15,66 @@ window.onbeforeunload = function(event)
 	}
 };
 
+function getGameLogButton() {
+	let btn = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button, button[class*='-gamelog-button'], div[class*='campaignButtonGroup'][class*='GameLogButton']");
+	if(btn.length === 0){
+		// Fallback SVG selector
+		btn = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]');
+	}
+	return btn;
+}
 
+const DISCORD_LINK_MAP = {
+  'https://cdn.discordapp.com/attachments/1083353621778923581/1110550133134852206/lightbulb.png': 'https://www.googleapis.com/drive/v3/files/1_QnkvmGct2dzeu-pBO9ofT-828pWvCcn?alt=media&key=AIzaSyBcA_C2gXjTueKJY2iPbQbDvkZWrTzvs5I',
+  'https://cdn.discordapp.com/attachments/1083353621778923581/1083353624891105290/star.png': 'https://drive.google.com/uc?id=1F868fVhQnzFALTcnEIXUDeAl3UKZccKA',
+  'https://cdn.discordapp.com/attachments/1083353621778923581/1083353624652038215/skull.png': 'https://drive.google.com/uc?id=1of0nmVMh8rnt9pz6iri9gtq-mCQmgCWA',
+  'https://cdn.discordapp.com/attachments/1083353621778923581/1083353625113399376/mappin.png': 'https://drive.google.com/uc?id=1excaNtaLfn_Hj5EHuH-h8iimpzC36i0M',
+  'https://cdn.discordapp.com/attachments/1083353621778923581/1148091041589756005/flame1.gif': 'https://drive.google.com/uc?id=1eWHXQsHloLuocYOuHnvvd0zymZQMH7sm'
+};
+function update_old_discord_link(link) {
+  return DISCORD_LINK_MAP[link] || link;
+}
 
 /** Parses the given URL for GoogleDrive or Dropbox semantics and returns an updated URL.
  * @param {String} url to parse
  * @return {String} a sanitized and possibly modified url to help with loading maps */
+const GOOGLE_DRIVE_ID_REGEX = /id=([a-zA-Z0-9_-]+)/;
 function parse_img(url) {
-		let retval = url;
-		if (typeof retval !== "string") {
-			console.log("parse_img is converting", url, "to an empty string");
-			retval = "";
-		} else if (retval.trim().startsWith("data:")) {
-			console.warn("parse_img is removing a data url because those are not allowed"); 
-			retval = "";
-		} else if (retval.includes("https://drive.google.com") && !retval.match(/id=([a-zA-Z0-9_-]+)/g)) {
-			const parsed = 'https://drive.google.com/thumbnail?id=' + retval.split('/')[5] +'&sz=w3000';
-			retval = parsed;
-			return retval;		
-		} 
-		else if (retval.startsWith("https://drive.google.com") || (retval.includes("https://drive.usercontent.google.com")) && retval.match(/id=([a-zA-Z0-9_-]+)/g)) {
-			const parsed = 'https://drive.google.com/thumbnail?id=' + retval.matchAll(/id=([a-zA-Z0-9_-]+)/g).next().value[1] +'&sz=w3000';
-			retval = parsed;
-			return retval;		
-		} 
-		else if(retval.startsWith("https://www.googleapis.com/drive/v3/files/")){ // fix due to 1.5/1.6 beta 
-			const fileid = retval.split('files/')[1].split('?')[0];
-			const parsed = 'https://drive.google.com/thumbnail?id=' + fileid +'&sz=w3000';
-			retval = parsed;
-			return retval;
+	if (typeof url !== "string") {
+		console.log("parse_img is converting", url, "to an empty string");
+		return "";
+	}
+	let retval = url.trim();
+	if (retval.startsWith("data:")) {
+		console.warn("parse_img is removing a data url because those are not allowed"); 
+		return "";
+	}
+	if (retval.includes("https://drive.google.com") || retval.includes("https://drive.usercontent.google.com")) {
+		const match = retval.match(GOOGLE_DRIVE_ID_REGEX);
+		if (match) {
+			return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w3000`;
+		} else if (retval.includes("https://drive.google.com")) {
+			// Fallback: split by '/' to get ID
+			return `https://drive.google.com/thumbnail?id=${retval.split('/')[5]}&sz=w3000`;
 		}
-		else if(retval.includes("dropbox.com")){
-			const splitUrl = url.split('dropbox.com');
-			const parsed = `https://dl.dropboxusercontent.com${splitUrl[splitUrl.length-1]}`
-			retval = parsed;
+	} else if (retval.startsWith("https://www.googleapis.com/drive/v3/files/")) {
+		const fileid = retval.split('files/')[1].split('?')[0];
+		return `https://drive.google.com/thumbnail?id=${fileid}&sz=w3000`;
+	} else if (retval.includes("dropbox.com")) {
+		const splitUrl = url.split('dropbox.com');
+		return `https://dl.dropboxusercontent.com${splitUrl[splitUrl.length - 1]}`;
+	} else if (retval.includes("https://1drv.ms/")) {
+		if (retval.split('/')[4].length !== 1) {
+			return `https://api.onedrive.com/v1.0/shares/u!${btoa(url)}/root/content`;
 		}
-		else if(retval.includes("https://1drv.ms/"))
-		{
-			if(retval.split('/')[4].length == 1){
-				retval = retval;
-			}
-			else{
-				retval = "https://api.onedrive.com/v1.0/shares/u!" + btoa(url) + "/root/content";
-			}
-		}
-		if(retval.includes("discordapp.com")){
-			retval = update_old_discord_link(retval)
-		}
-		return retval;	
+		return retval;
+	}
+	if (retval.includes("discordapp.com")) {
+		return update_old_discord_link(retval);
+	}
+
+	return retval;	
 }
-
-function update_old_discord_link(link){
-  if(link == 'https://cdn.discordapp.com/attachments/1083353621778923581/1110550133134852206/lightbulb.png'){
-    link = 'https://www.googleapis.com/drive/v3/files/1_QnkvmGct2dzeu-pBO9ofT-828pWvCcn?alt=media&key=AIzaSyBcA_C2gXjTueKJY2iPbQbDvkZWrTzvs5I'
-  }
-  else if(link == "https://cdn.discordapp.com/attachments/1083353621778923581/1083353624891105290/star.png"){
-   link = 'https://drive.google.com/uc?id=1F868fVhQnzFALTcnEIXUDeAl3UKZccKA';
-  }
-  else if(link == "https://cdn.discordapp.com/attachments/1083353621778923581/1083353624652038215/skull.png"){
-    link = "https://drive.google.com/uc?id=1of0nmVMh8rnt9pz6iri9gtq-mCQmgCWA"
-  }
-  else if(link == "https://cdn.discordapp.com/attachments/1083353621778923581/1083353625113399376/mappin.png"){
-    link = "https://drive.google.com/uc?id=1excaNtaLfn_Hj5EHuH-h8iimpzC36i0M"
-  }
-  else if(link == "https://cdn.discordapp.com/attachments/1083353621778923581/1148091041589756005/flame1.gif"){
-    link = "https://drive.google.com/uc?id=1eWHXQsHloLuocYOuHnvvd0zymZQMH7sm"
-  }
-  return link;
-}
-
-
 
 /**
  * Generates a random integer number between min and max.
@@ -114,9 +105,9 @@ function clamp (number, min, max) {
  * @param {String} url Youtube video URL
  * @returns String | false
  */
+const YT_REGEX = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
 function youtube_parser(url) {
-	let regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
-	let match = url.match(regExp);
+	const match = url.match(YT_REGEX);
 	return (match && match[7].length == 11) ? match[7] : false;
 }
 
@@ -125,8 +116,9 @@ function youtube_parser(url) {
  * @param {string} value any URL
  * @returns boolean
  */
+const URL_VALIDATION_REGEX = /^(?:(?:(?:https?|ftp):)?\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:[/?#]\S*)?$/i;
 function validateUrl(value) {
-  return /^(?:(?:(?:https?|ftp):)?\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:[/?#]\S*)?$/i.test(value);
+  return URL_VALIDATION_REGEX.test(value);
 }
 
 const MAX_ZOOM = 5
@@ -163,8 +155,8 @@ function change_zoom(newZoom, x, y, reset = false) {
 	if($('#projector_zoom_lock.enabled > [class*="is-active"]').length>0 && window.DM)
 		$(window).off('scroll.projectorMode')
 	
-
-
+    if(!window.WIZARDING)
+		draw_svg_grid(); // scale grid so lines are always visible
 	if(reset != true){
 		$(window).scrollLeft(pageX);
 		$(window).scrollTop(pageY);	
@@ -234,10 +226,16 @@ function add_zoom_to_storage() {
 * Sets default values for VTTWRAPPER and black_layer based off zoom.
 */
 function set_default_vttwrapper_size() {
-	$("#VTTWRAPPER").width($("#scene_map").width() * window.CURRENT_SCENE_DATA.scale_factor * window.ZOOM + 1400);
-	$("#VTTWRAPPER").height($("#scene_map").height() * window.CURRENT_SCENE_DATA.scale_factor * window.ZOOM + 1400);
-	$("#black_layer").width(($("#scene_map").width()) * window.CURRENT_SCENE_DATA.scale_factor * window.ZOOM + 2000 + window.VTTMargin );
-	$("#black_layer").height(($("#scene_map").height()) * window.CURRENT_SCENE_DATA.scale_factor * window.ZOOM + 2000 + window.VTTMargin );
+	const vttwrapper = $("#VTTWRAPPER");
+	const scene_map = $("#scene_map");
+	const black_layer = $("#black_layer");
+	const scalezoom = window.CURRENT_SCENE_DATA.scale_factor * window.ZOOM;
+	const w = $("#scene_map").width() * scalezoom;
+	const h = $("#scene_map").height() * scalezoom;
+	vttwrapper.width(w + 1400);
+	vttwrapper.height(h + 1400);
+	black_layer.width(w + 2000 + window.VTTMargin );
+	black_layer.height(h + 2000 + window.VTTMargin );
 }
 
 /**
@@ -304,83 +302,90 @@ function apply_zoom_from_storage() {
 	console.groupEnd()
 }
 
-var zoomBusy = false;
-var zoomQ = [];
-var lastZoom;	  
-//each zoom event [amt, typ, off, x, y] typ = 0(relative) 1(absolute) 2(offset)
-//keep a queue - which can mostly be squashed except for some offset events
-function throttledZoom(amount, typeFlag, zx, zy)  {
-	if(typeFlag === 2) {
-		if(zoomQ.length == 0) {
-			zoomQ = [[1.0,0,amount,zx,zy]];				
-		} else {
-			last = zoomQ[zoomQ.length-1];
-			if(last[1] === 0) {
-				last[2] = amount;
-			} else { //last[1] == 1
-				last[0] += amount;
-			}
-		}
-	} else if(zoomQ.length == 0 || typeFlag === 1) {
-		zoomQ = [[amount,typeFlag, 0, zx, zy]];
-	} else { //relative
-		last = zoomQ[zoomQ.length-1];
-		if(last[2] === 0) { //no offset
-			last[0] = last[0] * amount;
-		} else { //complex case where we need sequence
-			zoomQ.push([amount,typeFlag, 0, zx, zy]);
-		}
-	}
-	if(!zoomBusy) {
-		zoomBusy = true;
-		function applyOrDone() {
-			if(zoomQ.length) { //add all the queue events together based on current zoom
-				let z = window.ZOOM;
-				let zoomX, zoomY;
-				let doit = false;
-				if(zoomQ.length) {
-					while(zoomQ.length) {
-						e = zoomQ.pop(0);
-						z = ((e[1] === 0) ? z * e[0] : e[0]) + e[2];
-						zoomX = e[3];
-						zoomY = e[4];
-					}
-					z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
-					if(z != window.ZOOM) doit = true;
-					zoomQ = [];
+
+//encapsulate
+const throttledZoom = function(){
+	let zoomBusy = false;
+	let zoomQ = [];
+	let lastZoom;
+	function applyOrDone() {
+		if(zoomQ.length) { //add all the queue events together based on current zoom
+			let z = window.ZOOM;
+			let zoomX, zoomY;
+			let doit = false;
+			if(zoomQ.length) {
+				while(zoomQ.length) {
+					let e = zoomQ.shift(); //was: pop(0) -- not a thing
+					z = ((e[1] === 0) ? z * e[0] : e[0]) + e[2];
+					zoomX = e[3];
+					zoomY = e[4];
 				}
-				if(doit && lastZoom && Date.now() - lastZoom < 2) {
-					//throttle by time
-					setTimeout(() => {
-						change_zoom(z, zoomX, zoomY);
-						lastZoom = Date.now();
-						requestAnimationFrame(applyOrDone)
-					}, 1);
-				} else {
-					if(doit) {
-						change_zoom(z, zoomX, zoomY);
-						lastZoom = Date.now();
-					}
-					requestAnimationFrame(applyOrDone);
-				} 
+				z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+				if(z != window.ZOOM) doit = true;
+			}
+			if(doit && lastZoom && Date.now() - lastZoom < 2) {
+				//throttle by time
+				setTimeout(() => {
+					change_zoom(z, zoomX, zoomY);
+					lastZoom = Date.now();
+					requestAnimationFrame(applyOrDone)
+				}, 1);
 			} else {
-				zoomBusy = false;
+				if(doit) {
+					change_zoom(z, zoomX, zoomY);
+					lastZoom = Date.now();
+				}
+				requestAnimationFrame(applyOrDone);
+			} 
+		} else {
+			zoomBusy = false;
+		}
+	}
+
+	//each zoom event [amt, typ, off, x, y] typ = 0(relative) 1(absolute) 2(offset)
+	//keep a queue - which can mostly be squashed except for some offset events
+	function throttledZoom(amount, typeFlag, zx, zy)  {
+		if(typeFlag === 2) {
+			if(zoomQ.length === 0) {
+				zoomQ = [[1.0,0,amount,zx,zy]];				
+			} else {
+				let last = zoomQ[zoomQ.length-1];
+				if(last[1] === 0) {
+					last[2] = amount;
+				} else { //last[1] == 1
+					last[0] += amount;
+				}
+			}
+		} else if(zoomQ.length == 0 || typeFlag === 1) {
+			zoomQ = [[amount,typeFlag, 0, zx, zy]];
+		} else { //relative
+			let last = zoomQ[zoomQ.length-1];
+			if(last[2] === 0) { //no offset
+				last[0] = last[0] * amount;
+			} else { //complex case where we need sequence
+				zoomQ.push([amount,typeFlag, 0, zx, zy]);
 			}
 		}
-		requestAnimationFrame(applyOrDone);
+		if(!zoomBusy) {
+			zoomBusy = true;
+			requestAnimationFrame(applyOrDone);
+		}
 	}
-}
+	return throttledZoom;}();
 
 /**
 * Gets the zoom values that will fit the map to the viewport
 * @return {Number}
 */
 function get_reset_zoom() {
+	const w = $(window);
+	const scene_map = $("#scene_map");
+	const sf = window.CURRENT_SCENE_DATA.scale_factor;
 	const sidebar_open = ($('#hide_rightpanel').hasClass('point-right') && $('.ct-sidebar.ct-sidebar--hidden').length == 0) ? 340 : 0;
-	const wH = $(window).height();
-	const mH = $("#scene_map").height()*window.CURRENT_SCENE_DATA.scale_factor;
-	const wW = $(window).width()-sidebar_open;
-	const mW = $("#scene_map").width()*window.CURRENT_SCENE_DATA.scale_factor;
+	const wH = w.height();
+	const mH = scene_map.height()*sf;
+	const wW = w.width()-sidebar_open;
+	const mW = scene_map.width()*sf;
 
 	console.log(wH, mH, wW, mW);
 	return Math.min((wH / mH), (wW / mW));
@@ -442,10 +447,9 @@ function map_load_error_cb(e) {
 			}
 		}
 	}
-	window.LOADING = false
+	delete window.LOADING;
 	remove_loading_overlay();
 	$('.import-loading-indicator').remove();
-	delete window.LOADING;
 	window.MB.loadNextScene();
 	console.groupEnd();
 }
@@ -632,6 +636,7 @@ async function load_scenemap(url, is_video = false, width = null, height = null,
  * @param {Boolean} dontscroll prevent scrolling
  */
 function set_pointer(data, dontscroll = false) {
+	const w = $(window);
 
 	let marker = $("<div></div>");
 	marker.css({
@@ -661,8 +666,8 @@ function set_pointer(data, dontscroll = false) {
 	// Calculate pageX and pageY and scroll there!
 
 	if(!dontscroll){
-		let pageX = Math.round(data.x * window.ZOOM - ($(window).width() / 2));
-		let pageY = Math.round(data.y * window.ZOOM - ($(window).height() / 2));
+		let pageX = Math.round(data.x * window.ZOOM - (w.width() / 2));
+		let pageY = Math.round(data.y * window.ZOOM - (w.height() / 2));
 		let sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? 340 : 0);
 		$("html,body").animate({
 			scrollTop: pageY + window.VTTMargin,
@@ -745,25 +750,11 @@ function change_sidbar_tab(clickedTab, isCharacterSheetInfo = false) {
 		// This only happens when `is_character_page() == true` and the user clicked the gamelog tab.
 		// This is an important distinction, because we switch to the gamelog tab when the user clicks info on their character sheet that causes details to be displayed instead of the gamelog.
 		// Since the user clicked the tab, we need to show the gamelog instead of any detail info that was previously shown.
-    let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button, button[class*='-gamelog-button']")
-    if(gameLogButton.length == 0){
-      gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
-    }
-    gameLogButton.click()
+		getGameLogButton().click();
 	}
 }
 
-/**
- * Posts a message to the chat when a player connected to the server.
- */
-function report_connection() {
-	let msgdata = {
-			player: window.PLAYER_NAME,
-			img: window.PLAYER_IMG,
-			text: PLAYER_NAME + " has connected to the server!",
-	};
-	window.MB.inject_chat(msgdata);
-}
+
 
 function use_iframes_for_monsters() { // this is just in case we find a bug and need to give users an easy way to fall back to iframes
 	close_sidebar_modal();
@@ -785,21 +776,12 @@ function should_use_iframes_for_monsters() {
 }
 
 async function popout_all_selected_token_stat(){
-	const selectedTokens = window.CURRENTLY_SELECTED_TOKENS;
-	if(!selectedTokens || selectedTokens.length < 1)
-		return;
-	for(let id of selectedTokens){
+	forSelTokensAsync(async (token) => {
 		let container;
-		const token = window.TOKEN_OBJECTS[id];
-		if(token.isPlayer()){
-			continue;
-		}
+		if(token.isPlayer()) return;
 		if (token.options.statBlock) {
-			let customStatBlock = window.JOURNAL.notes[token.options.statBlock].text;
-			let pcURL = $(customStatBlock).find('.custom-pc-sheet.custom-stat').text();
-			if (pcURL) {
-				continue;
-			} 
+			const {customStatBlock, pcURL} = token.getCustomPcUrl();
+			if (pcURL) return;
 			container = await load_monster_stat(undefined, token.options.id, customStatBlock);
 		}
 		else if(token.options.monster){
@@ -824,7 +806,7 @@ async function popout_all_selected_token_stat(){
 			$(".dcm-backdrop").remove();
 		});
 		close_player_monster_stat_block();
-	}
+	});
 }
 function open_selected_token_stat() {
 	const selectedTokens = window.CURRENTLY_SELECTED_TOKENS;
@@ -836,8 +818,7 @@ function open_selected_token_stat() {
 		open_player_sheet(token.options.sheet, undefined, token.options.name);
 	}
 	else if (token.options.statBlock) {
-		let customStatBlock = window.JOURNAL.notes[token.options.statBlock].text;
-		let pcURL = $(customStatBlock).find('.custom-pc-sheet.custom-stat').text();
+		const {customStatBlock, pcURL} = token.getCustomPcUrl();
 		if (pcURL) {
 			open_player_sheet(pcURL, undefined, token.options.name);
 		}
@@ -873,7 +854,9 @@ function load_monster_stat(monsterId, tokenId, customStatBlock=undefined) {
 		return container;
 	}
 	if (should_use_iframes_for_monsters()) {
-		load_monster_stat_iframe(monsterId, tokenId);
+		const container = build_draggable_monster_window(tokenId);
+		container.find('.avtt-stat-block-container').remove();
+		container.append(load_monster_stat_iframe(monsterId, tokenId));
 		return container;
 	}
 	let container = build_draggable_monster_window(tokenId);
@@ -908,39 +891,25 @@ function load_monster_stat_iframe(monsterId, tokenId) {
 		$('#old_monster_block').remove();
 		$("#resizeDragMon").removeClass("hideMon");
 	}
-
-	// create a monster block wrapper element
-	if (! $("#resizeDragMon").length) {
-		const monStatBlockContainer = $(`<div id='resizeDragMon' style="display:none; left:300px"></div>`);
-		$("body").append(monStatBlockContainer)
-		monStatBlockContainer.append(build_combat_tracker_loading_indicator())
-		const loadingIndicator = monStatBlockContainer.find(".sidebar-panel-loading-indicator")
-		loadingIndicator.css("top", "25px")
-		loadingIndicator.css("height", "calc(100% - 25px)")
-		monStatBlockContainer.show("slow")
-		monStatBlockContainer.resize(function(e) {
-			e.stopPropagation();
-		});
-	}
-
-	const iframe = $(`<iframe id=monster_block data-monid=${monsterId}>`);
+	const container = $(`<div class='container avtt-stat-block-container'></div>`)
+	const iframe = $(`<iframe id='monster_block' data-monid='${monsterId}' style='width: 100%; height:100%; position:relative;'>`);
 	iframe.css("display", "none");
 
-	$("#resizeDragMon").append(iframe);
 
 	window.StatHandler.getStat(monsterId, function(stats) {
 		iframe.on("load", function(event) {
+			const contents = $(event.target).contents()
 			console.log('carico mostro');
-			$(event.target).contents().find("body[class*='marketplace']").replaceWith($("<div id='noAccessToContent' style='height: 100%;text-align: center;width: 100%;padding: 10px;font-weight: bold;color: #944;'>You do not have access to this content on DndBeyond.</div>"));
-			$(event.target).contents().find("#mega-menu-target").remove();
-			$(event.target).contents().find(".site-bar").remove();
-			$(event.target).contents().find(".page-header").remove();
-			$(event.target).contents().find(".homebrew-comments").remove();
-			$(event.target).contents().find("header").hide();
-			$(event.target).contents().find("#site-main").css("padding", "0px");
-			$(event.target).contents().find("#footer").remove();
-			const img = $(event.target).contents().find(".detail-content").find(".image");
-			const statblock = $(event.target).contents().find(".mon-stat-block");
+			contents.find("body[class*='marketplace']").replaceWith($("<div id='noAccessToContent' style='height: 100%;text-align: center;width: 100%;padding: 10px;font-weight: bold;color: #944;'>You do not have access to this content on DndBeyond.</div>"));
+			contents.find("#mega-menu-target").remove();
+			contents.find(".site-bar").remove();
+			contents.find(".page-header").remove();
+			contents.find(".homebrew-comments").remove();
+			contents.find("header").hide();
+			contents.find("#site-main").css("padding", "0px");
+			contents.find("#footer").remove();
+			const img = contents.find(".detail-content").find(".image");
+			const statblock = contents.find(".mon-stat-block");
 			if (img.length == 1) {
 				img.insertAfter(statblock);
 				const sendToGamelog = $("<button>Send IMG To Gamelog</button>");
@@ -960,8 +929,8 @@ function load_monster_stat_iframe(monsterId, tokenId) {
 			}
 
 
-			scan_monster($(event.target).contents(), stats, tokenId);
-			$(event.target).contents().find("a").attr("target", "_blank");
+			scan_monster(contents, stats, tokenId);
+			contents.find("a").attr("target", "_blank");
 			$(".sidebar-panel-loading-indicator").hide()
 			$("#monster_block").fadeIn("slow")
 			console.groupEnd()
@@ -1017,77 +986,8 @@ function load_monster_stat_iframe(monsterId, tokenId) {
 			});
 		});
 	});
-
-	/*Set draggable and resizeable on monster sheets for players. Allow dragging and resizing through iFrames by covering them to avoid mouse interaction*/
-	if($("#monster_close_title_button").length==0){
-		const monster_close_title_button=$('<div id="monster_close_title_button"><svg class="" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g transform="rotate(-45 50 50)"><rect></rect></g><g transform="rotate(45 50 50)"><rect></rect></g></svg></div>')
-		$("#resizeDragMon").append(monster_close_title_button);
-		monster_close_title_button.click(function() {
-			close_player_monster_stat_block()
-		});
-	}
-	if($("#resizeDragMon .popout-button").length==0){
-		const monster_popout_button=$('<div class="popout-button"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"/></svg></div>')
-		$("#resizeDragMon").append(monster_popout_button);
-		monster_popout_button.click(function() {
-			let name = $("#resizeDragMon .avtt-stat-block-container .mon-stat-block__name-link").text();
-			popoutWindow(name, $("#resizeDragMon .avtt-stat-block-container"));
-			name = name.replace(/(\r\n|\n|\r)/gm, "").trim();
-			$(window.childWindows[name].document).find(".avtt-roll-button").on("contextmenu", function (contextmenuEvent) {
-				$(window.childWindows[name].document).find("body").append($("div[role='presentation']").clone(true, true));
-				let popoutContext = $(window.childWindows[name].document).find(".dcm-container");
-				let maxLeft = window.childWindows[name].innerWidth - popoutContext.width();
-				let maxTop =  window.childWindows[name].innerHeight - popoutContext.height();
-				if(parseInt(popoutContext.css("left")) > maxLeft){
-					popoutContext.css("left", maxLeft)
-				}
-				if(parseInt(popoutContext.css("top")) > maxTop){
-					popoutContext.css("top", maxTop)
-				}
-				$(window.childWindows[name].document).find("div[role='presentation']").on("click", function (clickEvent) {
-           			 $(window.childWindows[name].document).find("div[role='presentation']").remove();
-        		});
-				$(".dcm-backdrop").remove();
-			});
-			monster_close_title_button.click();
-		});
-	}
-	$("#resizeDragMon").addClass("moveableWindow");
-	if(!$("#resizeDragMon").hasClass("minimized")){
-		$("#resizeDragMon").addClass("restored");
-	}
-	else{
-		$("#resizeDragMon").dblclick();
-	}
-	$("#resizeDragMon").resizable({
-		addClasses: false,
-		handles: "all",
-		containment: "#windowContainment",
-		start: function () {
-			$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
-		},
-		stop: function () {
-			$('.iframeResizeCover').remove();
-		},
-		minWidth: 200,
-		minHeight: 200
-	});
-
-	$("#resizeDragMon").mousedown(function(){
-		frame_z_index_when_click($(this));
-	});
-	$("#resizeDragMon").draggable({
-		addClasses: false,
-		scroll: false,
-		containment: "#windowContainment",
-		start: function () {
-			$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet").append($('<div class="iframeResizeCover"></div>'));
-		},
-		stop: function () {
-			$('.iframeResizeCover').remove();
-		}
-	});
-	minimize_player_monster_window_double_click($("#resizeDragMon"));
+	container.append(iframe);
+	return container;
 }
 
 function build_draggable_monster_window(tokenId) {
@@ -1111,7 +1011,7 @@ function build_draggable_monster_window(tokenId) {
 	/*Set draggable and resizeable on monster sheets for players. Allow dragging and resizing through iFrames by covering them to avoid mouse interaction*/
 	if($("#monster_close_title_button").length==0) {
 		const monster_close_title_button = $('<div id="monster_close_title_button"><svg class="" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g transform="rotate(-45 50 50)"><rect></rect></g><g transform="rotate(45 50 50)"><rect></rect></g></svg></div>');
-		$("#resizeDragMon").append(monster_close_title_button);
+		container.append(monster_close_title_button);
 		monster_close_title_button.click(function() {
 			close_player_monster_stat_block();
 		});
@@ -1119,7 +1019,7 @@ function build_draggable_monster_window(tokenId) {
 	let popoutButton = $("#resizeDragMon .popout-button");
 	if (popoutButton.length==0){
 		popoutButton =$('<div class="popout-button"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"/></svg></div>')
-		$("#resizeDragMon").append(popoutButton);
+		container.append(popoutButton);
 	}
 	popoutButton.off('click.popout').on('click.popout', function() {
 		let name = $("#resizeDragMon .avtt-stat-block-container .mon-stat-block__name-link").text();
@@ -1143,14 +1043,14 @@ function build_draggable_monster_window(tokenId) {
 		});
 		monster_close_title_button.click();
 	});
-	$("#resizeDragMon").addClass("moveableWindow");
-	if(!$("#resizeDragMon").hasClass("minimized")) {
-		$("#resizeDragMon").addClass("restored");
+	container.addClass("moveableWindow");
+	if(!container.hasClass("minimized")) {
+		container.addClass("restored");
 	}
 	else{
-		$("#resizeDragMon").dblclick();
+		container.dblclick();
 	}
-	$("#resizeDragMon").resizable({
+	container.resizable({
 		addClasses: false,
 		handles: "all",
 		containment: "#windowContainment",
@@ -1163,11 +1063,8 @@ function build_draggable_monster_window(tokenId) {
 		minWidth: 200,
 		minHeight: 200
 	});
-
-	$("#resizeDragMon").mousedown(function() {
-		frame_z_index_when_click($(this));
-	});
-	$("#resizeDragMon").draggable({
+	frame_z_index_when_click(container, true);
+	container.draggable({
 		addClasses: false,
 		scroll: false,
 		containment: "#windowContainment",
@@ -1178,7 +1075,7 @@ function build_draggable_monster_window(tokenId) {
 			$('.iframeResizeCover').remove();
 		}
 	});
-	minimize_player_monster_window_double_click($("#resizeDragMon"));
+	minimize_player_monster_window_double_click(container);
 
 	return container;
 }
@@ -1249,11 +1146,7 @@ async function init_controls() {
 	$(".sidebar").css("height", "calc(100vh - 24px)");
 
 	$(".ct-sidebar__inner button[aria-label='Unlocked']").click(); // Click on the padlock icon  // This is safe to call multiple times
-	let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button, button[class*='-gamelog-button']")
- 	if(gameLogButton.length == 0){
-   	gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
- 	}
- 	gameLogButton.click();
+	getGameLogButton().click();
 
 	init_sidebar_tabs();
 	let sidebarControlsParent = is_characters_page() ? $(".ct-sidebar__inner>[class*='styles_controls']") : $(".sidebar__controls");
@@ -1451,12 +1344,7 @@ function init_mouse_zoom() {
 
 
 /**
- * Start sending google analytics heartbeat events.
- */
-
-/**
  * Creates and displays splash screen
- * Also starts Google Analytics heartbeat.
  */
 function init_splash() {
 
@@ -1505,7 +1393,7 @@ function init_splash() {
 	ul.append("<li><a style='font-weight:bold;text-decoration: underline;' target='_blank' href='https://www.patreon.com/AboveVTT'>Patreon</a></li>");
 	cont.append(ul);*/
 	cont.append("");
-	cont.append("<div style='padding-top:10px'>Contributors: <b>SnailDice (Nadav),Stumpy, Palad1N, KuzKuz, Coryphon, Johnno, Hypergig, JoshBrodieNZ, Kudolpf, Koals, Mikedave, Jupi Taru, Limping Ninja, Turtle_stew, Etus12, Cyelis1224, Ellasar, DotterTrotter, Mosrael, Bain, Faardvark, Azmoria, Natemoonlife, Pensan, H2, CollinHerber, Josh-Archer, TachyonicSpace, TheRyanMC, j3f (jeffsenn), MonstraG, Wyrmwood, Drenam1</b></div>");
+	cont.append("<div style='padding-top:10px'>Contributors: <b>SnailDice (Nadav),Stumpy, Palad1N, KuzKuz, Coryphon, Johnno, Hypergig, JoshBrodieNZ, Kudolpf, Koals, Mikedave, Jupi Taru, Limping Ninja, Turtle_stew, Etus12, Cyelis1224, Ellasar, DotterTrotter, Mosrael, Bain, Faardvark, Azmoria, Natemoonlife, Pensan, H2, CollinHerber, Josh-Archer, TachyonicSpace, TheRyanMC, j3f (jeffsenn), MonstraG, Wyrmwood, Drenam1, Lauriel, Disil, WhoctorDo, HeroDragon33, Grimshok, SirWaltonOfSmeg, Jumbalicious79, Valamorde</b></div>");
 
 	cont.append("<br>AboveVTT is an hobby opensource project. It's completely free (like in Free Speech). The resources needed to pay for the infrastructure are kindly donated by the supporters through <a style='font-weight:bold;text-decoration: underline;' target='_blank' href='https://www.patreon.com/AboveVTT'>Patreon</a> , what's left is used to buy wine for cyruzzo");
 
@@ -1529,15 +1417,19 @@ function init_splash() {
 
 	patreons.append(patrons_list);
 	cont.append(patreons);
-	cont.click(function() {
-		$("#splash").remove();
-
-	});
 
 	let closeButton = $(`<button class="ddbeb-modal__close-button qa-modal_close" title="Close Modal" ><svg class="" xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><g transform="rotate(-45 50 50)"><rect x="0" y="45" width="100" height="10"></rect></g><g transform="rotate(45 50 50)"><rect x="0" y="45" width="100" height="10"></rect></g></svg></button>`);
 	cont.append(closeButton);
 
 	$(window.document.body).append(cont);
+	window.addEventListener("pointerdown", close_splash_if_not_link);
+}
+function close_splash_if_not_link(event) {
+	if (!event.target.closest('a')) close_splash();
+}
+function close_splash() {
+	$("#splash").remove();
+	window.removeEventListener("pointerdown", close_splash_if_not_link);
 }
 
 
@@ -1632,12 +1524,17 @@ function minimize_player_window_double_click(titleBar) {
  * Move frames behind each other in the order they were clicked
  * @param {DOMObject} moveableFrame
  */
-function frame_z_index_when_click(moveableFrame){
-
-	if(moveableFrame.css('z-index') != 90000) {
-		moveableFrame.css('z-index', 90000);
-		$(".moveableWindow, [role='dialog']").not(moveableFrame).each(function() {
-			$(this).css('z-index',($(this).css('z-index')-1));
+function frame_z_index_when_click(moveableFrame, install=false){
+	if(install) {
+		moveableFrame.on('pointerdown', (e) => frame_z_index_when_click($(e.currentTarget)));;
+	}
+	const moveableWindows = $(".moveableWindow, [role='dialog']");
+	const someFrameNotSet = moveableWindows.not("[style*='z-index']").length > 0;
+	if (someFrameNotSet || moveableFrame.css('z-index') != 100000 || !moveableFrame.attr('style')?.includes('z-index')) {
+		moveableFrame.css('z-index', 100000);
+		moveableWindows.not(moveableFrame).each(function() {
+			if($(this).css('z-index') > 100000) return;
+			$(this).css('z-index',(Math.min($(this).css('z-index')-1, 99999)));
 		});
 	}
 }
@@ -1732,7 +1629,7 @@ function  init_sheet() {
 	
 	
 		reload_button.click(function() {
-			let iframe = $("#sheet").find("iframe");
+			let iframe = container.find("iframe");
 			let currentSrc = iframe.attr('src');
 			iframe.attr('src', currentSrc);
 		});
@@ -1742,11 +1639,11 @@ function  init_sheet() {
 	
 	
 		/*Set draggable and resizeable on player sheets. Allow dragging and resizing through iFrames by covering them to avoid mouse interaction*/
-		$("#sheet").addClass("moveableWindow");
-		if(!$("#sheet").hasClass("minimized")){
-			$("#sheet").addClass("restored");
+		container.addClass("moveableWindow");
+		if(!container.hasClass("minimized")){
+			container.addClass("restored");
 		}
-		$("#sheet").resizable({
+		container.resizable({
 			addClasses: false,
 			handles: "all",
 			containment: "#windowContainment",
@@ -1759,11 +1656,8 @@ function  init_sheet() {
 			minWidth: 200,
 			minHeight: 200
 		});
-	
-		$("#sheet").mousedown(function(){
-			frame_z_index_when_click($(this));
-		});
-		$("#sheet").draggable({
+		frame_z_index_when_click(container, true);
+		container.draggable({
 			addClasses: false,
 			scroll: false,
 			containment: "#windowContainment",
@@ -1814,47 +1708,10 @@ function open_player_sheet(sheet_url, closeIfOpen = true, playerName = '') {
 	window.MB.sendMessage("custom/myVTT/lock", { player_sheet: sheet_url });
 	iframe.off("load").on("load", function(event) {
 		console.log("fixing up the character sheet");
+		const where = $(event.target)[0].contentDocument;
 
-		let scripts = [
-		    // External Dependencies
-		    { src: "jquery-3.6.0.min.js" },
-		    { src: "jquery.contextMenu.js" },
-		    // AboveVTT Files
-		    { src: "CoreFunctions.js" }, // Make sure CoreFunctions executes first
-		    { src: "DDBApi.js" },
-		    { src: "MonsterDice.js" },
-		    { src: "DiceRoller.js" },
-		    { src: "DiceContextMenu/DiceContextMenu.js" },
-		    { src: "MessageBroker.js" },
-		    { src: "rpg-dice-roller.bundle.min.js" },
-		    // AboveVTT files that execute when loaded
-		    { src: "CharactersPage.js" } // Make sure CharactersPage executes last
-		]
+		window.AVTT_INJECT("char", where);
 
-		// Too many of our scripts depend on each other.
-		// This ensures that they are loaded sequentially to avoid any race conditions.
-		let injectScript = function () {
-		    if (scripts.length === 0) {
-		        return;
-		    }
-		    let nextScript = scripts.shift();
-		    let s = $(event.target)[0].contentDocument.createElement('script');
-		    s.src = `${window.EXTENSION_PATH}${nextScript.src}`;
-		    if (nextScript.type !== undefined) {
-		        s.setAttribute('type', nextScript.type);
-		    }
-		    console.log(`attempting to append ${nextScript.src}`);
-		    s.onload = function() {
-		        console.log(`finished injecting ${nextScript.src}`);
-		        injectScript();
-		    };
-		    ($(event.target)[0].contentDocument.head || $(event.target)[0].contentDocument.documentElement).appendChild(s);
-		}
-		injectScript();
-		
-		
-		$(event.target).contents().find("head").append($(`<link type="text/css" rel="Stylesheet" href="${window.EXTENSION_PATH}DiceContextMenu/DiceContextMenu.css" />`));
-		$(event.target).contents().find("head").append($(`<link type="text/css" rel="Stylesheet" href="${window.EXTENSION_PATH}jquery.contextMenu.css" />`));
 		$(event.target).contents().find("head").append(`
 			<style>
 			button.avtt-roll-button,
@@ -1928,7 +1785,6 @@ function open_player_sheet(sheet_url, closeIfOpen = true, playerName = '') {
 			</style>
 		`);
 		console.log("removing headers");
-		$(event.target).contents().find("body").append(`<div id='extensionpath' data-path='${window.EXTENSION_PATH}'></div>`)
 
 		if (window.JOINTHEDICESTREAM) {
 			joinDiceRoom();
@@ -2004,21 +1860,7 @@ function whenAvailable(name, callback) {
 	}, interval);
 }
 
-/**
- * Notifie about player joining the game.
- */
-function notify_player_join() {
-	if(window.DM)
-		return;
-	const playerdata = {
-		abovevtt_version: window.AVTT_VERSION,
-		player_id: window.PLAYER_ID,
-		pc: read_pc_object_from_character_sheet(window.PLAYER_ID)
-	};
 
-	console.log("Sending playerjoin msg, abovevtt version: " + playerdata.abovevtt_version + ", sheet ID:" + window.PLAYER_ID);
-	whenAvailable('JOURNAL', function(){window.MB.sendMessage("custom/myVTT/playerjoin", playerdata)});
-}
 
 /**
  * Check if all players have the same AboveVTT version.
@@ -2073,15 +1915,10 @@ function init_character_page_sidebar() {
 		}, 1000);
 		return;
 	}
-	let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button, button[class*='-gamelog-button']")
-	if(gameLogButton.length == 0){
-	  gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
-	}
 	// Open the gamelog, and lock it open
-
 	if(window.showPanel == undefined || window.showPanel == true)
-		gameLogButton.click()
-	$(".ct-sidebar__control--unlock").click();
+		getGameLogButton().click()
+	$(".ct-sidebar__control--unlock, [class*='styles_controls'] [aria-label='Unlocked']").click();
 
 	$("#site-main").css({"display": "block", "visibility": "hidden"});
 	$(".dice-rolling-panel").css({"visibility": "visible"});
@@ -2091,7 +1928,7 @@ function init_character_page_sidebar() {
 	});
 
 	$("div.sidebar").parent().css({"display": "block", "visibility": "visible"});
-	$(".ct-sidebar__control--unlock").click();
+	$(".ct-sidebar__control--unlock, [class*='styles_controls'] [aria-label='Unlocked']").click();
 	$("div.sidebar").parent().css({"display": "block", "visibility": "visible"});
 	$(".ct-sidebar__pane-top").hide();
 	$(".ct-sidebar__pane-bottom").hide();
@@ -2160,11 +1997,7 @@ function init_character_page_sidebar() {
  * Any time they do that, we need to react to those changes.
  */
 function monitor_character_sidebar_changes() {
-	let gameLogButton = $("div.ct-character-header__group--game-log.ct-character-header__group--game-log-last, [data-original-title='Game Log'] button, button[class*='-gamelog-button']")
-	 if(gameLogButton.length == 0){
-	   gameLogButton = $(`[d='M243.9 7.7c-12.4-7-27.6-6.9-39.9 .3L19.8 115.6C7.5 122.8 0 135.9 0 150.1V366.6c0 14.5 7.8 27.8 20.5 34.9l184 103c12.1 6.8 26.9 6.8 39.1 0l184-103c12.6-7.1 20.5-20.4 20.5-34.9V146.8c0-14.4-7.7-27.7-20.3-34.8L243.9 7.7zM71.8 140.8L224.2 51.7l152 86.2L223.8 228.2l-152-87.4zM48 182.4l152 87.4V447.1L48 361.9V182.4zM248 447.1V269.7l152-90.1V361.9L248 447.1z']`).closest('[role="button"]'); // this is a fall back to look for the gamelog svg icon and look for it's button.
-	 }
-	gameLogButton.click(function(event) {
+	getGameLogButton().click(function(event) {
 		if (event.originalEvent !== undefined) {
 			// the user actually clicked the button. Make sure we switch tabs
 			$("#switch_gamelog").click();
@@ -2209,131 +2042,161 @@ function init_ui() {
         <link rel="stylesheet" href="/content/1-0-2027-0/js/libs/lightbox2/dist/css/lightbox.min.css">
 	`);
 
-	const background = $("<img id='scene_map'>");
-	background.css("top", "0");
-	background.css("left", "0");
-	background.css("position", "absolute");
+	const background = $("<img id='scene_map' class='TLA'/>");
 	background.css("z-index", "10");
 	
-	const drawOverlayUnderFogDarkness = $("<canvas id='draw_overlay_under_fog_darkness'></canvas>");
-	drawOverlayUnderFogDarkness.css("position", "absolute");
-	drawOverlayUnderFogDarkness.css("top", "0");
-	drawOverlayUnderFogDarkness.css("left", "0");
+	const drawOverlayUnderFogDarkness = $("<canvas id='draw_overlay_under_fog_darkness' class='TLA'></canvas>");
 	drawOverlayUnderFogDarkness.css("z-index", "11");
 
-	const mapItems = $("<div id='map_items'></div>");
-	mapItems.css("top", "0");
-	mapItems.css("left", "0");
-	mapItems.css("position", "absolute");
+	const mapItems = $("<div id='map_items' class='TLA'/>");
 	mapItems.css("z-index", "11");
 
-	const tokenMapItems = $("<div id='token_map_items'></div>")
-	tokenMapItems.css("top", "0");
-	tokenMapItems.css("left", "0");
-	tokenMapItems.css("position", "absolute");
+	const tokenMapItems = $("<div id='token_map_items' class='TLA'/>")
 	tokenMapItems.css("z-index", "12");
+	
+	const mapContainer = $("<div id='scene_map_container' class='TLA'/>");
 
-	const mapContainer = $("<div id='scene_map_container' />");
-	mapContainer.css("top", "0");
-	mapContainer.css("left", "0");
-	mapContainer.css("position", "absolute");
-
-	lightContainer = $("<div id='light_container'/>");
-	lightContainer.css("top", "0");
-	lightContainer.css("left", "0");
+	lightContainer = $("<div id='light_container' class='TLA'/>");
 	lightContainer.css("bottom", "0");
 	lightContainer.css("right", "0");
-	lightContainer.css("position", "absolute");
 
-	const drawOverlay = $("<canvas id='draw_overlay'></canvas>");
-	drawOverlay.css("position", "absolute");
-	drawOverlay.css("top", "0");
-	drawOverlay.css("left", "0");
+	const drawOverlay = $("<canvas id='draw_overlay' class='TLA'/>");
 	drawOverlay.css("z-index", "22");
 
-	const lightOverlay = $("<canvas id='light_overlay'></canvas>");
-	lightOverlay.css("position", "absolute");
-	lightOverlay.css("top", "0");
-	lightOverlay.css("left", "0");
+	const lightOverlay = $("<canvas id='light_overlay' class='TLA'/>");
 	lightOverlay.css("z-index", "9");
 	lightOverlay.css("mix-blend-mode", "lighten");
 
-	const outer_light_container = $("<div id='outer_light_container'></canvas>");
-	outer_light_container.css("position", "absolute");
-	outer_light_container.css("top", "0");
-	outer_light_container.css("left", "0");
+	const outer_light_container = $("<div id='outer_light_container' class='TLA'/>");
 	outer_light_container.css("z-index", "9");
 	outer_light_container.css("width", "100%");
 	outer_light_container.css("height", "100%");
 
 
-	const textDiv = $("<div id='text_div'></div>");
-	textDiv.css("position", "absolute");
-	textDiv.css("top", "0");
-	textDiv.css("left", "0");
-	textDiv.css("z-index", "20");
+	const textDiv = $("<div id='text_div' class='TLA'/>");
+	textDiv.css({ "z-index": "20" });	
 
-	const grid = $("<canvas id='grid_overlay'></canvas>");
-	grid.css("position", "absolute");
-	grid.css("top", "0");
-	grid.css("left", "0");
-	grid.css("z-index", "19");
+	const grid_svg_underlay = $("<div id='grid_svg_underlay' class='grid-svg-tile'/>");
+	grid_svg_underlay.css("z-index", "11");	//over map but under mapdrawing
+	const grid = $("<div id='grid_svg_overlay' class='grid-svg-tile'/>");
+	grid.css("display", "var(--grid-overlay-on)");
+	const grid_svg_overlay_container = $("<div id='grid_svg_overlay_container' class='TLA'/>")
+	grid_svg_overlay_container.css({ 
+		"transform": "scale(var(--scene-scale))", 
+		"transform-origin": "top left",
+		"pointer-events": "none",
+		"z-index": "22"
+	});
 
-	const walls = $("<canvas id='walls_layer'></canvas>");
-	walls.css("position", "absolute");
-	walls.css("top", "0");
-	walls.css("left", "0");
+	grid_svg_overlay_container.append(grid);
+	//change the wizbox styling here
+	const wizbox = $(
+`<svg id="wizbox" class="TLA" style="display: block; width: 100%; height: 100%;" xmlns="http://www.w3.org/2000/svg">
+        <style>
+            .grid-box {
+                fill: none;
+                stroke: #ff0000;
+                stroke-width: min(5px, calc(1px / var(--window-zoom)));
+				stroke-dasharray:5, 5;
+                vector-effect: non-scaling-stroke;
+                transition: fill 0.2s;
+            }
+        </style>
+        <defs>
+            <polygon id="wiz-hex" class="grid-box" 
+                     points="0,-1 0.866,-0.5 0.866,0.5 0,1 -0.866,0.5 -0.866,-0.5" />
+        </defs>
+        <g id="wizbox-grid" visibility="hidden">
+            <path class="grid-box" d="M 0 0 L 0 1 L 1 1 L 1 0 L 0 0 M 0.33 0 L 0.33 1 M 0.67 0 L 0.67 1 M 0 0.33 L 1 0.33 M 0 0.67 L 1 0.67"/>
+        </g>
+        <g id="wizbox-hex" visibility="hidden">
+            <use href="#wiz-hex" x="0" y="0" />
+            <use href="#wiz-hex" transform="translate(0, -1.5) translate(0.866, 0)" /> <use href="#wiz-hex" transform="translate(0.866, 1.5)" />  <use href="#wiz-hex" transform="translate(-0.866, 1.5)" /> <use href="#wiz-hex" transform="translate(-1.732, 0)" />   <use href="#wiz-hex" transform="translate(-0.866, -1.5)" /><use href="#wiz-hex" transform="translate(1.732, 0)" />    </g>
+    </svg>
+`
+	);
+	wizbox.css("z-index", "19");
+
+	//Set up drag box, select box and rotation grabbers
+	const dragSelectBox = $(
+     `<svg id="dragbox" xmlns="http://www.w3.org/2000/svg">
+        <g id="dragbox-region">
+            <g id="dragbox-rect" visibility="hidden"> 
+            <path id="dragbox-rect1" d="M 0 0 L 0 1 M 1 0 L 1 1 M 0 0 L 1 0 M 0 1 L 1 1"  class="drag-box-b"/>
+            <path id="dragbox-rect2" d="M 0 0 L 0 1 M 1 0 L 1 1 M 0 0 L 1 0 M 0 1 L 1 1"  class="drag-box-w"/>
+            </g>
+            <rect id="selbox-rect" class="sel-box" visibility="hidden" x="0" y="0" width="1" height="1" rx="0.01" />
+            <g id="dragbox-inside"  visibility="hidden">
+            <path class="drag-box-b"
+             d="M 0.01 0.01 L 0.01 0.80 M 0.01 0.01 L 0.80 0.01 M 0.99 0.99 L 0.99 0.20 M 0.99 0.99 L 0.20 0.99 "/>
+            <path stroke-dasharray="2" class="drag-box-w"
+             d="M 0.01 0.01 L 0.01 0.80 M 0.01 0.01 L 0.80 0.01 M 0.99 0.99 L 0.99 0.20 M 0.99 0.99 L 0.20 0.99 "/> </g>
+        <g id="rot-grab" class="grabber" visibility="hidden"> <g class="grabber-icon-c">
+            <circle fill="#ced9e080" cx="12.5" cy="12.5" r="12.5" />
+            <path d="M12.5,17.125 c-2.59,0-4.695-2.1-4.695-4.697
+             c0-2.592,2.102-4.695,4.695-4.695 c2.595,0,4.697,2.103,4.697,4.695 C17.197,15.025,15.095,17.125,12.5,17.125z
+             M24.75,12.5 c0,0-6.147-6.637-12.25-6.637 C6.397,5.863,0.25,12.5,0.25,12.5 s6.147,6.635,12.25,6.635
+             c3.26,0,6.53-1.892,8.872-3.655 M12.5,10.127 c-1.27,0-2.3,1.033-2.3,2.302 c0,1.267,1.033,2.302,2.3,2.302
+             c1.27,0,2.302-1.033,2.302-2.302 C14.802,11.16,13.77,10.127,12.5,10.127z" />
+        </g></g>
+		
+        <g id="group-rot-grab" class="grabber" visibility="hidden"> <g class="grabber-icon-r">
+			<circle fill="#ced9e080" cx="12.5" cy="12.5" r="12.5" />
+			<g id="aoeRotateSvg" transform="translate(3,1) scale(2.2)">
+				<polygon points="1.22 8.06 3.17 1.94 7.43 6.74 1.22 8.06" style="fill: #ced9e080; stroke: #000; stroke-miterlimit: 10;"/>
+				<g>
+					<path d="M1.22,8.78c-.06,0-.12,0-.18-.02-.19-.05-.34-.17-.44-.33-.1-.17-.12-.36-.07-.55.08-.32.37-.54.7-.54.06,0,.12,0,.18.02.19.05.34.17.44.33.1.17.12.36.07.55-.08.32-.37.54-.7.54Z" style="fill: #000;"/>
+					<path d="M1.22,7.84s.04,0,.06,0c.12.03.19.15.16.27-.03.11-.13.17-.21.17-.02,0-.04,0-.06,0-.12-.03-.19-.15-.16-.27.03-.11.13-.17.21-.17M1.22,6.84c-.54,0-1.04.36-1.18.91-.17.65.22,1.32.87,1.49.1.03.21.04.31.04.54,0,1.04-.36,1.18-.91.17-.65-.22-1.32-.87-1.49-.1-.03-.21-.04-.31-.04h0Z" style="fill: #000;"/>
+				</g>
+				<g>
+					<path d="M8.6,5.11c-.24-2.24-1.49-3.65-3.73-4.23" style="fill: none; stroke: #000; stroke-linecap: round; stroke-linejoin: round;"/>
+					<polygon points="9.55 4.78 8.63 6.55 7.55 4.87 9.55 4.78" style="fill: #000;"/>
+					<polygon points="5.34 0 3.45 .64 4.96 1.96 5.34 0" style="fill: #000;"/>
+				</g>
+			</g>
+			<g id="groupRotateSvg">
+				<path d="M12.499 14.453 Q11.693 14.453 11.12 13.88 q-0.573-0.574-0.573-1.38
+				Q10.547 11.693 11.121 11.12 q0.574-0.573 1.38-0.573 Q13.307 10.547 13.88 11.121 q0.573 0.574 0.573 1.38
+				Q14.453 13.307 13.879 13.88 q-0.574 0.573-1.38 0.573 Z M12.5 21.875 q-3.906 0-6.641-2.747 T3.125 12.474
+				h1.563 q0 3.255 2.278 5.547 T12.5 20.313 q3.264 0 5.539-2.274 Q20.313 15.765 20.313 12.5 t-2.274-5.539
+				Q15.765 4.688 12.5 4.688 q-1.797 0-3.359 0.794 T6.406 7.63 h2.709 v1.563 H3.698 V3.776 h1.563 v2.76
+				q1.38-1.615 3.261-2.513 T12.5 3.125 q1.953 0 3.659 0.742 t2.969 2.005 q1.263 1.263 2.005 2.969 T21.875 12.5
+				q0 1.953-0.742 3.659 t-2.005 2.969 q-1.263 1.263-2.969 2.005 T12.5 21.875 Z"/>
+			</g>
+        </g></g>
+      </svg>`);
+
+	const walls = $("<canvas id='walls_layer' class='TLA'/>");
 	walls.css("z-index", "19");
 
-	const elev = $("<canvas id='elev_overlay'></canvas>");
-	elev.css("position", "absolute");
-	elev.css("top", "0");
-	elev.css("left", "0");
-	elev.css("z-index", "19");
+	const elev = $("<canvas id='elev_overlay' class='TLA'/>");
+	elev.css("z-index", "23");
 
-	const weather = $("<canvas id='weather_overlay'></canvas>");
-	weather.css("position", "absolute");
-	weather.css("top", "0");
-	weather.css("left", "0");
+	const weather = $("<canvas id='weather_overlay' class='TLA'/>");
 	weather.css("z-index", "55");
 
-	const weatherLight = $("<canvas id='weather_light'></canvas>");
-	weatherLight.css("position", "absolute");
-	weatherLight.css("top", "0");
-	weatherLight.css("left", "0");
+	const weatherLight = $("<canvas id='weather_light' class='TLA'/>");
 	weatherLight.css("z-index", "25");
 
-	const fog = $("<canvas id='fog_overlay'></canvas>");
-	fog.css("top", "0");
-	fog.css("left", "0");
-	fog.css("position", "absolute");
+	const fog = $("<canvas id='fog_overlay' class='TLA'/>");
 	fog.css("z-index", "21");
 
 
-	const rayCasting = $("<canvas id='raycastingCanvas'></canvas>");
-	rayCasting.css({"top": "0", "left": "0", "position": "absolute", "z-index": "22"});
+	const rayCasting = $("<canvas id='raycastingCanvas' class='TLA'/>");
+	rayCasting.css("z-index", "22");
 
 	// this overlay sits above other canvases, but below tempOverlay
 	// when peers stream their rulers, this canvas is where we draw them
-	const peerOverlay = $("<canvas id='peer_overlay'></canvas>");
-	peerOverlay.css("position", "absolute");
-	peerOverlay.css("top", "0");
-	peerOverlay.css("left", "0");
+	const peerOverlay = $("<canvas id='peer_overlay' class='TLA'/>");
 	peerOverlay.css("z-index", "15"); // below fog
 
 	// this overlay sits above all other canvases
 	// we draw to this and then bake the image into the corresponding
 	// canvas, based on the drawing function
-	const tempOverlay = $("<canvas id='temp_overlay'></canvas>");
-	tempOverlay.css("position", "absolute");
-	tempOverlay.css("top", "0");
-	tempOverlay.css("left", "0");
+	const tempOverlay = $("<canvas id='temp_overlay' class='TLA'/>");
 	tempOverlay.css("z-index", "25");
 
-	const darknessLayer = $("<div id='darkness_layer'></div>");
-	darknessLayer.css("position", "absolute");
-	darknessLayer.css("top", "0");
-	darknessLayer.css("left", "0");
+	const darknessLayer = $("<div id='darkness_layer' class='TLA'/>");
 
 	tempOverlay.dblclick(function(e) {
 		if(window.DRAWFUNCTION != 'select')
@@ -2375,34 +2238,33 @@ function init_ui() {
 	window.ZOOM = 1.0;
 
 	
-	const VTT = $(`<div id='VTT' style='position:absolute; top:0px;left:0px;  '/>`);
+	const VTT = $(`<div id='VTT' class="TLA"'/>`);
 
 	//VTT.css("margin-left","200px");
 	//VTT.css("margin-top","200px");
 	//VTT.css("padding-right","400px");
 	//VTT.css("padding-bottom","400px");
 
-	let tokens = $("<div id='tokens'></div>");
-	tokens.css("position", "absolute");
-	tokens.css("top", 0);
-	tokens.css("left", 0);
-
-	VTT.append(tokens);
-
+	VTT.append($("<div id='tokens' class='TLA'/>")); //(40)
 	VTT.append(mapContainer);
 	VTT.append(peerOverlay);
 	VTT.append(drawOverlayUnderFogDarkness);
 	VTT.append(fog);
-	VTT.append(grid);
+	VTT.append(grid_svg_overlay_container);
 	VTT.append(drawOverlay);
 	VTT.append(textDiv);
 	VTT.append(tempOverlay);
+	VTT.append(dragSelectBox);
 	VTT.append(walls);
 	VTT.append(elev);
 	VTT.append(weather);
 	mapItems.append(tokenMapItems);
+	mapItems.append(grid_svg_underlay);
+	
 	mapContainer.append(outer_light_container);
 	mapContainer.append(mapItems);
+	if (window.DM) grid_svg_overlay_container.append(wizbox);
+	
 	mapContainer.append(darknessLayer);
 	outer_light_container.append(rayCasting);
 	outer_light_container.append(lightContainer);
@@ -2412,28 +2274,20 @@ function init_ui() {
 	mapItems.append(background);
 	mapItems.append(drawOverlayUnderFogDarkness);
 
-
-
-	wrapper = $("<div id='VTTWRAPPER'/>");
+	wrapper = $("<div id='VTTWRAPPER' class='TLA'/>");
 	wrapper.css("margin-left", `${window.VTTMargin}px`);
 	wrapper.css("margin-top", `${window.VTTMargin}px`);
 	wrapper.css("paddning-right", "200px");
 	wrapper.css("padding-bottom", "200px");
-	wrapper.css("position", "absolute");
-	wrapper.css("top", "0px");
-	wrapper.css("left", "0px");
 	wrapper.width(window.width);
 	wrapper.height(window.height);
 
 	wrapper.append(VTT);
 	$("body").append(wrapper);
 
-	black_layer = $("<div id='black_layer'/>");
+	black_layer = $("<div id='black_layer' class='TLA'/>");
 	black_layer.width(window.width+window.VTTMargin);
 	black_layer.height(window.height+window.VTTMargin);
-	black_layer.css("position", "absolute");
-	black_layer.css("top", "0px");
-	black_layer.css("left", "0px");
 	black_layer.css("background", "black");
 	black_layer.css("opacity", "0");
 	$("body").append(black_layer);
@@ -2446,7 +2300,6 @@ function init_ui() {
 
 	init_controls();
 	init_sheet();
-	init_my_dice_details();
 	
 	window.WaypointManager = new WaypointManagerClass();
 
@@ -2462,9 +2315,9 @@ function init_ui() {
 	init_combat_tracker();
 
 	token_menu();
-	
+	install_grabbers(); //do it once instead of every time
 
-	// EXPERRIMENTAL DRAG TO MOVE
+	// EXPERIMENTAL DRAG TO MOVE
 	let  curDown = false,
 		curYPos = 0,
 		curXPos = 0;
@@ -2517,9 +2370,6 @@ function init_ui() {
 		curDown = false;
 		$("#VTT, #black_layer").css("cursor", "");
 
-		if (event.target.tagName.toLowerCase() !== 'a') {
-			$("#splash").remove(); // don't remove the splash screen if clicking an anchor tag otherwise the browser won't follow the link
-		}
 		if (sidebar_modal_is_open() && event.which === 1 && !window.MODALDOWN) {
 			// check if the click was within the modal or within an element that we specifically don't want to close the modal
 			let modal = event.target.closest(".sidebar-modal");
@@ -2596,7 +2446,7 @@ function init_buttons() {
 	let buttons = $(`<div class="ddbc-tab-options--layout-pill"></div>`);
 	$("body").append(buttons);
 
-	buttons.append($("<button style='display:inline; width:75px;' id='select-button' class='drawbutton hideable ddbc-tab-options__header-heading' data-shape='rect' data-function='select'><u>S</u>ELECT</button>"));
+	buttons.append($("<button style='display:inline; width:75px;' id='select-button' data-name='Select (S)' class='drawbutton hasTooltip hideable ddbc-tab-options__header-heading' data-shape='rect' data-function='select'><spam class='button-text'><u>S</u>ELECT</span></button>"));
 
 	init_ruler_menu(buttons);
 	
@@ -2615,7 +2465,7 @@ function init_buttons() {
 	setup_aoe_button(buttons);
 	handle_drawing_button_click();
 
-	buttons.append("<button style='display:inline;width:75px' id='help_button' class='hideable ddbc-tab-options__header-heading'>HELP</button>");
+	buttons.append("<button style='display:inline;width:75px' id='help_button' data-name='Help' class='drawbutton hideable hasTooltip ddbc-tab-options__header-heading'>HELP</button>");
 
 	buttons.css("position", "fixed");
 	buttons.css("top", '5px');
@@ -2692,16 +2542,13 @@ function init_zoom_buttons() {
 			const iconWrapper = $(event.currentTarget).find(".ddbc-tab-options__header-heading");
 			if (iconWrapper.hasClass('ddbc-tab-options__header-heading--is-active')) {
 				iconWrapper.removeClass('ddbc-tab-options__header-heading--is-active');
-				window.ProjectorEnabled = false;
 			} else {
 				iconWrapper.addClass('ddbc-tab-options__header-heading--is-active');
-				window.ProjectorEnabled = false;
 			}
 		});
 		projector_toggle.append(`<div class="ddbc-tab-options__header-heading"><span style="font-size: 20px;" class="material-symbols-outlined">cast</span></div>`);
 		if(defaultValues.projectorMode != undefined){
-			projector_toggle.find('.ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', defaultValues.projectorMode) 
-			window.ProjectorEnabled = defaultValues.projectorMode;
+			projector_toggle.find('.ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', defaultValues.projectorMode)
 		}
 				
 		const projector_zoom_lock = $(`<div id='projector_zoom_lock' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Quick toggle projector zoom lock'></div>`);
@@ -2779,7 +2626,7 @@ function init_zoom_buttons() {
 
 		let select_locked = $(`<div id='select_locked' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Toggle Locked Tokens Selectable'> 
 		<div class="ddbc-tab-options__header-heading ddbc-tab-options__header-heading--is-active">
-				<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="20px" height="20px" x="0px" y="0px"
+				<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="20px" height="20px" x="0px" y="0px"
 		 viewBox="0 0 24 24" style="enable-background:new 0 0 24 24;" xml:space="preserve">
 			<style type="text/css">
 				#select_locked .st0{fill:none;}
@@ -2986,14 +2833,78 @@ function init_zoom_buttons() {
 			window.SelectedTokenVision = true;
 		}
 		redraw_light();	
-    if(window.DM && !window.SelectedTokenVision)
-      do_check_token_visibility();
+		if(window.DM && !window.SelectedTokenVision)
+			do_check_token_visibility();
 	});
 	if(defaultValues.selectedTokenVision != undefined){
 		selected_token_vision.find('.ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active', defaultValues.selectedTokenVision); 
 		window.SelectedTokenVision = defaultValues.selectedTokenVision;
 	}
 	zoom_section.append(selected_token_vision);
+
+	if(is_spectator_page()){
+		const lockView = $(`<div id='lock_view_button' class='ddbc-tab-options--layout-pill hideable'><div class='ddbc-tab-options__header-heading hasTooltip button-icon' data-name='Lock View (Shift+K)'><span class='material-symbols-outlined md-16 button-icon'>visibility_lock</span></div></div>`);
+		zoom_section.append(lockView);
+		const resetPos = mydebounce(() => {
+			change_zoom(window.lockViewPos.zoom);
+			window.scrollTo({top: window.lockViewPos.scrollY, left: window.lockViewPos.scrollX, behavior: "smooth"});		
+		}, 2000)
+		lockView.off('pointerdown.lockView').on('pointerdown.lockView', (e) =>{
+			const button = $(e.currentTarget);
+			const enabled = button.find('.ddbc-tab-options__header-heading').hasClass('ddbc-tab-options__header-heading--is-active')
+			button.find('.ddbc-tab-options__header-heading').toggleClass('ddbc-tab-options__header-heading--is-active')
+			
+			if(!enabled){
+				window.lockViewPos = {
+					scrollX: window.scrollX,
+					scrollY: window.scrollY,
+					zoom: window.ZOOM
+				}
+				$(window).off('scroll.resetToLockedPos').on('scroll.resetToLockedPos', resetPos);
+				return;
+			}
+			
+			delete window.lockViewPos;
+			$(window).off('scroll.resetToLockedPos')
+		})
+	}
+	const gridZoomConversion = $(`<div id='grid_zoom_conversion' class='ddbc-tab-options--layout-pill hideable'><div class='ddbc-tab-options__header-heading hasTooltip button-icon' data-name='Set grid visual size to match stored size'><svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24.73 24.74">
+  <g>
+    <path d="M1.5,8.5c.15,0-1.39,0-1.24,0h.72" style="fill: none; stroke: var(--font-color, #231f20); stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
+    <line x1="3.67" y1="8.5" x2="21.14" y2="8.5" style="fill: none; stroke: var(--font-color, #231f20); stroke-dasharray: 3.58 2.69; stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
+    <line x1="22.48" y1="8.5" x2="24.48" y2="8.5" style="fill: none; stroke: var(--font-color, #231f20); stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
+  </g>
+  <g>
+    <path d="M8.32.86c0,.15,0-.75,0-.6v1.34" style="fill: none; stroke: var(--font-color, #231f20); stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
+    <line x1="8.32" y1="4.22" x2="8.32" y2="21.19" style="fill: none; stroke: var(--font-color, #231f20); stroke-dasharray: 3.48 2.61; stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
+    <line x1="8.32" y1="22.49" x2="8.32" y2="24.49" style="fill: none; stroke: var(--font-color, #231f20); stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
+  </g>
+  <g>
+    <line x1=".26" y1="16.68" x2="2.26" y2="16.68" style="fill: none; stroke: var(--font-color, #231f20); stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
+    <line x1="4.79" y1="16.68" x2="21.22" y2="16.68" style="fill: none; stroke: var(--font-color, #231f20); stroke-dasharray: 3.37 2.53; stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
+    <line x1="22.48" y1="16.68" x2="24.48" y2="16.68" style="fill: none; stroke: var(--font-color, #231f20); stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
+  </g>
+  <g>
+    <line x1="16.31" y1=".27" x2="16.31" y2="2.27" style="fill: none; stroke: var(--font-color, #231f20); stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
+    <line x1="16.31" y1="4.8" x2="16.31" y2="21.23" style="fill: none; stroke: var(--font-color, #231f20); stroke-dasharray: 3.37 2.53; stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
+    <line x1="16.31" y1="22.49" x2="16.31" y2="24.49" style="fill: none; stroke: var(--font-color, #231f20); stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
+  </g>
+  <g>
+    <line x1="5.07" y1="19.83" x2="1.13" y2="23.78" style="fill: none; stroke: var(--font-color, #231f20); stroke-miterlimit: 10;"/>
+    <polygon points="1.34 21.17 1.34 23.57 3.74 23.57 2.72 24.58 .32 24.58 .32 22.19 1.34 21.17" style="fill: var(--font-color, #231f20);"/>
+  </g>
+  <g>
+    <line x1="19.18" y1="5.42" x2="23.19" y2="1.41" style="fill: none; stroke: var(--font-color, #231f20); stroke-miterlimit: 10;"/>
+    <polygon points="22.98 4.02 22.98 1.62 20.58 1.62 21.6 .6 24 .6 24 3 22.98 4.02" style="fill: var(--font-color, #231f20);"/>
+  </g>
+</svg></div></div>`);
+	zoom_section.append(gridZoomConversion);
+	gridZoomConversion.off('pointerdown.gridZoom').on('pointerdown.gridZoom', (e) =>{
+		if(window.EXPERIMENTAL_SETTINGS?.gridZoomConversion){
+			const zoom = window.EXPERIMENTAL_SETTINGS?.gridZoomConversion; 
+			change_zoom(zoom / parseFloat(window.CURRENT_SCENE_DATA.hpps));
+		}
+	})
 
 
 	let zoom_center = $("<div id='zoom_fit' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='fit screen (0)'><div class='ddbc-tab-options__header-heading'><span class='material-icons button-icon'>fit_screen</span></div></div>");
@@ -3073,7 +2984,7 @@ function init_help_menu() {
 			<div id="help-menu">
 				<div class="help-tabs">
 					<ul>
-						<li class="active"><a href="#tab1"> Keyboard shortcuts</a></li>
+						<li class="active"><a href="#tab1">Keyboard/Mouse shortcuts</a></li>
 						<li><a href="#tab19" class='popout' data-href="https://github.com/cyruzzo/AboveVTT/wiki" data-name='AboveVTT Wiki'>Wiki <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"></path><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H5c-1.11 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"></path></svg></a></li>
 						<li><a href="#tab2">FAQ</a></li>
 						<li><a href="#tab3">Scene Creation</a></li>
@@ -3095,7 +3006,7 @@ function init_help_menu() {
 
 				<section class="tabs-content">
 					<div id="tab1">
-						<h3>Keyboard Shortcuts</h3>
+						<h3>Keyboard/Mouse Shortcuts</h3>
 						<dl>
 							<dt>SPACE</dt>
 							<dd>Show/hide character sheet (players only)</dd>
@@ -3111,6 +3022,10 @@ function init_help_menu() {
 						<dl>
 							<dt>Q</dt>
 							<dd>Show/hide sidebar</dd>
+						</dl>
+						<dl>
+							<dt>${getShiftKeyName()}+G</dt>
+							<dd>Show/hide high visibility grid</dd>
 						</dl>
 						<dl>
 							<dt>ESC</dt>
@@ -3157,12 +3072,38 @@ function init_help_menu() {
 							<dd>Prev creature in combat</dd>
 						</dl>
 						<dl>
-							<dt>- / ${getCtrlKeyName()}+Mouse Wheel Down</dt>
+							<dt>Double Click on Scene/Token</dt>
+							<dd>Ping/highlight location or token to all players. The DM has a quick toggle (right side) for centering player views on scene ping.</dd>
+						</dl>
+						<dl>
+							<dt>-</dt> <dt>${getCtrlKeyName()}+Mouse Wheel Down</dt>
 							<dd>Zoom out</dd>
 						</dl>
 						<dl>
-							<dt>= / + / ${getCtrlKeyName()}+Mouse Wheel Up</dt>
+							<dt>=</dt> <dt>+</dt> <dt>${getCtrlKeyName()}+Mouse Wheel Up</dt>
 							<dd>Zoom in</dd>
+						</dl>
+						<dl>
+							<dt>Arrow Keys</dt> 
+							<dd>Move selected tokens in direction of arrow key</dd>
+						</dl>
+						<dl>
+							<dt>Shift+Arrow Keys</dt> 
+							<dd>Rotate selected tokens to face in direction of arrow key</dd>
+						</dl>
+						<dl>
+							<dt>[</dt>&nbsp;<dt>]</dt>&nbsp;<dt>${getShiftKeyName()}+[</dt>&nbsp;<dt>${getShiftKeyName()}+]</dt> 
+							<dd>Rotate selected tokens as a group. Shift rotates in smaller increments</dd>
+						</dl>
+						<dl>
+							<dt>|</dt> <dt>${getShiftKeyName()}+\\</dt>
+							<dd>Flip selected tokens images</dd>
+						</dl>
+						<dl>
+							<dt>'</dt><dd>Move selected tokens to top of stack</dd>
+						</dl>
+						<dl>
+							<dt>/</dt><dd>Move selected tokens to bottom of stack</dd>
 						</dl>
 						<dl>
 							<dt>1-9</dt>
@@ -3176,12 +3117,20 @@ function init_help_menu() {
 							<dd>Subtract from Roll Mod</dd>
 						</dl>
 						<dl>
-							<dt>= / + (with Dice Pool or Mod adjuster visibile)</dt>
+							<dt>=</dt> / <dt>+</dt> (with Dice Pool or Mod adjuster visibile)</dt>
 							<dd>Add to Roll Mod</dd>
 						</dl>
 						<dl>
 							<dt>Enter</dt>
 							<dd>Roll added dice pool</dd>
+						</dl>
+						<dl>
+							<dt>F1 through F4</dt>
+							<dd>Load saved location and zoom</dd>
+						</dl>
+						<dl>
+							<dt>Shift+F1 through Shift+F4</dt>
+							<dd>Save current location and zoom</dd>
 						</dl>
 						<dl>
 							<dt>${getModKeyName()} (held)</dt>
@@ -3256,8 +3205,12 @@ function init_help_menu() {
 							<dd>Force recenter camera and instant teleport token for those receiving the message. (Always does this for those clicking the portal)</dd>
 						</dl>
 						<dl>
-							<dt>${getModKeyName()}+A while edit wall points tool is selected</dt>
-							<dd>Select all wall points</dd>
+							<dt>${getModKeyName()}+A with Select tool</dt>
+							<dd>Selects all tokens</dd>
+						</dl>
+						<dl>
+							<dt>${getModKeyName()}+A with Walls tool : edit points</dt>
+							<dd>Selects all wall points</dd>
 						</dl>
 						<dl>
 							<dt>Hold ${getShiftKeyName()} while selecting wall points with edit point tool</dt>
@@ -3267,6 +3220,11 @@ function init_help_menu() {
 							<dt>Hold ${getShiftKeyName()} while editting wall points</dt>
 							<dd>Instead of moving all selected points, it will rescale all lines that have a point selected.</dd>
 						</dl>
+						<dl>
+							<dt>Hold ${getShiftKeyName()} while adding token(s) to map</dt>
+							<dd>Token(s) are added in hidden state</dd>
+						</dl>
+
 						<dl>
 							<dt>${getModKeyName()}+click scenes/tokens while reordering (DM only)</dt>
 							<dd>While reordering the scenes listing or token listing this will to add/remove scenes to multi-selection</dd>
@@ -3405,182 +3363,6 @@ function init_my_dice_details(){
 }
 
 /**
- * Attempts to convert the output of an rpgDiceRoller DiceRoll to the DDB format.
- * If the conversion is successful, it will be sent over the websocket, and this will return true.
- * If the conversion fails for any reason, nothing will be sent, and this will return false,
- * @param {String} expression the dice rolling expression; ex: 1d20+4
- * @param {Boolean} toSelf    whether this is sent to self or everyone
- * @returns {Boolean}         true if we were able to convert and send; else false
- */
-// send_rpg_dice_to_ddb(expression, displayName, imgUrl, modifier, damageType, dmOnly)
-function send_rpg_dice_to_ddb(expression, displayName, imgUrl, rollType="roll", damageType, actionType="custom", sendTo="everyone") {
-
-	let diceRoll = new DiceRoll(expression);
-	diceRoll.action = actionType;
-	diceRoll.rollType = rollType;
-	diceRoll.name = displayName == true ? 'THE DM' : displayName;
-	diceRoll.avatarUrl = imgUrl;
-	// diceRoll.entityId = monster.id;
-	// diceRoll.entityType = monsterData.id;
-
-	if (window.diceRoller.roll(diceRoll)) {
-		console.log("send_rpg_dice_to_ddb rolled via diceRoller");
-		return true;
-	}
-
-	console.group("send_rpg_dice_to_ddb")
-	console.log("with values", expression, displayName, imgUrl, rollType, damageType, actionType, sendTo)
-
-
-	try {
-		expression = expression.replace(/\s+/g, ''); // remove all whitespace
-
-		const supportedDieTypes = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"];
-
-		let roll = new rpgDiceRoller.DiceRoll(expression);
-
-		// rpgDiceRoller doesn't give us the notation of each roll so we're going to do our best to find and match them as we go
-		let choppedExpression = expression;
-		let notationList = [];
-		for (let i = 0; i < roll.rolls.length; i++) {
-			let currentRoll = roll.rolls[i];
-			if (typeof currentRoll === "string") {
-				let idx = choppedExpression.indexOf(currentRoll);
-				let previousNotation = choppedExpression.slice(0, idx);
-				notationList.push(previousNotation);
-				notationList.push(currentRoll);
-				choppedExpression = choppedExpression.slice(idx + currentRoll.length);
-			}
-		}
-		console.log("chopped expression", choppedExpression)
-		notationList.push(choppedExpression); // our last notation will still be here so add it to the list
-
-		if (roll.rolls.length != notationList.length) {
-			console.warn(`Failed to convert expression to DDB roll; expression ${expression}`);
-			console.groupEnd()
-			return false;
-		}
-
-		let convertedDice = [];       // a list of objects in the format that DDB expects
-		let allValues = [];           // all the rolled values
-		let convertedExpression = []; // a list of strings that we'll concat for a string representation of the final math being done
-		let constantsTotal = 0;       // all the constants added together
-		for (let i = 0; i < roll.rolls.length; i++) {
-			let currentRoll = roll.rolls[i];
-			if (typeof currentRoll === "object") {
-				let currentNotation = notationList[i];
-				let currentDieType = supportedDieTypes.find(dt => currentNotation.includes(dt)); // we do it this way instead of splitting the string so we can easily clean up things like d20kh1, etc. It's less clever, but it avoids any parsing errors
-				if (!supportedDieTypes.includes(currentDieType)) {
-					console.warn(`found an unsupported dieType ${currentNotation}`);
-					console.groupEnd()
-					return false;
-				}
-				if (currentNotation.includes("kh") || currentNotation.includes("kl")) {
-					let cleanerString = currentRoll.toString()
-						.replace("[", "(")    // swap square brackets with parenthesis
-						.replace("]", ")")    // swap square brackets with parenthesis
-						.replace("d", "")     // remove all drop notations
-						.replace(/\s+/g, ''); // remove all whitespace
-					convertedExpression.push(cleanerString);
-				} else {
-					convertedExpression.push(currentRoll.value);
-				}
-				let dice = currentRoll.rolls.map(d => {
-					allValues.push(d.value);
-					console.groupEnd()
-					return { dieType: currentDieType, dieValue: d.value };
-				});
-
-				convertedDice.push({
-					"dice": dice,
-					"count": dice.length,
-					"dieType": currentDieType,
-					"operation": 0
-				})
-			} else if (typeof currentRoll === "string") {
-				convertedExpression.push(currentRoll);
-			} else if (typeof currentRoll === "number") {
-				convertedExpression.push(currentRoll);
-				if (i > 0) {
-					if (convertedExpression[i-1] == "-") {
-						constantsTotal -= currentRoll;
-					} else if (convertedExpression[i-1] == "+") {
-						constantsTotal += currentRoll;
-					} else {
-						console.warn(`found an unexpected symbol ${convertedExpression[i-1]}`);
-						console.groupEnd()
-						return false;
-					}
-				} else {
-					constantsTotal += currentRoll;
-				}
-			}
-		}
-		let ddbJson = {
-			id: uuid(),
-			dateTime: `${Date.now()}`,
-			gameId: window.MB.gameid,
-			userId: window.MB.userid,
-			source: "web",
-			persist: true,
-			messageScope: sendTo === "everyone" ?  "gameId" : "userId",
-			messageTarget: sendTo === "everyone" ?  window.MB.gameid : window.MB.userid,
-			entityId: window.MB.userid,
-			entityType: "user",
-			eventType: "dice/roll/fulfilled",
-			data: {
-				action: actionType,
-				setId: window.mydice.data.setId,
-				context: {
-					entityId: window.MB.userid,
-					entityType: "user",
-					messageScope: sendTo === "everyone" ?  "gameId" : "userId",
-					messageTarget: sendTo === "everyone" ?  window.MB.gameid : window.MB.userid,
-					name: displayName,
-					avatarUrl: imgUrl
-				},
-				rollId: uuid(),
-				rolls: [
-					{
-						diceNotation: {
-							set: convertedDice,
-							constant: constantsTotal
-						},
-						diceNotationStr: expression,
-						rollType: rollType,
-						rollKind: expression.includes("kh") ? "advantage" : expression.includes("kl") ? "disadvantage" : "",
-						result: {
-							constant: constantsTotal,
-							values: allValues,
-							total: roll.total,
-							text: convertedExpression.join("")
-						}
-					}
-				]
-			}
-		};
-		if (window.MB.ws.readyState == window.MB.ws.OPEN) {
-			window.MB.ws.send(JSON.stringify(ddbJson));
-			console.groupEnd()
-			return true;
-		} else { // TRY TO RECOVER
-			get_cobalt_token(function(token) {
-				window.MB.loadWS(token, function() {
-					// TODO, CONSIDER ADDING A SYNCMEUP / SCENE PAIR HERE
-					window.MB.ws.send(JSON.stringify(ddbJson));
-				});
-			});
-			console.groupEnd()
-			return true; // we can't guarantee that this actually worked, unfortunately
-		}
-	} catch (error) {
-		console.warn(`failed to send expression as DDB roll; expression = ${expression}`, error);
-		console.groupEnd()
-		return false;
-	}
-}
-
-/**
  * Gathers browser information from User Agent.
  * @returns Object
  */
@@ -3632,9 +3414,7 @@ function is_player_sheet_open() {
  * When not on the character page, `open_player_sheet` is used.
  */
 function show_player_sheet() {
-	$("#character-tools-target").css({
-		"display": "",
-	});
+
 	$(".ct-character-sheet__inner, [class*='styles_mobileNav']>div>button[class*='styles_navToggle']").css({
 		"display": "",
 		"z-index": 21000
@@ -3662,9 +3442,7 @@ function show_player_sheet() {
  * When not on the characters page, `close_player_sheet` is used.
  */
 function hide_player_sheet() {
-	$("#character-tools-target").css({
-		"display": "none",
-	});
+
 	$(".ct-character-sheet__inner, [class*='styles_mobileNav']>div>button[class*='styles_navToggle']").css({
 		"display": "none",
 		"z-index": -1
