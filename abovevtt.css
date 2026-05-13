@@ -226,13 +226,13 @@ body > div {
 .party-item-table td.item-add-cell{
     min-width: 90px;
 }
-.note-text .ct-currency-button__currency-item-preview{
+:is(.note-text, .avtt-stat-block-container) .party-currency .ct-currency-button__currency-item-preview{
     width:16px;
     height:16px;
     position:relative;
     display:inline-block;
 }
-.note-text .party-currency {
+:is(.note-text, .avtt-stat-block-container) .party-currency {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -750,7 +750,7 @@ span.button-text{
 
 #sheet {
     left: auto;
-    right: 340px;
+    right: var(--sidebar-width, 340px);
     display: none;
     position: fixed !important;
     border-radius: 5px; 
@@ -912,6 +912,23 @@ select#doorTypeSelectUVTT{
     position: relative;
     display:inline-block;
 }
+#avtt-sidebar-resize-handle {
+    position: fixed;
+    top: 30px;
+    right: var(--sidebar-width, 340px);
+    width: 6px;
+    height: calc(100vh - 30px);
+    cursor: ew-resize;
+    z-index: 80;
+    background: transparent;
+}
+#avtt-sidebar-resize-handle:hover {
+    background: rgba(100, 149, 237, 0.4);
+}
+body:has(#hide_rightpanel[data-visible="0"]) #avtt-sidebar-resize-handle {
+    display: none;
+}
+
 .iframeResizeCover {
     z-index:9999999;
     position:absolute;
@@ -953,7 +970,8 @@ select#doorTypeSelectUVTT{
     filter: drop-shadow(0px 0px 2px #000) blur(1px); /*fill in fog gaps on player view*/
     opacity: 1;
 }
-#dragbox {
+#dragbox,
+#rotDragbox {
   position: absolute;
   overflow: visible;
   top: 0;
@@ -962,7 +980,10 @@ select#doorTypeSelectUVTT{
   transform: scale(var(--scene-scale));
   display: block;
   pointer-events: none;
-  z-index: 1000000;
+  z-index: 20;
+}
+#rotDragbox{
+    z-index: 45;
 }
 #dragbox .drag-box-b {
   stroke: black;
@@ -988,16 +1009,16 @@ select#doorTypeSelectUVTT{
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
-#dragbox .grabber {
+#rotDragbox .grabber {
   cursor: alias;
   pointer-events: auto;
 }
 
 /*adjust grabber scale 1.2 here:*/
-#dragbox .grabber-icon-r {
+#rotDragbox .grabber-icon-r {
   transform: scale(calc(1.2 / var(--scene-scale) / var(--window-zoom))) translate(0px, -25px);
 }
-#dragbox .grabber-icon-c {
+#rotDragbox .grabber-icon-c {
   transform: translate(0px, -10px) scale(calc(1.2 / var(--scene-scale)  / var(--window-zoom))) translate(-12.5px, -25px);
 }
 
@@ -1910,7 +1931,8 @@ div#scene_properties form > div{
 #adjustments-flyout>div>button.token-wall-poly-button.visible{
     display:block;
 }
-.hasTooltip::after {
+.hasTooltip::after,
+.door-button[data-name]::after {
     content: attr(data-name);
     -webkit-font-smoothing: antialiased;
     margin: 0 auto;
@@ -1927,6 +1949,7 @@ div#scene_properties form > div{
 }
 
 .hasTooltip::after,
+.door-button[data-name]::after,
 .sidebar-hover-text-flyout{
   pointer-events: none;
 }
@@ -1963,7 +1986,8 @@ div#scene_properties form > div{
     transition: 0.1s ease-in-out 0.2s;
 }
 
-.hasTooltip.VTTToken::after {
+.hasTooltip.VTTToken::after,
+.door-button[data-name]::after {
     position: absolute;
     z-index: 4;
     left: 50%;
@@ -1975,6 +1999,11 @@ div#scene_properties form > div{
     pointer-events: none;
 }
 
+.door-button[data-name]::after{
+    bottom: -100%;
+    transform: translate(-50%);
+    font-size: 0.85em;
+}
 
 .definitelyNotAToken.ui-draggable-disabled>.token-image{
     cursor: default !important;
@@ -1993,6 +2022,7 @@ div#scene_properties form > div{
 }
 
 .hasTooltip:not(.drawbutton):hover:after,
+.door-button[data-name]:hover:after,
 .mobileAVTTUI .drawbutton.hasTooltip:hover:after {
     opacity: 1;
     visibility: visible;
@@ -2045,7 +2075,9 @@ padding-bottom: 5px;
 }
 
 .labelToken.hasTooltip:after,
-.labelToken.hasTooltip:hover:after{
+.labelToken.hasTooltip:hover:after,
+.door-button[data-name][data-always-show-name='true']:hover:after,
+.door-button[data-name][data-always-show-name='true']:after{
      content: attr(data-name);
     opacity: 1;
     background: none;
@@ -2067,6 +2099,10 @@ padding-bottom: 5px;
         var(--positive-shadow) var(--positive-shadow) 0px #000, 
         0px 0px 5px #000;
     pointer-events:none;
+}
+.door-button[data-name][data-always-show-name='true']:hover:after,
+.door-button[data-name][data-always-show-name='true']:after{
+    transform: none;
 }
 .labelToken.notVisible.hasTooltip:after,
 .labelToken.notVisible.hasTooltip:hover:after{
@@ -2751,6 +2787,10 @@ body>[class*='styles_mobileNav']>button{
 }*/
 
 /* .ct-sidebar__pane-content, */
+body .sidebar__pane-content{
+    max-width: 600px !important;
+    width: var(--sidebar-width, 340px) !important;
+}
 body:not(.encounter-builder-page) .sidebar__pane-content {
     position: absolute;
     right: 0;
@@ -2780,12 +2820,21 @@ body .gamelogcontainer .sidebar__pane-content {
     width: 90%;
     margin: auto;
 }
-#export_current_scene{
-    margin: 7px 0px 0px 0px;
-    width: 94.5%;
-    transform: scale(0.8);
+#export_current_scene,
+#recover_scenes{
+    margin: 0px;
+    width: 145%;
+    position: relative;
+    left: 50%;
+    transform: translate(-50%) scale(0.65);
 }
-
+#export_current_scene_container,
+#recover_scenes_container{
+    width: 50%;
+    display: inline-block;
+    position: relative;
+    float: right;
+}
 #other_export_container button{
     width: 50%;
     vertical-align: middle;
@@ -2830,7 +2879,7 @@ body .gamelogcontainer .sidebar__pane-content {
 .sidebar__controls .tab-btn .sidebar-tab-image > div {
     width: 100%;
     height: 80%;
-    margin: 5% 0 0 0;
+    margin: 2px 0 0 0;
     background-color: #838383;
 }
 .avtt-sidebar-controls .tab-btn.selected-tab .sidebar-tab-image > div,
@@ -2843,7 +2892,7 @@ body .gamelogcontainer .sidebar__pane-content {
 .sidebar__controls .tab-btn .sidebar-tab-image > svg {
     width: 100%;
     height: 80%;
-    margin: 5% 0 0 0;
+    margin: 2px 0 0 0;
     color: #838383;
 }
 .avtt-sidebar-controls .tab-btn.selected-tab .sidebar-tab-image > svg,
@@ -3228,6 +3277,10 @@ button.roll-button-mod.adv {
     overflow: auto;
     height: calc(100% - 68px);
     width: 100%;
+    position: relative;
+}
+.moveableWindow.resize_drag_window:has(>.note){
+    overflow:clip;
 }
 .body-rpgcharacter-sheet .moveableWindow .note > .note-text {
     height: calc(100% - 25px);
@@ -4353,12 +4406,12 @@ div.token-image {
 }
 
 .ct-sidebar[class*='styles_sidebar'] {
-    min-width: 340px !important;
+    min-width: var(--sidebar-width, 340px) !important;
 }
 
 .ct-sidebar[class*='styles_sidebar'] [class*='styles_content'] {
-    min-width: 340px !important;
-    max-width: 340px !important;
+    min-width: var(--sidebar-width, 340px) !important;
+    max-width: var(--sidebar-width, 340px) !important;
 }
 
 .token:before{
@@ -4892,7 +4945,7 @@ body {
     padding: 10px;
     overflow-y: auto;
     background-color: rgb(235, 241, 245);
-    width: 340px;
+    width: var(--sidebar-width, 340px);
     top: 30px;
     right: 0px;
     left: auto;
@@ -4912,7 +4965,7 @@ body {
     position: fixed;
     top: 30px;
     right: 0px;
-    width: 340px;
+    width: var(--sidebar-width, 340px);
     z-index: -1;
     height: calc(-45px + 100vh);
 }
@@ -5230,25 +5283,27 @@ button.applyDamageButton svg {
 }
 
 .block-send-to-game-log {
-    position:absolute;
-    float:right;
-    background: none;
-    backdrop-filter: brightness(3);
-    right: 14px;
-    top: -4px;
-    font-size:10px !important;
-    padding: 2px;
+    position: absolute;
     display: flex;
     border-radius: 5px;
     border: none;
     outline: none !important;
     align-items: center;
-    direction: rtl;
-}
-.block-send-to-game-log:has(.whisper-container.visible){
-    background: revert !important;
+    padding: 0px;
+    margin: 0px;
+    background: #eee;
+    opacity: 0.5;
+    right: 4px;
+    top: 4px;
+    cursor: pointer;
 }
 
+.block-send-to-game-log:hover {
+    background-color: #888;
+    opacity: 1;    
+}
+
+/*todo: not sure what this style is for?*/
 td button.block-send-to-game-log {
     position: absolute;
     display: flex;
@@ -5257,29 +5312,15 @@ td button.block-send-to-game-log {
     right: 2px;
     transform: translate(0px, -50%);
 }
+/*size of send-to button*/
 td button.block-send-to-game-log span{
-    font-size:9px !important;
+    font-size:18px !important;
 }
-button.block-send-to-game-log:has(.whisper-container.visible){
-    border:1px solid #000;
-    z-index:10000;
-}
-.whisper-container.visible {
-    display: flex;
-    position: relative;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: flex-end;
-    margin-right:10px;
+/*size of send-to button when in table*/
+td > button.block-send-to-game-log > span {
+    font-size:12px !important;
 }
 
-.whisper-container {
-    display: none;
-}
-.whisper_toggle_row {
-    display: flex;
-    align-items: center;
-}
 h3#error-message{
     max-height:100px;
     overflow:hidden;
@@ -5347,12 +5388,6 @@ div#initialPosition_row input[type=number] {
     right:5px;
     top: 15px
 }
-button.block-send-to-game-log span {
-    font-size: 13px;
-    padding: 0px;
-    margin: 0px;
-}
-
 
 .damageButtonsContainer {
     top:-15px;
@@ -6298,6 +6333,7 @@ span.exhaustion-pip.last{
     right: 0px;
     bottom: 0px;
     background: rgb(235, 241, 245);
+    z-index: 10;
     /* easy debugging */
     /* opacity: 0.5; */
 }
@@ -7060,6 +7096,12 @@ button.avtt-roll-formula-button {
 }
 .ct-sidebar__inner .glc-game-log .abovevtt-sidebar-injected *{
     color: rgb(92, 112, 128);
+}
+.glc-game-log {
+    max-width: 600px !important;
+}
+[class*="GameLogEntry-Other-Flex"] {
+    height: fit-content !important;
 }
 .glc-game-log .popout-button{
     position: relative;
@@ -9252,7 +9294,7 @@ body:not(.body-rpgcampaign) .site-bar{
     z-index: 8;
     mix-blend-mode: lighten;
 }
-.aura-clip-container.vision:has(.devilsight){
+.aura-clip-container:is(.devilsight, .truesight){
     z-index: 20 !important;
 }
 [data-darkness]{
@@ -9348,7 +9390,7 @@ body.preventSelectDefinitelyNot .token.declutterToken[style*='opacity: 0.5']{
     mix-blend-mode: lighten;
 }
 
-.aura-element-container-clip.vision.devilsight{
+.aura-element-container-clip.vision:is(.devilsight, .truesight){
     z-index: 20 !important;
 }
 #map_items{
@@ -10698,6 +10740,29 @@ button.journal-view-button.journal-button img {
         top: 5px;
         right: 5px;
     }
+    .timerCancelButton,
+    .timerPauseButton{
+        color: rgb(211 211 211);
+        text-shadow: 1px 1px 1px #000, 0px 0px 1px #000;
+        font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+        font-size: 25px;
+        text-overflow: clip;
+    }
+    .timerButtonContainer{
+        display: flex;
+        gap: 5px;
+    }
+    .timerCancelButton:hover,
+    .timerPauseButton:hover{
+        cursor: pointer;
+        color: #F00;
+    }
+    .timerPauseButton:hover{
+        color: #ff8f00;
+    }
+    .timerPauseButton.paused:hover{
+        color: #23cb23;
+    }
 }
 
 .custom-stat-block input.injected-input {
@@ -10862,19 +10927,19 @@ button.resistanceButton.qrm_buttons_bar span {
     background-image: radial-gradient(rgba(var(--color1), calc(var(--opacity1) * var(--opacity))) var(--light1-blur-size), rgba(var(--color2), calc(var(--opacity2) * var(--opacity))) calc(var(--light1-blur-size) * 1.3) var(--light2-blur-size), transparent var(--transparency-blur-size)) !important;
 }
 
-[data-animation='static-blur-fx'] .darkvision,
-[data-animation='flicker-fx'] .darkvision{
+[data-animation='static-blur-fx'] :is(.darkvision, .devilsight, .truesight),
+[data-animation='flicker-fx'] :is(.darkvision, .devilsight, .truesight){
     background-image: radial-gradient(var(--vision-color) calc(var(--vision-radius) * 0.9), #00000000 var(--vision-radius)) !important;
 }
 [data-custom-animation] .islight,
 .aura-element[data-custom-animation],
-[data-custom-animation].darkvision-animation .darkvision{
+[data-custom-animation].darkvision-animation :is(.darkvision, .devilsight, .truesight){
  -webkit-mask-image: var(--custom-mask-image);
  -webkit-mask-size: contain;
 }
 [data-animation='aurafx-rotate'] .islight,
 .aura-element[data-animation='aurafx-rotate'][id*='aura_'],
-[data-animation='aurafx-rotate'].darkvision-animation .darkvision {
+[data-animation='aurafx-rotate'].darkvision-animation :is(.darkvision, .devilsight, .truesight) {
     animation: aurafx-rotate var(--custom-rotate-rpm, 40s) infinite linear;
     transform: scale(var(--animation-scale)) rotate(calc(1deg * var(--animation-rotation, 0)));
 }
@@ -11642,8 +11707,12 @@ table#aura_presets_properties  {
     border-collapse: unset;
     border-spacing: 10px;    
 }
-
-
+table#light_presets_properties :is(td, th):has(.token-image-modal-footer-title) {
+    width: 120px;
+}
+table#light_presets_properties div.token-image-modal-footer-title{
+    font-size: 8px;
+}
 #light_presets_properties div.removePreset svg rect,
 #animation_presets_properties div.removePreset svg rect,
 #aura_presets_properties div.removePreset svg rect{
@@ -12216,6 +12285,7 @@ div#playlistFields {
     border-style: solid; 
     margin-right: 3px;
     font-size:20px;
+    text-indent: 20px;
 }
 
 #chat-language option {
@@ -14765,7 +14835,7 @@ button#displayedDiceFormulaExit:hover {
 .mobileAVTTUI #zoom_buttons{
     display: flex;
     flex-direction: column-reverse !important;
-    right: 342px !important;
+    right: calc(var(--sidebar-width, 340px) + 2px) !important;
     top:26px;
     left:unset !important;
 }
@@ -14816,6 +14886,68 @@ button#displayedDiceFormulaExit:hover {
     left: -195px !important;
 }
 
+.js-popup-options {
+    margin: 2px;
+}
+.js-popup-option {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    border: 1px;
+    flex-wrap: wrap;
+    font-family: Roboto Condensed,Roboto,Helvetica,sans-serif;
+    cursor: pointer;
+    color: #838383;
+    line-height: 1;
+    font-weight: 700;
+    font-size: 12px;
+    gap: 4px;    
+    text-transform: uppercase;
+    background-color: #f2f2f2;
+    border-radius: 3px;
+    padding: 5px 7px;
+    margin: 1px;
+    white-space: nowrap;
+    background-image: unset;
+}
+.js-popup-decoration {
+    width: 100%;
+    display: block;
+    font-family: Roboto Condensed,Roboto,Helvetica,sans-serif;
+    color: black; 
+    font-weight: bold;
+    font-size: 12px;
+    text-transform: uppercase;
+    background-color: #f2f2f2;
+    margin: 1px;
+    white-space: nowrap;
+    background-image: unset;
+    text-align: center;
+    padding: 0;
+    border: 0;
+    border-top: 1px solid #ccc;
+}
+.js-popup {
+    padding: 0;
+    z-index: 10000000;
+    position: absolute;
+    width: fit-content;
+    height: fit-content;
+    margin: 0;
+    border: none;
+}
+.js-popup form {
+    margin: 0px;
+    width: 120px;
+}
+.js-popup-option:hover {
+    color: #f2f2f2;
+    background-color: #5d5d5d;
+}
+.js-popup--is-active {
+    color: #fff;
+    background-color: #c53131;
+}
 
 
 @font-face {

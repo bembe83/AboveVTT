@@ -106,17 +106,20 @@ const buffsDebuffs = {
       "dmg": "0",
       "save": "-d4",
       "check": "0",
-      "type": "spell"
+      "type": "spell",
+	  "condition": "Baned",
   },
   "Bless": {
       "tohit": "+d4",
       "dmg": "0",
       "save": "+d4",
       "check": "0",
-      "type": "spell"
+      "type": "spell",
+	  "condition": "Blessed",
   },
   
   "Exhaustion": {
+    "condition": "Exhaustion",
     "multiOptions": {
       "-2": {
         "tohit": "0",
@@ -172,6 +175,7 @@ const buffsDebuffs = {
     },
     "newRoll": '2d20kl1',
     "type": "2024condition",
+	"condition": "Blinded",
   },
   "Frightened": {
     "tohit": "0",
@@ -185,6 +189,7 @@ const buffsDebuffs = {
     },
     "newRoll": '2d20kl1',
     "type": "2024condition",
+	"condition": "Frightened",
   },
   "Invisible": {
     "tohit": "0",
@@ -198,6 +203,7 @@ const buffsDebuffs = {
     },
     "newRoll": '2d20kl1',
     "type": "2024condition",
+	"condition": "Invisible"
   },
   "Poisoned": {
     "tohit": "0",
@@ -211,6 +217,7 @@ const buffsDebuffs = {
     },
     "newRoll": '2d20kl1',
     "type": "2024condition",
+	"condition": "Poisoned",
   },
   "Prone": {
     "tohit": "0",
@@ -223,6 +230,7 @@ const buffsDebuffs = {
     },
     "newRoll": '2d20kl1',
     "type": "2024condition",
+	"condition": "Prone",
   },
   "Restrained" :{
     "tohit": "0",
@@ -236,6 +244,7 @@ const buffsDebuffs = {
     },
     "newRoll": '2d20kl1',
     "type": "2024condition",
+	"condition": "Restrained",
   },
   "Rage": {
     "multiOptions": {
@@ -278,6 +287,7 @@ const buffsDebuffs = {
     },
     "type": "class",
     "class": "barbarian",
+    "condition": "Rage",
   },
   "Elemental Cleaver": {
     "multiOptions": {
@@ -1031,8 +1041,7 @@ async function init_characters_pages(container = $(document)) {
 
 const debounceConvertToRPGRoller =  mydebounce(() => {convertToRPGRoller()}, 20)
 function rollDiceButton(e, button){
-  if ($(this).parent().hasClass('ct-reset-pane__hitdie-manager-dice') || $(this).prev().text().trim().match(/^death saves$/gi))// allow hit dice and death saves roll to go through ddb for auto heals - maybe setup our own message by put to https://character-service.dndbeyond.com/character/v5/life/hp/damage-taken later
-    return;
+
   let rollData = {}
   rollData = getRollData(button);
   if (!rollData.expression.match(allDiceRegex) && window.EXPERIMENTAL_SETTINGS['rpgRoller'] != true) {
@@ -1397,6 +1406,25 @@ function register_buff_row_context_menu() {
 
   })
 }
+function click_condition(conditionName, setToggle = true, callback, addtionalCSS = ''){
+  $('body').append(`<style id='condition-click'>.ct-condition-manage-pane{visibility:hidden !important;}${addtionalCSS}</style>`);
+  $('.ct-combat__statuses-group--conditions .ct-combat__summary-label:contains("Conditions"), .ct-combat-tablet__cta-button:contains("Conditions"), .ct-combat-mobile__cta-button:contains("Conditions")').click();
+  setTimeout(function () {
+    if(typeof setToggle == "boolean" || conditionName !== 'Exhaustion'){
+      setToggle = typeof setToggle === "boolean" ? setToggle : Boolean(parseInt(setToggle));
+      $(`.ct-sidebar__inner .ct-condition-manage-pane__condition-name:contains('${conditionName}') ~ .ct-condition-manage-pane__condition-toggle>[class*='styles_toggle'][aria-pressed="${!setToggle}"]`).click();
+    }
+    else{
+      $(`[class*='styles_progressBar']>[class*='styles_bar']:nth-of-type(${setToggle/-2+1})`).click();
+    }    
+  }, 30)
+  setTimeout(function () {
+    if(is_abovevtt_page()) $(`#switch_gamelog`).click();
+    else $(document.body).click();
+    if(callback) callback();
+    $('#condition-click').remove();
+  }, 40)	
+}
 function rebuild_buffs(fullBuild = false){
   window.rollBuffs = JSON.parse(localStorage.getItem('rollBuffs' + window.PLAYER_ID)) || [];
   const buffDebuffKeys=Object.keys(buffsDebuffs);
@@ -1444,18 +1472,23 @@ function rebuild_buffs(fullBuild = false){
     avttBuffSelect = $(`#avtt-buff-options`);
     avttBuffSelect.find('.avttBuffItems').html(innerBuffHtml)
   }
-
-  const avttBuffItems = avttBuffSelect.find('.avttBuffItems')
-  avttBuffSelect.off('click.clickHandle').on('click.clickHandle', '.clickHandle', function(){
+  const toggleBuffMenuVisiblity = function(){
     avttBuffSelect.toggleClass('visible')
     if(avttBuffSelect.hasClass('visible')){
-      $(document).on('click.blurHandle', function(e){
-        if($(e.target).closest('#avtt-buff-options, .context-menu-list').length == 0){
-          avttBuffSelect.toggleClass('visible', false)
-          $(document).off('click.blurHandle');
-        }
-      })  
+      //set a timeout here to allow other automated clicks such as clicking the gamelog after setting a condition to finish before adding the close event
+      setTimeout(function(){
+        $(document).on('click.blurHandle', function(e){
+          if($(e.target).closest('#avtt-buff-options, .context-menu-list').length == 0){
+            avttBuffSelect.toggleClass('visible', false)
+            $(document).off('click.blurHandle');
+          }
+        })
+      }, 250)
     }
+  }
+  const avttBuffItems = avttBuffSelect.find('.avttBuffItems')
+  avttBuffSelect.off('click.clickHandle').on('click.clickHandle', '.clickHandle', function(){
+    toggleBuffMenuVisiblity();
   })
   avttBuffSelect.off('click.headers').on('click.headers', 'ul>ul', function(e){
     e.stopPropagation();
@@ -1510,6 +1543,40 @@ function rebuild_buffs(fullBuild = false){
          window.rollBuffs = window.rollBuffs.filter(d => !d.includes(i)); 
         }
         localStorage.setItem('rollBuffs' + window.PLAYER_ID, JSON.stringify(window.rollBuffs));
+        $(this).blur();
+        if(buffsDebuffs[i].condition != undefined) { // Allow buffsDebuffs with conditions to update player tokens
+          let setOnOff = 'removeCondition';
+          let condition = buffsDebuffs[i].condition;
+          const value = $(this).val();
+          if( value != '0'){
+            setOnOff = 'addCondition';
+          }
+          const menuOpen = avttBuffSelect.hasClass('visible');
+          const additionalCSS = menuOpen ? `.dropdown-check-list .avttBuffItems {
+                  display: block !important;
+                  position: absolute !important;
+                  background: var(--theme-background-solid) !important;
+                  z-index: 200 !important;
+              }` : '';
+          if(STANDARD_CONDITIONS.includes(condition)){
+              click_condition(condition, value, menuOpen ? toggleBuffMenuVisiblity : undefined, additionalCSS);
+          }
+          else if (is_abovevtt_page()) {        
+            const pc = find_pc_by_player_id(window.PLAYER_ID, false);
+            if (!pc) return;
+            const token = window.all_token_objects[pc.sheet];
+            if (!token) return;
+            token[setOnOff](condition);
+            token.place_sync_persist();
+          } else {
+            tabCommunicationChannel.postMessage({
+              msgType: setOnOff, 
+              characterId: window.PLAYER_ID,
+              text: condition, 
+              sendTo: window.sendToTab
+            })
+          }
+        }
       })
       row.find('span.favorite').off('click.favorite').on('click.favorite', function(e){
         e.preventDefault();
@@ -1575,6 +1642,39 @@ function rebuild_buffs(fullBuild = false){
          window.rollBuffs = window.rollBuffs.filter(d => d != i); 
         }
         localStorage.setItem('rollBuffs' + window.PLAYER_ID, JSON.stringify(window.rollBuffs));
+        $(this).blur();
+        if(buffsDebuffs[i].condition != undefined) { // Allow buffsDebuffs with conditions to update player tokens
+          let setOnOff = 'removeCondition';
+          let condition = buffsDebuffs[i].condition;
+          if($(this).is(':checked')){
+            setOnOff = 'addCondition';
+          }
+          const menuOpen = avttBuffSelect.hasClass('visible');
+          const additionalCSS = menuOpen ? `.dropdown-check-list .avttBuffItems {
+                  display: block !important;
+                  position: absolute !important;
+                  background: var(--theme-background-solid) !important;
+                  z-index: 200 !important;
+              }` : '';
+          if(STANDARD_CONDITIONS.includes(condition)){
+            click_condition(condition, setOnOff == 'addCondition' ? true : false, menuOpen ? toggleBuffMenuVisiblity : undefined, additionalCSS);
+          } else if (is_abovevtt_page()) {
+            const pc = find_pc_by_player_id(window.PLAYER_ID, false);
+            if (!pc) return;
+            const token = window.all_token_objects[pc.sheet];
+            if (!token) return;
+
+            token[setOnOff](condition);
+            token.place_sync_persist();
+          } else {
+            tabCommunicationChannel.postMessage({
+              msgType: setOnOff, 
+              characterId: window.PLAYER_ID,
+              text: condition, 
+              sendTo: window.sendToTab
+            })
+          }
+        }
       })
       row.find('span.favorite').off('click.favorite').on('click.favorite', function(e){
         e.preventDefault();
@@ -3074,7 +3174,7 @@ function set_window_name_and_image(callback) {
     window.PLAYER_IMG = get_higher_res_url($(".ddbc-character-avatar__portrait").css("background-image").slice(4, -1).replace(/"/g, "")) || get_higher_res_url($(".ddbc-character-avatar__portrait").attr('src')) || defaultAvatarUrl;
   } catch {}
 
-  if (typeof window.PLAYER_NAME !== "string" || window.PLAYER_NAME.length <= 1 || typeof window.PLAYER_IMG !== "string" || window.PLAYER_IMG.length <= 1) {
+  if (typeof window.PLAYER_NAME !== "string" || window.PLAYER_NAME.length < 1 || typeof window.PLAYER_IMG !== "string" || window.PLAYER_IMG.length < 1) {
     // try again
     if (!window.set_window_name_and_image_attempts) {
       window.set_window_name_and_image_attempts = 1;

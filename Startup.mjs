@@ -142,6 +142,17 @@ $(function() {
 		}
        
         tabCommunicationChannel.addEventListener ('message', (event) => {
+          if((event.data.msgType == 'addCondition' || event.data.msgType == 'removeCondition') && event.data.sendTo == window.PLAYER_ID){ // Sets a player token's condition on and off
+            const tokenId = Object.keys(window.all_token_objects).find(key => key.includes(event.data.characterId));
+            const pcToken = window.all_token_objects[tokenId];
+            if(!pcToken) return;
+            const condition = event.data.text;
+            const setOnOff = event.data.msgType;
+            
+            pcToken[setOnOff](condition);
+            pcToken.place_sync_persist();
+            return;
+          }
           if(event.data.msgType == 'CharacterData' && !find_pc_by_player_id(event.data.characterId, false))
             return;
           if(event.data.msgType == 'roll'){
@@ -266,7 +277,7 @@ $(function() {
               });
             }
             else if(event.data.msgType == 'projectionScroll' && event.data.sceneId == window.CURRENT_SCENE_DATA.id){
-              let sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? 340 : 0);
+              let sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? get_sidebar_width() : 0);
               let windowRatio = window.innerHeight / event.data.innerHeight;
 
               if(windowRatio == 1 && window.ZOOM == event.data.zoom){

@@ -266,7 +266,7 @@ class JournalManager{
 			if(is_abovevtt_page()){
 				this.build_journal();
 			}
-			if(window.DM && !is_gamelog_popout()){
+			if(window.DM && !is_gamelog_popout() && is_abovevtt_page()){
 				// also sync the journal
 				window.JOURNAL?.sync();
 			}
@@ -429,10 +429,47 @@ class JournalManager{
 		
 
 	}
+	show_rename_input(note_id, searchText=''){	
+		const self = this;
+				
+		const input_note_title=$(`
+			<input type='text' class='input-add-chapter' value='${self.notes[note_id].title}'>
+		`);
+		const rename_btn = $(`.sidebar-list-item-row[data-id='${note_id}'] button.save-rename`);
+		const edit_btn = $(`.sidebar-list-item-row[data-id='${note_id}'] button.edit-note`);
+		input_note_title.keypress(function(e){
+			if (e.which == 13 && input_note_title.val() !== "") {
+				self.notes[note_id].title = input_note_title.val();
+				self.sendNotes([self.notes[note_id]]);
+				self.persist();
+				self.build_journal(searchText);
+			}
+
+			// If the user presses escape, cancel the edit
+			if (e.which == 27) {
+				self.build_journal(searchText);
+			}
+
+		});
+		input_note_title.off('click').on('click', function(e){
+			e.stopPropagation();
+		})
+		input_note_title.blur(function(event){	
+			let e = $.Event('keypress');
+			e.which = 13;
+			input_note_title.trigger(e);
+		});
+		edit_btn.css('visibility', 'hidden');
+		rename_btn.show();
+		const entry_title = $(`.sidebar-list-item-row[data-id='${note_id}'] .sidebar-list-item-row-details-title`);
+		entry_title.replaceWith(input_note_title);
+		
+		input_note_title.focus();
+	}
 	build_journal(searchText){
 		console.log('build_journal');
 		let self=this;
-
+		
 		// Clear all elements from journal panel except the searchbar, which needs to stay in place between searches
 		journalPanel.body.children().not('#journal-control-container, #journal-control-container *').remove();
 		
@@ -1090,53 +1127,14 @@ class JournalManager{
 							render_source_chapter_in_iframe(self.notes[note_id].ddbsource);
 						});
 					}
-					let rename_btn = $("<button class='token-row-button'><img src='"+window.EXTENSION_PATH+"assets/icons/rename-icon.svg'></button>");
+					let rename_btn = $("<button style='display:none' class='token-row-button save-rename'><img src='"+window.EXTENSION_PATH+"assets/icons/save.svg'></button>");
 					
-					rename_btn.click(function(){
-						//Convert the note title to an input field and focus it
-						const input_note_title=$(`
-							<input type='text' class='input-add-chapter' value='${self.notes[note_id].title}'>
-						`);
-
-						input_note_title.keypress(function(e){
-							if (e.which == 13 && input_note_title.val() !== "") {
-								self.notes[note_id].title = input_note_title.val();
-								self.sendNotes([self.notes[note_id]]);
-								self.persist();
-								self.build_journal(searchText);
-							}
-
-							// If the user presses escape, cancel the edit
-							if (e.which == 27) {
-								self.build_journal(searchText);
-							}
-						});
-						input_note_title.off('click').on('click', function(e){
-							e.stopPropagation();
-						})
-						input_note_title.blur(function(event){	
-							let e = $.Event('keypress');
-							e.which = 13;
-							input_note_title.trigger(e);
-						});
-
-						entry_title.empty();
-						
-						entry_title.append(input_note_title);
-						entry_title.append(edit_btn);
-
-						input_note_title.focus();
-
-						// Convert the edit button to a save button
-						rename_btn.empty();
-						rename_btn.append(`
-							<img src='${window.EXTENSION_PATH}assets/icons/save.svg'>
-						`);
-					});
 
 
 
-					let edit_btn=$("<button class='token-row-button'><span class='material-symbols-outlined'>edit_note</span></button>");
+
+
+					let edit_btn=$("<button class='token-row-button edit-note'><span class='material-symbols-outlined'>edit_note</span></button>");
 					edit_btn.click(function(){
 						window.JOURNAL.edit_note(note_id);	
 					});
@@ -1497,37 +1495,7 @@ class JournalManager{
 		                name: "Rename",
 		                callback: function(itemKey, opt, originalEvent) {
 		                    //Convert the note title to an input field and focus it
-		                    const input_note_title=$(`
-		                    	<input type='text' class='input-add-chapter' value='${self.notes[note_id].title}'>
-		                    `);
-
-		                    input_note_title.keypress(function(e){
-		                    	if (e.which == 13 && input_note_title.val() !== "") {
-		                    		self.notes[note_id].title = input_note_title.val();
-		                    		self.sendNotes([self.notes[note_id]]);
-		                    		self.persist();
-		                    		self.build_journal(searchText);
-		                    	}
-
-		                    	// If the user presses escape, cancel the edit
-		                    	if (e.which == 27) {
-		                    		self.build_journal();
-		                    	}
-		                    });
-		                    input_note_title.off('click').on('click', function(e){
-		                    	e.stopPropagation();
-		                    })
-		                    input_note_title.blur(function(event){	
-		                    	let e = $.Event('keypress');
-		                        e.which = 13;
-		                        input_note_title.trigger(e);
-		                    });
-		              
-		                    let entry_title = $(element).find('.sidebar-list-item-row-details-title');
-							
-		                    entry_title.append(input_note_title);
-		                    input_note_title.focus();
-
+		                    self.show_rename_input(note_id, searchText);
 			            }   
 	            	};   
 	            	if(!self.notes[note_id].ddbsource){
@@ -1849,7 +1817,8 @@ class JournalManager{
 		note_container.attr("role", "dialog");
 		note_container.addClass(['ui-dialog', 'ui-corner-all', 'ui-widget', 'ui-widget-content', 'ui-front', 'ui-draggable', 'ui-resizable'])
 		note_container.find('.title_bar').off('dblclick.adjustClasses').on('dblclick.adjustClasses', function (event) {
-			note_container.toggleClass(['ui-dialog', 'ui-corner-all', 'ui-widget', 'ui-widget-content', 'ui-front', 'ui-draggable', 'ui-resizable']);
+			const isMinimized = $(this).hasClass('minimized');
+			note_container.toggleClass(['ui-dialog', 'ui-corner-all', 'ui-widget', 'ui-widget-content', 'ui-front', 'ui-draggable', 'ui-resizable'], !isMinimized);
 		});
 		if(!noteAlreadyOpen){
 			note.attr('title',self.notes[id].title);
@@ -1947,6 +1916,14 @@ class JournalManager{
 		let note_text= noteAlreadyOpen ? note.find('.note-text') : $("<div class='note-text'/>");
 		if(noteAlreadyOpen){
 			note_text.empty();
+			const titleBarMinimized = note_container.find('.title_bar.minimized');
+			if(titleBarMinimized.length>0){
+				titleBarMinimized.dblclick(); // if note is minimized open it
+			} else{
+				note_container.css('display', '') // if note is hidden for popout this will display it
+			}
+			
+
 		}
 		note_text.append(self.notes[id].text); // valid tags are controlled by tinyMCE.init()
 		this.translateHtmlAndBlocks(note_text, id).then(() => {	
@@ -2268,79 +2245,8 @@ class JournalManager{
 	    }
 	}
 	block_send_to_buttons(target){
-		const blocks = target.find('img:not(.mon-stat-block__separator-img), .text--quote-box, .rules-text, .block-torn-paper, .read-aloud-text, .dmScreenChunk')
+		const blocks = target.find('img:not(.mon-stat-block__separator-img), video, .text--quote-box, .rules-text, .block-torn-paper, .read-aloud-text, .dmScreenChunk')
 
-		const sendToGamelogButton = $('<button class="block-send-to-game-log"><span class="material-symbols-outlined">login</span></button>')
-
-		
-	
-
-	    const whisper_container=$("<div class='whisper-container'/>");
-
-        for(let i=0; i<window.playerUsers.length; i++){
-			if(whisper_container.find(`input[name='${window.playerUsers[i].userId}']`).length == 0){
-				const randomId = uuid();
-				let whisper_toggle=$(`<input type='checkbox' name='${window.playerUsers[i].userId}'/>`);
-				let whisper_row = $(`<div class='whisper_toggle_row'><label>${window.playerUsers[i].userName}</label></div>`)
-				whisper_toggle.off('click.toggle').on('click.toggle', function(e){
-
-					e.stopPropagation();
-				})
-				whisper_row.find('label').off('click.stopProp').on('click.stopProp', function(e){
-					e.stopPropagation();
-					e.preventDefault();
-					$(this).next('input[type=checkbox]').click();
-				})
-				whisper_row.append(whisper_toggle)
-
-				
-				whisper_container.append(whisper_row);
-			}
-		}
-		sendToGamelogButton.off('contextmenu').on("contextmenu", function(e) {
-			e.preventDefault();
-			e.stopPropagation();
-			const checkedInputs=$(this).find('.whisper-container input:checked');
-	        checkedInputs.click();
-			$(this).find('.whisper-container').toggleClass('visible');
-
-			if($(this).find('.whisper-container').hasClass('visible')){
-		      $(document).on('click.blurWhisperHandle', function(e){
-		        if($(e.target).closest('.whisper-container').length == 0){
-		          $('.whisper-container').toggleClass('visible', false)
-		          $(document).off('click.blurWhisperHandle');
-		        }
-		      })  
-		    }
-		})
-		$(sendToGamelogButton).append(whisper_container);
-		sendToGamelogButton.off('click').on("click", function(e) {
-	        e.stopPropagation();
-	        e.preventDefault();
-	        
-	        let targetBlock = $(e.currentTarget).parent().clone();
-	        targetBlock.find('button.block-send-to-game-log').remove();
-	        targetBlock.find('img').removeAttr('width height style').toggleClass('magnify', true);
-	       	const whisper_container=$(this).find('.whisper-container');
-	        if(whisper_container.hasClass('visible')){
-	        	const checkedInputs = whisper_container.find('input:checked');
-	        	const whisperArray = [];
-	        	checkedInputs.each(function () {
-			       whisperArray.push($(this).attr('name'));
-			  	});
-			  	send_html_to_gamelog(`<p>${targetBlock[0].outerHTML}</p>`, whisperArray)
-	        }
-	        else{
-	        	send_html_to_gamelog(`<p>${targetBlock[0].outerHTML}</p>`);
-	        }
-	        
-	    });
-
-
-		const tables = target.find('table');
-		
-		const allDiceRegex = /(\d+)?d(?:100|20|12|10|8|6|4)((?:kh|kl|ro(<|<=|>|>=|=)|min=)\d+)*/g; // ([numbers]d[diceTypes]kh[numbers] or [numbers]d[diceTypes]kl[numbers]) or [numbers]d[diceTypes]
-       	
    		blocks.wrap(function(i){
 			const container = $(`<div class='note-text' style='position:relative;max-width: 100%;'></div>`)
 			if(blocks[i] instanceof HTMLImageElement){
@@ -2352,18 +2258,21 @@ class JournalManager{
 			}
 			return container;
 		});
-		sendToGamelogButton.clone(true, true).insertAfter(blocks);
+		blocks.each((i, block) => {
+			createSendPlayerButton(block, "login", block instanceof HTMLImageElement || block instanceof HTMLVideoElement).insertAfter(block);			
+		});
+
+		const tables = target.find('table');
+		const allDiceRegex = /(\d+)?d(?:100|20|12|10|8|6|4)((?:kh|kl|ro(<|<=|>|>=|=)|min=)\d+)*/g; // ([numbers]d[diceTypes]kh[numbers] or [numbers]d[diceTypes]kl[numbers]) or [numbers]d[diceTypes]
 		if(allDiceRegex.test($(tables).find('tr:first-of-type>:first-child').text())){
 			let result = $(tables).find(`tbody > tr td:last-of-type`);
 			$(tables).find('td').css({
 				'position': 'relative',
 				'padding-right': '10px'
 			});
-			result.append(sendToGamelogButton.clone(true, true)); 
+			result.each((i, block) =>
+				$(block).append(createSendPlayerButton(block, "login")));
 		}
-
-
-		
 	}
 				   
 	replaceNoteEmbed(text, notesIncluded=[]){
@@ -2543,13 +2452,14 @@ class JournalManager{
 		}
 		const embededIframes = target.find('iframe');
 		for(let i=0; i<embededIframes.length; i++){
-			if(!embededIframes[i].src.startsWith(window.EXTENSION_PATH))
+			if(embededIframes[i].src.includes("youtube")){
+				embededIframes[i].src = embededIframes[i].src.replace(/youtube(-nocookie)?\.com/gi, 'youtube-nocookie.com');
+			}
+			else if(!embededIframes[i].src.startsWith(window.EXTENSION_PATH)){
 				embededIframes[i].src = `${window.EXTENSION_PATH}iframe.html?src=${encodeURIComponent(embededIframes[i].src)}`;
+			}
 		}
 
-
-
-		
 
     	let data = $(target).clone().html();
 
@@ -2685,9 +2595,9 @@ class JournalManager{
             	let eachNumberFound = (input.match(/(?<!<[^>]+)\d+\/day( each)?/gi)) ? parseInt(input.match(/(?<!<[^>]+)[0-9]+(?![0-9]?px)/gi)[0]) : undefined;
             	let slotsNumberFound = (input.match(/(?<!<[^>]+)\d+\w+ level \(\d slots?\)\:/gi)) ? parseInt(input.match(/(?<!<[^>]+)[0-9]+/gi)[1]) : undefined;
             	let spellLevelFound = (slotsNumberFound) ? input.match(/\d+\w+ level/gi)[0] : undefined;
-                let parts = input.split(/((?<!<[^>]+):\s)/gi);
+                let parts = input.split(/((?<!<[^>]+):)/i);
                 let i = parts.length - 1;
-                parts[i] = parts[i].split(/(?<!<[^>]+),\s(?![^(]*\))/gm);
+                parts[i] = parts[i].split(/(?<!<[^>]+),(?![^(]*\))/gm);
                 for (let p in parts[i]) {
 
                 	if(parts[i][p].match(/^((\s+?)?(<a|<span))/gi) && $(parts[i][p])?.is('a, span[data-spell]'))
@@ -3106,7 +3016,41 @@ class JournalManager{
 		}
 
     }
-	
+	getCustomCR(statBlock){
+		if(statBlock == undefined) return 0;
+       
+		statBlock.find('style').remove();
+		statBlock=statBlock[0].innerHTML;
+		let crText = $(statBlock).find('.custom-challenge-rating.custom-stat').text();
+		if(crText == '' || crText == undefined){
+			let searchText = statBlock.replaceAll('mon-stat-block-2024', '').replaceAll(/\&nbsp\;/g,' ')
+
+			let statBlockCR = searchText.matchAll(/[\s>]CR[\s]+([0-9]+(\/[0-9])?)/gi).next()
+			if(statBlockCR.value != undefined){
+			if(statBlockCR.value[1] != undefined)
+				crText = statBlockCR.value[1];
+			} 
+			else{
+			statBlockCR = searchText.matchAll(/[\s>](CR[\W]|challenge)[\s\S]*?[\s>]([0-9]+(\/[0-9])?)/gi).next()
+
+				if(statBlockCR.value != undefined){
+					if(statBlockCR.value[2] != undefined)
+						crText = statBlockCR.value[2];
+				}  
+			}
+		}
+		if(crText == '' || crText == undefined) return 0;
+
+		try{
+			const cr = eval(crText);
+			return cr;
+		}catch(e){
+			console.warn(`Could not parse CR from custom stat block, defaulting to 0. CR text was ${crText}`);
+			return 0;
+		}
+	}
+
+
 	note_visibility(id,visibility){
 		this.notes[id].player=visibility;
 
@@ -4700,6 +4644,15 @@ class JournalManager{
 				self.notes[note_id].plain = tinymce.activeEditor.getContent({ format: 'text' });
 				self.notes[note_id].statBlock = statBlock;
 				self.persist();
+				if(statBlock){
+					const row = $(`#tokens-panel .sidebar-list-item-row[data-id='${note_id}']`);
+					const subtitle = row.find('.sidebar-list-item-row-details-subtitle');
+					subtitle.find('.challenge-rating').remove();
+					const statBlock = $(`<div>${self.notes[note_id].text}</div>`)
+					const cr = window.JOURNAL.getCustomCR(statBlock);
+					subtitle.prepend(`<div class="subtitle-attibute challenge-rating"><span class="plain-text">CR</span>${cr}</div>`)
+				}
+			
 				const dmScreenPageOpen = $('#dmScreenCustomBlock');
 				if(dmScreenPageOpen.length > 0){
 					const openNoteId = dmScreenPageOpen.attr('data-note-id');

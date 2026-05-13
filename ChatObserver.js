@@ -39,7 +39,7 @@ class ChatObserver {
                         duration,
                         startTime
                     });
-                    create_gamelog_timer(message, duration, startTime);
+                    create_gamelog_timer(message, duration, startTime, true);
                     self.#didSubmit(input, value);
                 } else {
                     self.#sendChatMessage(value);

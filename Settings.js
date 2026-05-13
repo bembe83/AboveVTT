@@ -356,13 +356,21 @@ function avtt_settings() {
 		},
 		{	
 			name: "gridZoomConversion",
-			label: "Store grid size based on current view",
-			buttonText: "Store",
+			label: "Store Grid Visual Size",
+			description: "<p>This allows you to save a grid visual size. This is useful for in person play where you want to quickly set the grid size to match physical mini sizes.</p><p>The stored value will be based on the current scenes grid size and zoom level. It will then be able to calculate the correct zoom level to make the grid match the stored visual size on any scene. This may be different per device so you will have to store the value on the device you plan on adjusting zoom to match the stored visual size.</p><p>A quick toggle button will be added to the right side buttons when a value is stored</p>",
+			buttonText: ["Clear", "Store"],
 			type: "customButton",
-			customFunction: function (clickEvent, body) {
-				set_avtt_setting_value('gridZoomConversion', window.ZOOM*parseFloat(window.CURRENT_SCENE_DATA.hpps));
-				showTempMessage(`Grid visual size stored`, { fadeDelay: 600, fadeTime: 400 });
-			},
+			customFunction: [
+				function (clickEvent, body) {
+					clear_avtt_setting('gridZoomConversion');
+					showTempMessage(`Grid visual size cleared`, { fadeDelay: 600, fadeTime: 400 });
+					$("#grid_zoom_conversion").css('display', 'none');
+				}, function (clickEvent, body) {
+					set_avtt_setting_value('gridZoomConversion', window.ZOOM*parseFloat(window.CURRENT_SCENE_DATA.hpps));
+					showTempMessage(`Grid visual size stored`, { fadeDelay: 600, fadeTime: 400 });
+					$("#grid_zoom_conversion").css('display', '');
+				}
+			],
 			class: 'ui'
 		},
 		{
@@ -488,10 +496,14 @@ function avtt_settings() {
 								delete window.TOKEN_SETTINGS[name];
 							}
 						}, function() {
-							let visionInput = $("input[name='visionColor']").spectrum("get");
-			   				let light1Input = $("input[name='light1Color']").spectrum("get");
-			    			let light2Input = $("input[name='light2Color']").spectrum("get");
-			        		
+							const devilsightInput = $("input[name='devilsightColor']").spectrum("get");
+							const truesightInput = $("input[name='truesightColor']").spectrum("get");
+							const visionInput = $("input[name='visionColor']").spectrum("get");
+			   				const light1Input = $("input[name='light1Color']").spectrum("get");
+			    			const light2Input = $("input[name='light2Color']").spectrum("get");
+
+			        		window.TOKEN_SETTINGS.devilsight.color= `rgba(${devilsightInput._r}, ${devilsightInput._g}, ${devilsightInput._b}, ${devilsightInput._a})`;
+							window.TOKEN_SETTINGS.truesight.color= `rgba(${truesightInput._r}, ${truesightInput._g}, ${truesightInput._b}, ${truesightInput._a})`;
 			        		window.TOKEN_SETTINGS.vision.color= `rgba(${visionInput._r}, ${visionInput._g}, ${visionInput._b}, ${visionInput._a})`;
 			   				window.TOKEN_SETTINGS.light1.color = `rgba(${light1Input._r}, ${light1Input._g}, ${light1Input._b}, ${light1Input._a})`;
 			    			window.TOKEN_SETTINGS.light2.color = `rgba(${light2Input._r}, ${light2Input._g}, ${light2Input._b}, ${light2Input._a})`;
@@ -672,6 +684,35 @@ function avtt_settings() {
 		class: 'ui',
 		global: 1
 	})
+	settings.push({
+		name: 'sidebarWidth',
+		label: 'Sidebar Width',
+		type: 'rangeInput',
+		options: [
+			{ min: 340, max: 600, step: 10, description: "Width of the sidebar panel in pixels" },
+		],
+		defaultValue: 340,
+		class: 'ui',
+		global: 1,
+		hiddenSetting: true
+	})
+	
+	settings.push(
+	{
+		name: "exportRemind",
+		label: "Export Reminder",
+		type: "dropdown",
+		options: [
+			{ value: 0, label: "Never", description: `No reminder` },
+			{ value: 1, label: "Daily", description: `Daily reminder` },
+			{ value: 7, label: "Weekly", description: `Weekly reminder` },
+			{ value: 30, label: "Monthly", description: `Monthly reminder` }	
+		],
+		defaultValue: 0,
+		class: 'ui',
+		global: 1
+	})
+	
 	settings.push(
 	{
 		name: "monsterCritType",
@@ -994,6 +1035,9 @@ function set_avtt_setting_value(name, newValue) {
 		case "projector":
 			$('#projector_toggle, #projector_zoom_lock').toggleClass('enabled', newValue);
 			break;
+		case "sidebarWidth":
+			apply_sidebar_width(newValue);
+			break;
 		case "receiveCursorFromPeers":
 		case "receiveRulerFromPeers":
 			local_peer_setting_changed(name, newValue);
@@ -1055,7 +1099,10 @@ function set_avtt_setting_value(name, newValue) {
 			break;
 	}
 }
-
+function clear_avtt_setting(name){
+	delete window.EXPERIMENTAL_SETTINGS[name];
+	persist_experimental_settings(window.EXPERIMENTAL_SETTINGS);
+}
 function is_valid_token_option_value(tokenOptionName, value) {
 	return token_setting_options().find(o => o.name === tokenOptionName)?.options?.map(value).includes(value);
 }
@@ -1094,7 +1141,7 @@ function b64DecodeUnicode(str) {
 
 
 
-function download(data, filename, type) {
+function download(data, filename, type, appendTo = document.body) {
     let file = new Blob([data], {type: type});
     if (window.navigator.msSaveOrOpenBlob) // IE10+
         window.navigator.msSaveOrOpenBlob(file, filename);
@@ -1103,10 +1150,11 @@ function download(data, filename, type) {
                 url = URL.createObjectURL(file);
         a.href = url;
         a.download = filename;
-        document.body.appendChild(a);
+		a.id = 'downloadAvttExportLink'
+        $(appendTo).append(a);
         a.click();
         setTimeout(function() {
-            document.body.removeChild(a);
+            $('#downloadAvttExportLink').remove();
             window.URL.revokeObjectURL(url);
         }, 0);
     }
@@ -1146,7 +1194,10 @@ function init_settings() {
 					<input accept='.abovevtt' id='input_file' type='file' multiple style='display: none' />
 				</div>
 				<div id='export_current_scene_container'>
-					<button id='export_current_scene' onclick='export_current_scene();' class="sidebar-panel-footer-button sidebar-hover-text" data-hover="Download a file containing the current scene data including token notes">EXPORT CURRENT SCENE ONLY</button>
+					<button id='export_current_scene' onclick='export_current_scene();' class="sidebar-panel-footer-button sidebar-hover-text" data-hover="Download a file containing the current scene data including token notes">EXPORT CURRENT SCENE</button>
+				</div>
+				<div id='recover_scenes_container'>
+		<button id='recover_scenes' onclick='recover_scenes();' class="sidebar-panel-footer-button sidebar-hover-text" data-hover="Attempt Scene recovery from older campaign invite link"> Recover Scenes</button>
 				</div>
 				<div id='other_export_container'>
 					<span>Specific Local Data Exports:</span>
@@ -1179,7 +1230,7 @@ function init_settings() {
 	`);
 	for(let i = 0; i < experimental_features.length; i++) {	
 		let setting = experimental_features[i];
-		if (setting.dmOnly === true && !window.DM) {
+		if ((setting.dmOnly === true && !window.DM) || setting.hiddenSetting === true) {
 			continue;
 		}
 		let currentValue = get_avtt_setting_value(setting.name);
@@ -1237,6 +1288,11 @@ function init_settings() {
 				break;
 			case "customButton":
 				inputWrapper = build_custom_button_input(setting);
+				break;
+			case "rangeInput":
+				inputWrapper = build_rangeInput_input(setting, currentValue, function(_name, newValue){
+					set_avtt_setting_value(setting.name, newValue);
+				})
 				break;
 		}
 		if (inputWrapper) {
@@ -1301,7 +1357,7 @@ function redraw_settings_panel_token_examples(settings) {
 	let items = $(".example-tokens-wrapper .example-token");
 	for (let i = 0; i < items.length; i++) {
 		let item = $(items[i]);
-		mergedSettings.imgsrc = item.find(".token-image").attr("src");
+		mergedSettings.imgsrc = item.find(".token-image").attr("data-src");
 		item.replaceWith(build_example_token(mergedSettings, 90));
 	}
 }
@@ -1460,18 +1516,33 @@ function build_sidebar_token_options_flyout(availableOptions, setValues, updateV
 
 
 	if(showExtraOptions){
-		
+		window.TOKEN_SETTINGS.truesight = (window.TOKEN_SETTINGS?.truesight) ? window.TOKEN_SETTINGS.truesight : {color: 'rgba(142, 142, 142, 1)'};
+		window.TOKEN_SETTINGS.devilsight = (window.TOKEN_SETTINGS?.devilsight) ? window.TOKEN_SETTINGS.devilsight : {color: 'rgba(142, 142, 142, 1)'};
 	    window.TOKEN_SETTINGS.vision = (window.TOKEN_SETTINGS?.vision) ? window.TOKEN_SETTINGS.vision : {color: 'rgba(142, 142, 142, 1)'};
 	    window.TOKEN_SETTINGS.light1 = (window.TOKEN_SETTINGS?.light1) ? window.TOKEN_SETTINGS.light1 : {color: 'rgba(255, 255, 255, 1)'};
 	   	window.TOKEN_SETTINGS.light2 = (window.TOKEN_SETTINGS?.light2) ? window.TOKEN_SETTINGS.light2 : {color: 'rgba(142, 142, 142, 1)'};
 	
 
 	    let lightInputs = `<div class="token-image-modal-footer-select-wrapper">
-	                    <div class="token-image-modal-footer-title">Darkvision Color</div>
+					<div class="token-image-modal-footer-title">Darkvision Color</div>
 	                    <div style="padding-left: 2px">
 	                        <input class="spectrum" name="visionColor" value="${window.TOKEN_SETTINGS.vision.color}" >
 	                    </div>
 	                </div>
+					<div class="token-image-modal-footer-select-wrapper">
+						<div class="token-image-modal-footer-title">Devilsight Color</div>
+							<div style="padding-left: 2px">
+								<input class="spectrum" name="devilsightColor" value="${window.TOKEN_SETTINGS.devilsight.color}" >
+							</div>
+						</div>
+					</div>
+					<div class="token-image-modal-footer-select-wrapper">
+						<div class="token-image-modal-footer-title">True Color</div>
+							<div style="padding-left: 2px">
+								<input class="spectrum" name="truesightColor" value="${window.TOKEN_SETTINGS.truesight.color}" >
+							</div>
+						</div>
+					</div>
 	                <div class="token-image-modal-footer-select-wrapper">
 	                    <div class="token-image-modal-footer-title">Inner Light Color</div>
 	                    <div style="padding-left: 2px">
@@ -1495,6 +1566,8 @@ function build_sidebar_token_options_flyout(availableOptions, setValues, updateV
 	        clickoutFiresChange: true,
 	        appendTo: "parent"
 	    });
+		container.find("input[name='devilsightColor']").spectrum("set", window.TOKEN_SETTINGS.devilsight.color);
+		container.find("input[name='truesightColor']").spectrum("set", window.TOKEN_SETTINGS.truesight.color);
 		container.find("input[name='visionColor']").spectrum("set", window.TOKEN_SETTINGS.vision.color);
 	    container.find("input[name='light1Color']").spectrum("set", window.TOKEN_SETTINGS.light1.color);
 	    container.find("input[name='light2Color']").spectrum("set", window.TOKEN_SETTINGS.light2.color);
@@ -1554,15 +1627,17 @@ function build_sidebar_token_options_flyout(availableOptions, setValues, updateV
 
 			let defaultTokenOptions = default_options();
 
-			if(showExtraOptions == true){
-				$("input[name='visionColor']").spectrum("set", defaultTokenOptions.light2.color);
+			if(showExtraOptions == true){	
 			    $("input[name='light1Color']").spectrum("set", defaultTokenOptions.light1.color);
-			    $("input[name='light2Color']").spectrum("set", defaultTokenOptions.light2.color);
+			    $("input[name='light2Color'], input[name='visionColor'], input[name='devilsightColor'], input[name='truesightColor']").spectrum("set", defaultTokenOptions.light2.color);
 			}
 			else{
+				$("input[name='devilsightColor']").spectrum("set", ((window.TOKEN_SETTINGS?.devilsight?.color) ? window.TOKEN_SETTINGS.devilsight.color : defaultTokenOptions.light2.color));
+				$("input[name='truesightColor']").spectrum("set", ((window.TOKEN_SETTINGS?.truesight?.color) ? window.TOKEN_SETTINGS.truesight.color : defaultTokenOptions.light2.color));
 				$("input[name='visionColor']").spectrum("set", ((window.TOKEN_SETTINGS?.vision?.color) ? window.TOKEN_SETTINGS.vision.color : defaultTokenOptions.light2.color));
 			    $("input[name='light1Color']").spectrum("set", ((window.TOKEN_SETTINGS?.light1?.color) ? window.TOKEN_SETTINGS.light1.color : defaultTokenOptions.light1.color));
 			    $("input[name='light2Color']").spectrum("set", ((window.TOKEN_SETTINGS?.light2?.color) ? window.TOKEN_SETTINGS.light2.color : defaultTokenOptions.light2.color));
+				
 			}
 
 
@@ -1714,6 +1789,73 @@ function persist_experimental_settings(settings) {
 	localStorage.setItem("ExperimentalSettings" + gameid, JSON.stringify(settings));
 }
 
+function recover_scenes(){
+	//display any previously known links - or allow user to enter
+	function populateHistory() {
+		const menu = document.getElementById('history-menu');
+		const storageData = localStorage.getItem(`AVTT-CampaignInfo-${window.CAMPAIGN_INFO.id}-previous`);
+		if (storageData) {
+			const items = storageData.split(',');
+			document.getElementById('old-link').value = items[0];			
+			menu.innerHTML = '';
+			items.forEach(item => {
+				const opt = document.createElement('option');
+				opt.value = item;
+				opt.textContent = item;
+				menu.appendChild(opt);
+			});
+			$("#history-menu-div").css("display", "block");			
+		} else {
+			$("#history-menu-div").css("display", "none");
+		}
+	}
+	function showRecoverDialog() {
+		const recoverDialog = $(`#recoverDialog`);		
+		if (recoverDialog.length > 0){
+			populateHistory();
+			recoverDialog.show();
+		} else {
+			const recoverDialog = find_or_create_generic_draggable_window("recoverDialog", "Recover Scenes", false, false, '#recoverDialog', '40%', '30%', '10%', '10%', false, 'input, select, option, button', true);
+			recoverDialog.append(
+				$(`
+				<div style="padding: 20px; border: 1px solid #ccc; border-radius: 8px; background: #fff; font-family: sans-serif;">
+				<div style="margin-bottom: 15px;">
+				<label for="old-link" style="display: block; font-size: 12px; color: #666;">Enter an old invite campaign id from link URL to attempt to recover previous scenes</label>
+				<div style="display: flex; align-items: center; margin-bottom: 10px;">
+				<span style="font-family: monospace;">https://www.dndbeyond.com/campaigns/join/
+				<input type="text" id="old-link" style="width: 180px; box-sizing: border-box; padding: 5px; margin-top: 5px; style="flex-grow: 1;"></span>
+				</div>
+				</div>
+				<div id="history-menu-div" style="margin-bottom: 15px;">
+				<label for="history-menu" style="display: block; font-size: 12px; color: #666;">Known Previously</label>
+				<select id="history-menu" style="width: 100%; padding: 5px;" onchange="document.getElementById('old-link').value = this.value">
+				</select>
+				</div>
+				<button id="recoverButton" type="button" style="width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+				Recover
+    </button>
+</div>`));
+			//populate history: <option value="">Select a previous value...</option>
+			$('#recoverButton').click(function (e) {
+				e.stopPropagation();
+				const oldId = document.getElementById('old-link').value;
+				//validate oldlink matches campaign id
+				if(oldId.startsWith(window.CAMPAIGN_INFO.id)) {
+					console.log("TODO: implement attemptRecovery", oldId);
+					attemptRecovery(oldId);
+				} else {
+					alert("Secret does not match current Campaign");
+				}
+				recoverDialog.hide();
+			});
+			populateHistory();
+			recoverDialog.show();
+		}
+	}
+	// find previous options
+	showRecoverDialog();
+}
+  
 function export_current_scene(){
 	build_import_loading_indicator('Preparing Export File');
 	let currentSceneData = {
@@ -1969,9 +2111,9 @@ function export_audio_csv() {
 
 
 
-function export_file() {
+function export_file(downloadAppendTo) {
 	build_import_loading_indicator('Preparing Export File');
-	let DataFile = {
+	const DataFile = {
 		version: 2,
 		scenes: [{}],
 		tokencustomizations: [],
@@ -1979,10 +2121,12 @@ function export_file() {
 		journalchapters: [],
 		soundpads: {}
 	};
-	let currentdate = new Date(); 
-	let datetime = `${currentdate.getFullYear()}-${(currentdate.getMonth()+1)}-${currentdate.getDate()}`
+	const currentdate = new Date(); 
+	const datetime = `${currentdate.getFullYear()}-${(currentdate.getMonth()+1)}-${currentdate.getDate()}`
+	const filename = `${window.CAMPAIGN_INFO.name}-${datetime}.abovevtt`;
+	const storageKey = `AVTT-exportStamp-${window.CAMPAIGN_INFO.id}`;
 	let firstError = false;
-	AboveApi.exportScenes()
+	return AboveApi.exportScenes()
 		.then(scenes => {
 			DataFile.scenes = scenes;
 			DataFile.tokencustomizations = window.TOKEN_CUSTOMIZATIONS;
@@ -1991,7 +2135,9 @@ function export_file() {
 			DataFile.soundpads = window.SOUNDPADS;
 			DataFile.mixerstate = window.MIXER.state();
 			DataFile.tracklibrary = Array.from(window.TRACK_LIBRARY.map().entries());
-			download(b64EncodeUnicode(JSON.stringify(DataFile,null,"\t")),`${window.CAMPAIGN_INFO.name}-${datetime}.abovevtt`,"text/plain");
+			download(b64EncodeUnicode(JSON.stringify(DataFile,null,"\t")),filename,"text/plain", downloadAppendTo);
+			localStorage.setItem(storageKey, Date.now().toString())
+			return true;
 		})
 		.catch(error => {	
 			firstError = true;	//data is probably too large to get from https - fallback on individually grabbing scenes.
@@ -2004,11 +2150,14 @@ function export_file() {
 				DataFile.soundpads = window.SOUNDPADS;
 				DataFile.mixerstate = window.MIXER.state();
 				DataFile.tracklibrary = Array.from(window.TRACK_LIBRARY.map().entries());
-				download(b64EncodeUnicode(JSON.stringify(DataFile,null,"\t")),`${window.CAMPAIGN_INFO.name}-${datetime}.abovevtt`,"text/plain");
-				$(".import-loading-indicator").remove();	
+				download(b64EncodeUnicode(JSON.stringify(DataFile,null,"\t")),filename,"text/plain", downloadAppendTo);
+				$(".import-loading-indicator").remove();
+				localStorage.setItem(storageKey, Date.now().toString());	
+				return true;				
 			})
 			.catch(error2 => {
 				showError(error2, "export_scenes failed to fetch from the cloud");
+				return false;
 			})
 		})
 		.finally(() => {
@@ -2161,6 +2310,29 @@ function import_process_datafile_text(fileText) {
 	}
 
 	return DataFile;
+}
+
+function attemptRecovery(campaignSecret) {
+	AboveApi.exportScenes(campaignSecret).then((scenes) => {
+		if(scenes && scenes.length > 0) {
+			//do we really want/need migrate here? or is there a better way?
+			build_import_loading_indicator('Preparing Import');
+			AboveApi.migrateScenes(window.gameId, scenes)
+				.then(() => {
+					$(".import-loading-indicator .loading-status-indicator__subtext").addClass("complete");
+					setTimeout(() => {
+						alert("Migration (hopefully) completed. You need to Re-Join AboveVTT");
+						location.reload();
+					}, 2000);
+				})
+				.catch(error => {
+					showError(error, "cloud_migration failed");
+				});
+		} else {
+			alert("No scenes found");
+		}
+	});
+	
 }
 
 function import_readfile() {
