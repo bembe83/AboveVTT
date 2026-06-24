@@ -235,9 +235,9 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 
 					if ($('#gridType input:checked').val() != 1) {
 						
-							let left = parseInt($("#aligner1").css('left')) + parseInt($(event.target).css("top")) - parseInt($("#aligner1").css('top'))
-							left = (parseInt($(event.target).css("top")) - parseInt($("#aligner1").css('top'))) < 25 ? parseInt($("#aligner1").css('left')) + 25 : left
-							let top = (parseInt($(event.target).css("top")) - parseInt($("#aligner1").css('top'))) < 25 ? parseInt($("#aligner1").css('top')) + 25 : Math.round((event.clientY - click2.y + original.top) / zoom);
+							let left = parseInt($("#aligner1")[0].style.left) + parseInt(event.target.style.top) - parseInt($("#aligner1").css('top'))
+							left = (parseInt(event.target.style.top) - parseInt($("#aligner1").css('top'))) < 25 ? parseInt($("#aligner1").css('left')) + 25 : left
+							let top = (parseInt(event.target.style.top) - parseInt($("#aligner1").css('top'))) < 25 ? parseInt($("#aligner1").css('top')) + 25 : Math.round((event.clientY - click2.y + original.top) / zoom);
 					
 							ui.position = {
 								left: left,
@@ -249,14 +249,14 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 							let left;
 							let top;
 							if(ui.position.top - parseInt($("#aligner1").css('top')) > ui.position.left - parseInt($("#aligner1").css('left'))){
-								left = parseInt($("#aligner1").css('left')) + parseInt($(event.target).css("top")) - parseInt($("#aligner1").css('top'))
-								left = (parseInt($(event.target).css("top")) - parseInt($("#aligner1").css('top'))) < 25 ? parseInt($("#aligner1").css('left')) + 25 : left
-								top = (parseInt($(event.target).css("top")) - parseInt($("#aligner1").css('top'))) < 25 ? parseInt($("#aligner1").css('top')) + 25 : Math.round((event.clientY - click2.y + original.top) / zoom);
+								left = parseInt($("#aligner1")[0].style.left) + parseInt(event.target.style.top) - parseInt($("#aligner1").css('top'))
+								left = (parseInt(event.target.style.top) - parseInt($("#aligner1").css('top'))) < 25 ? parseInt($("#aligner1").css('left')) + 25 : left
+								top = (parseInt(event.target.style.top) - parseInt($("#aligner1").css('top'))) < 25 ? parseInt($("#aligner1").css('top')) + 25 : Math.round((event.clientY - click2.y + original.top) / zoom);
 							}
 							else {
-								top = parseInt($("#aligner1").css('top')) + parseInt($(event.target).css("left")) - parseInt($("#aligner1").css('left'))
-								top = (parseInt($(event.target).css("left")) - parseInt($("#aligner1").css('left'))) < 25 ? parseInt($("#aligner1").css('top')) + 25 : top
-								left = (parseInt($(event.target).css("left")) - parseInt($("#aligner1").css('left'))) < 25 ? parseInt($("#aligner1").css('left')) + 25 : Math.round((event.clientX - click2.x + original.left) / zoom);						
+								top = parseInt($("#aligner1")[0].style.top) + parseInt(event.target.style.left) - parseInt($("#aligner1").css('left'))
+								top = (parseInt(event.target.style.left) - parseInt($("#aligner1").css('left'))) < 25 ? parseInt($("#aligner1").css('top')) + 25 : top
+								left = (parseInt(event.target.style.left) - parseInt($("#aligner1").css('left'))) < 25 ? parseInt($("#aligner1").css('left')) + 25 : Math.round((event.clientX - click2.x + original.left) / zoom);						
 							}
 
 
@@ -440,7 +440,8 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 		load_scenemap(map_url, map_is_video, window.CURRENT_SCENE_DATA.width, window.CURRENT_SCENE_DATA.height, window.CURRENT_SCENE_DATA.UVTTFile, async function() {
 			$("#scene_map").off("load");
 			delete window.LOADING;
-			await reset_canvas();
+			const continueLoading = await reset_canvas();
+			if(!continueLoading) return;
 			await set_default_vttwrapper_size()
 			align_grid(false, false, copiedSceneData);
 			window.WeatherOverlay.stop();
@@ -882,7 +883,7 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 		}
 		
 		window.TOKEN_OBJECTS[id].place(0);
-		window.TOKEN_OBJECTS[id].sync($.extend(true, {}, options));
+		window.TOKEN_OBJECTS[id].sync();
 
 	}
 
@@ -951,6 +952,7 @@ class ScenesHandler { // ONLY THE DM USES THIS OBJECT
 		window.MB.sendMessage("custom/myVTT/delete_scene",{ id: sceneId });
 		let sceneIndex = window.ScenesHandler.scenes.findIndex(s => s.id === sceneId);
 		window.ScenesHandler.scenes.splice(sceneIndex, 1);
+		remove_zoom_from_storage(sceneId);
 		if (window.JOURNAL.notes[sceneId] != undefined){
 			delete window.JOURNAL.notes[sceneId];
 			window.JOURNAL.persist();

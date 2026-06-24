@@ -501,13 +501,22 @@ function build_custom_button_input(settingOption) {
     changeHandler = function(){};
   }
   let wrapper = $(`
-     <div class="token-image-modal-footer-select-wrapper" data-option-name="${settingOption.name}">
+     <div class="token-image-modal-footer-select-wrapper sidebar-hover-text" ${settingOption.description ? `data-hover="${settingOption.description}"` : ''} data-option-name="${settingOption.name}">
        <div class="token-image-modal-footer-title">${settingOption.label}</div>
      </div>
   `);
-  let flyoutButton = $(`<button class='sidebar-panel-footer-button avtt-small-settings-edit'>${settingOption.buttonText}</button>`);
-  flyoutButton.on("click", function(e){settingOption.customFunction(e, $('#settings-panel .sidebar-panel-body'))});
-  wrapper.append(flyoutButton)
+  if(Array.isArray(settingOption.buttonText) && Array.isArray(settingOption.customFunction) && settingOption.buttonText.length == settingOption.customFunction.length){
+     for(let i = 0; i < settingOption.buttonText.length; i++){
+          let flyoutButton = $(`<button class='sidebar-panel-footer-button avtt-small-settings-edit' style="margin-left: 5px;">${settingOption.buttonText[i]}</button>`);
+          flyoutButton.on("click", function(e){settingOption.customFunction[i](e, $('#settings-panel .sidebar-panel-body'))});
+          wrapper.append(flyoutButton)
+     }
+  } else{
+      let flyoutButton = $(`<button class='sidebar-panel-footer-button avtt-small-settings-edit'>${settingOption.buttonText}</button>`);
+      flyoutButton.on("click", function(e){settingOption.customFunction(e, $('#settings-panel .sidebar-panel-body'))});
+      wrapper.append(flyoutButton)
+  }
+
   return wrapper;
 }
 function build_text_input(settingOption, currentValue, changeHandler) {
@@ -727,7 +736,7 @@ class SidebarListItem {
     if(monsterData.img_main == null || monsterData.img_main == "http://api.open5e.com/"){
       monsterData.img_main = 'https://www.dndbeyond.com/avatars/4675/675/636747837794884984.jpeg'
     }
-    let item = new SidebarListItem(monsterData.slug, monsterData.name, monsterData.img_main, ItemType.Open5e, RootFolder.Open5e.path, RootFolder.Open5e.id);
+    let item = new SidebarListItem(monsterData.key, monsterData.name, monsterData.img_main, ItemType.Open5e, RootFolder.Open5e.path, RootFolder.Open5e.id);
     item.monsterData = monsterData;
     return item;
   }
@@ -1589,7 +1598,7 @@ function build_sidebar_list_row(listItem) {
   rowItem.append(imgHolder);
   if (listItem.type !== "aoe" && !listItem.isTypeScene()){
     let tokenCustomizations = find_token_customization(listItem.type, listItem.id);
-    let listingImage = (tokenCustomizations?.tokenOptions?.alternativeImages && tokenCustomizations.tokenOptions?.alternativeImages?.[0] != undefined) ? tokenCustomizations.tokenOptions.alternativeImages[0] : listItem.image; 
+    let listingImage = tokenCustomizations?.tokenOptions?.defaultImage != undefined ? tokenCustomizations.tokenOptions.defaultImage : (tokenCustomizations?.tokenOptions?.alternativeImages && tokenCustomizations.tokenOptions?.alternativeImages?.[0] != undefined) ? tokenCustomizations.tokenOptions.alternativeImages[0] : listItem.image; 
     let img;
     let video = false;
     let isAvttBucketFile = listingImage?.startsWith('above-bucket-not-a-url');
@@ -1880,7 +1889,12 @@ function build_sidebar_list_row(listItem) {
       }
       break;
     case ItemType.MyToken:
-      subtitle.hide();
+      if(window.JOURNAL.notes[listItem.id] !== undefined){
+        const statBlock = $(`<div>${window.JOURNAL.notes[listItem.id].text}</div>`)
+        const cr = window.JOURNAL.getCustomCR(statBlock);
+        subtitle.append(`<div class="subtitle-attibute challenge-rating"><span class="plain-text">CR</span>${cr}</div>`)
+      }
+     
       // TODO: Style specifically for My Tokens
       row.css("cursor", "default");
       break;
@@ -1999,7 +2013,13 @@ function build_sidebar_list_row(listItem) {
       break;
     case ItemType.Monster:
       row.attr("data-monster", listItem.monsterData.id);
-      subtitle.append(`<div class="subtitle-attibute"><span class="plain-text">CR</span>${convert_challenge_rating_id(listItem.monsterData.challengeRatingId)}</div>`);
+      if(window.JOURNAL.notes[listItem.id] !== undefined){
+        const statBlock = $(`<div>${window.JOURNAL.notes[listItem.id].text}</div>`)
+        const cr = window.JOURNAL.getCustomCR(statBlock);
+        subtitle.append(`<div class="subtitle-attibute challenge-rating"><span class="plain-text">CR</span>${cr}</div>`)
+      } else{
+        subtitle.append(`<div class="subtitle-attibute challenge-rating"><span class="plain-text">CR</span>${convert_challenge_rating_id(listItem.monsterData.challengeRatingId)}</div>`);   
+      }
       if (listItem.monsterData.isHomebrew === true) {
         subtitle.append(`<div class="subtitle-attibute"><span class="material-icons">alt_route</span>Homebrew</div>`);
       } else if (listItem.monsterData.isReleased === false) {
@@ -2024,9 +2044,9 @@ function build_sidebar_list_row(listItem) {
       break;
     case ItemType.Open5e:
       row.attr("data-monster", listItem.monsterData.id);
-      subtitle.append(`<div class="subtitle-attibute"><span class="plain-text">CR</span>${convert_challenge_rating_id(listItem.monsterData.challengeRatingId)}</div>`);
+      subtitle.append(`<div class="subtitle-attibute challenge-rating"><span class="plain-text">CR</span>${convert_challenge_rating_id(listItem.monsterData.challengeRatingId)}</div>`);
       if (listItem.monsterData.isHomebrew === true) {
-        subtitle.append(`<div class="subtitle-attibute"><span class="material-icons" style="width: 15px;font-family: 'Material Symbols Outlined'; font-size:15px;">book_2</span>${listItem.monsterData.document__slug}</div>`);
+        subtitle.append(`<div class="subtitle-attibute"><span class="material-icons" style="width: 15px;font-family: 'Material Symbols Outlined'; font-size:15px;">book_2</span>${listItem.monsterData.document?.key}</div>`);
       } 
       break;
     case ItemType.BuiltinToken:
@@ -2049,7 +2069,6 @@ function build_sidebar_list_row(listItem) {
         $("#scenes-panel .dm_scenes_button.selected-scene").removeClass("selected-scene");
         $(clickEvent.currentTarget).addClass("selected-scene");
         window.MB.sendMessage("custom/myVTT/switch_scene", { sceneId: listItem.id, switch_dm: true });
-        add_zoom_to_storage();
       });
       let switch_players = $(`<button class='player_scenes_button token-row-button' title="Move Players To This Scene"></button>`);
       switch_players.append(svg_everyone());
@@ -2068,7 +2087,6 @@ function build_sidebar_list_row(listItem) {
         }
         window.splitPlayerScenes = {};
         $('#scenes-panel .sidebar-list-item-row-details~img').remove();
-        add_zoom_to_storage()
       });
       rowItem.append(switch_dm);
       rowItem.append(switch_players);
@@ -2156,7 +2174,7 @@ function did_click_row(clickEvent) {
               : clickedItem.image;
             flyout.append(`<img class='list-item-image-flyout' src="${src}" alt="scene map preview" />`);
           }
-          flyout.css("right", "340px");
+          flyout.css("right", get_sidebar_width() + "px");
         });
         clickedRow.off("mouseleave").on("mouseleave", function (mouseleaveEvent) {
           $(mouseleaveEvent.currentTarget).off("mouseleave");
@@ -2221,7 +2239,7 @@ function did_click_row(clickEvent) {
         }
       }
       else {
-        console.log(`Opening open5e monster with id ${clickedItem.monsterData.slug}`);
+        console.log(`Opening open5e monster with id ${clickedItem.monsterData.key}`);
         open_monster_item(clickedItem, true);
       }
       break;
@@ -2640,43 +2658,7 @@ function edit_encounter(clickEvent) {
           cr = foundCR;
         }
         else if(hasCustomStatBlock){
-          if(window.JOURNAL.notes[itemCustomization.tokenOptions.statBlock] != undefined){
-           
-            statBlock.find('style').remove();
-            statBlock=statBlock[0].innerHTML;
-            let crText = $(statBlock).find('.custom-challenge-rating.custom-stat').text();
-            if(crText == '' || crText == undefined){
-              let searchText = statBlock.replaceAll('mon-stat-block-2024', '').replaceAll(/\&nbsp\;/g,' ')
-
-              let statBlockCR = searchText.matchAll(/[\s>]CR[\s]+([0-9]+(\/[0-9])?)/gi).next()
-              if(statBlockCR.value != undefined){
-                if(statBlockCR.value[1] != undefined)
-                    crText = statBlockCR.value[1];
-              } 
-              else{
-                statBlockCR = searchText.matchAll(/[\s>](CR[\W]|challenge)[\s\S]*?[\s>]([0-9]+(\/[0-9])?)/gi).next()
-
-                if(statBlockCR.value != undefined){
-                    if(statBlockCR.value[2] != undefined)
-                        crText = statBlockCR.value[2];
-                }  
-              }
-
-                    
-            }
-            if(crText != '' && crText != undefined){
-              try{
-                cr = eval(crText); 
-              }catch(e){
-                console.warn(`Could not parse CR from custom stat block, defaulting to 0. CR text was ${crText}`);
-                cr = 0;
-              }
-            }
-            else{
-              cr = 0;
-            }
-
-          }
+          cr = window.JOURNAL.getCustomCR(statBlock);
         }
         for(let j = 0; j<item.quantity; j++ ){
           if(item.type != 'pc'){

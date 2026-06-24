@@ -1,6 +1,7 @@
 
 function consider_upscaling(target){
-	target.scale_factor = Math.max(1, Math.ceil(60 / target.hpps), Math.ceil(60 / target.vpps));	
+	const targetScale = Math.max(Math.ceil(60 / target.hpps), Math.ceil(60 / target.vpps));
+	target.scale_factor = clamp(targetScale, 1, 6);	
 }
 
 function handle_basic_form_toggle_click(event){
@@ -12,8 +13,8 @@ function handle_basic_form_toggle_click(event){
 		$(event.currentTarget).removeClass("rc-switch-unknown");
 		$(event.currentTarget).addClass("rc-switch-checked");
 	  }
-}
-
+	  
+	}
 function handle_map_toggle_click(event){
 	handle_basic_form_toggle_click(event)
 	// validate image input expects the target to be the input not the t oggle
@@ -396,7 +397,7 @@ function open_grid_wizard_controls(scene_id, aligner1, aligner2, regrid = functi
 	scene_properties = $('<div id="scene_properties"/>');
 	dialog.append(scene_properties);
 
-	adjust_create_import_edit_container(dialog, undefined, undefined, window.innerWidth-340, 340);
+	adjust_create_import_edit_container(dialog, undefined, undefined, window.innerWidth-get_sidebar_width(), get_sidebar_width());
 
 	let container = scene_properties;
 
@@ -1453,7 +1454,7 @@ Tbh I feel like these overcomplicate things
 		)
 	initialPosition.find('button#initialPosition').off('click.setPos').on('click.setPos', function(e){
 		initialPosition.find(`input[name='initial_zoom']`).val(parseFloat(window.ZOOM));
-		const sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? 340 : 0);
+		const sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? get_sidebar_width() : 0);
 		initialPosition.find(`input[name='initial_x']`).val(parseFloat(window.scrollX)+window.innerWidth/2-sidebarSize/2);
 		initialPosition.find(`input[name='initial_y']`).val(parseFloat(window.scrollY)+window.innerHeight/2);
 	})

@@ -47,6 +47,8 @@ const debounceHandleInjected = mydebounce(() => {
 					let doubleDamage = $(`<button class='applyDamageButton vulnerable'>2x${damageSVG}</button>`);
 					let quarterDamage = $(`<button class='applyDamageButton resist-save'>1/4 ${damageSVG}</button>`);
 					let healDamage = $(`<button class='applyDamageButton heal'>${healSVG}</button>`);
+					const saveButton = $(`<button class='applyDamageButton save'><svg xmlns="http://www.w3.org/2000/svg" fill="#000000" width="20px" height="20px" viewBox="10 10 540 540"><path d="M106.75 215.06L1.2 370.95c-3.08 5 .1 11.5 5.93 12.14l208.26 22.07-108.64-190.1zM7.41 315.43L82.7 193.08 6.06 147.1c-2.67-1.6-6.06.32-6.06 3.43v162.81c0 4.03 5.29 5.53 7.41 2.09zM18.25 423.6l194.4 87.66c5.3 2.45 11.35-1.43 11.35-7.26v-65.67l-203.55-22.3c-4.45-.5-6.23 5.59-2.2 7.57zm81.22-257.78L179.4 22.88c4.34-7.06-3.59-15.25-10.78-11.14L17.81 110.35c-2.47 1.62-2.39 5.26.13 6.78l81.53 48.69zM240 176h109.21L253.63 7.62C250.5 2.54 245.25 0 240 0s-10.5 2.54-13.63 7.62L130.79 176H240zm233.94-28.9l-76.64 45.99 75.29 122.35c2.11 3.44 7.41 1.94 7.41-2.1V150.53c0-3.11-3.39-5.03-6.06-3.43zm-93.41 18.72l81.53-48.7c2.53-1.52 2.6-5.16.13-6.78l-150.81-98.6c-7.19-4.11-15.12 4.08-10.78 11.14l79.93 142.94zm79.02 250.21L256 438.32v65.67c0 5.84 6.05 9.71 11.35 7.26l194.4-87.66c4.03-1.97 2.25-8.06-2.2-7.56zm-86.3-200.97l-108.63 190.1 208.26-22.07c5.83-.65 9.01-7.14 5.93-12.14L373.25 215.06zM240 208H139.57L240 383.75 340.43 208H240z"></path></svg></button>`);
+					const spellSaveText = $(current.data.injected_data?.text)?.find('.custom-spell-save-text')?.text();
 
 
 					damageButtonContainer.off('click.damage').on('click.damage', 'button', function(e){
@@ -76,7 +78,30 @@ const debounceHandleInjected = mydebounce(() => {
 						if($(`.tokenselected:not([data-id*='profile'])`).length == 0){
 							showTempMessage('No non-player tokens selected');
 						}
-						
+						if(clicked.hasClass('save')){
+							if(!childWindows['Quick Roll Menu'])
+								$("#qrm_dialog").show()
+							if ($('#quick_roll_area').length == 0){
+								close_token_context_menu()
+								const splitMsg = spellSaveText.split(" ");
+								const save = {
+									damage,
+									type: splitMsg[0],
+									dc: parseInt(splitMsg[1].replaceAll(/\D*/gi, "")),
+								}
+								open_quick_roll_menu(e, {left: 'calc(50% - 205px)', top: 'calc(50% - 234px)', save});
+							}
+							$("#qrm_clear_all").click();
+							forSelTokens((token, id) => {
+								add_to_quick_roll_menu(token, true)
+							})
+
+							$('#qrm_roll_button').click();
+							if(childWindows['Quick Roll Menu']){
+								qrm_update_popout();
+							}
+							return;
+						}
 						forSelTokens((token, id) => {
 							if(token.isPlayer() || token.isAoe()) return;
 							let newHp = Math.max(0, parseInt(token.hp) - parseInt(damage));
@@ -99,6 +124,9 @@ const debounceHandleInjected = mydebounce(() => {
 					}
 					else{
 						damageButtonContainer.append(damageButton, halfDamage, quarterDamage, doubleDamage, healDamage);
+					}
+					if(spellSaveText){
+						damageButtonContainer.append(saveButton);
 					}
 					
 					li.find(`[class*='MessageContainer-Flex']`).append(damageButtonContainer);
@@ -227,6 +255,7 @@ function setupMBIntervals(){
 	window.pingInterval = setInterval(function() {
 		window.MB.sendPing();
 		window.MB.sendAbovePing();
+		checkForExportRemind();
 	}, 480000);
 }
 
@@ -253,7 +282,8 @@ class MessageBroker {
 		if(is_gamelog_popout() || (!is_abovevtt_page()))
 			return;
 		let self=this;
-
+		if(window.pingInterval!=undefined)
+			clearInterval(window.pingInterval);
 		if (callback)
 			this.callbackAboveQueue.push(callback);
 		
@@ -315,6 +345,8 @@ class MessageBroker {
 			if(self.reconnectTimeout != undefined){
 				clearTimeout(self.reconnectTimeout);
 			}	
+			if(window.pingInterval!=undefined)
+				clearInterval(window.pingInterval);
 			console.log('Attempting reconnect to Above Websocket');
 			if(window.reconnectAttemptAbovews == undefined){
 				window.reconnectAttemptAbovews = 0;
@@ -620,14 +652,14 @@ class MessageBroker {
 					}
 				}
 			}
-			if (msg.eventType == "dice/roll/pending") {
+			if(msg.eventType == "dice/roll/pending") {
 				// check for injected_data!
 				if (msg.data.injected_data) {
 					notify_gamelog();
 					self.handle_injected_data(msg);
 				}
-			}
-			if (msg.eventType == "dice/roll/fulfilled") {
+				return;
+			} else if (msg.eventType == "dice/roll/fulfilled") {
 				notify_gamelog();
 				const gamelogItem = $(`ol[class*='-GameLogEntries'] li`).first();
 
@@ -761,7 +793,7 @@ class MessageBroker {
 									let doubleDamage = $(`<button class='applyDamageButton vulnerable'>2x${damageSVG}</button>`);
 									let quarterDamage = $(`<button class='applyDamageButton resist-save'>1/4 ${damageSVG}</button>`);
 									let healDamage = $(`<button class='applyDamageButton heal'>${healSVG}</button>`);
-
+									const saveButton = $(`<button class='applyDamageButton save'><svg xmlns="http://www.w3.org/2000/svg" fill="#000000" width="20px" height="20px" viewBox="10 10 540 540"><path d="M106.75 215.06L1.2 370.95c-3.08 5 .1 11.5 5.93 12.14l208.26 22.07-108.64-190.1zM7.41 315.43L82.7 193.08 6.06 147.1c-2.67-1.6-6.06.32-6.06 3.43v162.81c0 4.03 5.29 5.53 7.41 2.09zM18.25 423.6l194.4 87.66c5.3 2.45 11.35-1.43 11.35-7.26v-65.67l-203.55-22.3c-4.45-.5-6.23 5.59-2.2 7.57zm81.22-257.78L179.4 22.88c4.34-7.06-3.59-15.25-10.78-11.14L17.81 110.35c-2.47 1.62-2.39 5.26.13 6.78l81.53 48.69zM240 176h109.21L253.63 7.62C250.5 2.54 245.25 0 240 0s-10.5 2.54-13.63 7.62L130.79 176H240zm233.94-28.9l-76.64 45.99 75.29 122.35c2.11 3.44 7.41 1.94 7.41-2.1V150.53c0-3.11-3.39-5.03-6.06-3.43zm-93.41 18.72l81.53-48.7c2.53-1.52 2.6-5.16.13-6.78l-150.81-98.6c-7.19-4.11-15.12 4.08-10.78 11.14l79.93 142.94zm79.02 250.21L256 438.32v65.67c0 5.84 6.05 9.71 11.35 7.26l194.4-87.66c4.03-1.97 2.25-8.06-2.2-7.56zm-86.3-200.97l-108.63 190.1 208.26-22.07c5.83-.65 9.01-7.14 5.93-12.14L373.25 215.06zM240 208H139.57L240 383.75 340.43 208H240z"></path></svg></button>`);
 
 									damageButtonContainer.off('click.damage').on('click.damage', 'button', function (e) {
 										const clicked = $(e.currentTarget);
@@ -785,6 +817,30 @@ class MessageBroker {
 												msgType: 'gamelogDamageButtons',
 												damage: damage
 											});
+											return;
+										}
+										if(clicked.hasClass('save')){
+											if(!childWindows['Quick Roll Menu'])
+												$("#qrm_dialog").show()
+											if ($('#quick_roll_area').length == 0){
+												close_token_context_menu()
+												const splitMsg = msg.avttSpellSave.split(" ");
+												const save = {
+													damage,
+													type: splitMsg[0],
+													dc: parseInt(splitMsg[1].replaceAll(/\D*/gi, "")),
+												}
+												open_quick_roll_menu(e, {left: 'calc(50% - 205px)', top: 'calc(50% - 234px)', save});
+											}
+											$("#qrm_clear_all").click();
+											forSelTokens((token, id) => {
+												add_to_quick_roll_menu(token, true)
+											})
+
+											$('#qrm_roll_button').click();
+											if(childWindows['Quick Roll Menu']){
+												qrm_update_popout();
+											}
 											return;
 										}
 										if ($(`.tokenselected:not([data-id*='profile'])`).length == 0) {
@@ -813,6 +869,9 @@ class MessageBroker {
 									}
 									else {
 										damageButtonContainer.append(damageButton, halfDamage, quarterDamage, doubleDamage, healDamage);
+									}
+									if(msg.avttSpellSave !== undefined){
+										 damageButtonContainer.append(saveButton);
 									}
 
 									target.find(`[class*='MessageContainer-Flex']`).append(damageButtonContainer);
@@ -908,10 +967,10 @@ class MessageBroker {
 					}
 
 				}
-
+				return;
 			}
 			// WE NEED TO IGNORE CERTAIN MESSAGE IF THEY'RE NOT FROM THE CURRENT SCENE
-			if (window.CURRENT_SCENE_DATA == undefined || (msg.sceneId && window.CURRENT_SCENE_DATA && msg.sceneId !== window.CURRENT_SCENE_DATA.id && [
+			if(window.CURRENT_SCENE_DATA == undefined || (msg.sceneId && window.CURRENT_SCENE_DATA && msg.sceneId !== window.CURRENT_SCENE_DATA.id && [
 				"custom/myVTT/delete_token",
 				"custom/myVTT/createtoken",
 				"custom/myVTT/reveal",
@@ -924,21 +983,18 @@ class MessageBroker {
 				console.log("skipping msg from a different scene");
 				return;
 			}
-			if (msg.eventType == "character-sheet/item-shared/fulfilled"){
+			if(msg.eventType == "character-sheet/item-shared/fulfilled"){
 				DDBApi.debounceGetPartyInventory();
 				return;
-			}
-			if (msg.eventType == "custom/myVTT/token" && (msg.sceneId == window.CURRENT_SCENE_DATA.id || msg.data.id in window.TOKEN_OBJECTS)) {
+			} else if (msg.eventType == "custom/myVTT/token" && (msg.sceneId == window.CURRENT_SCENE_DATA.id || msg.data.id in window.TOKEN_OBJECTS)) {
 				self.handleToken(msg);
-			}
-			if(msg.eventType=="custom/myVTT/delete_token"){
+			} else if(msg.eventType=="custom/myVTT/delete_token"){
 				let tokenid=msg.data.id;
 				if(tokenid in window.TOKEN_OBJECTS){
 					window.TOKEN_OBJECTS[tokenid].options.deleteableByPlayers = true;
 					window.TOKEN_OBJECTS[tokenid].delete(false);
 				}
-			}
-			if(msg.eventType == "custom/myVTT/createtoken"){
+			} else if(msg.eventType == "custom/myVTT/createtoken"){
 				if(window.DM){
 					let left = parseInt(msg.data.left);
 					let top = parseInt(msg.data.top);
@@ -948,17 +1004,14 @@ class MessageBroker {
 						place_token_in_center_of_view(msg.data);
 					}
 				}
-			}
-			if(msg.eventType == "custom/myVTT/deleteExplore"){
+			} else if(msg.eventType == "custom/myVTT/deleteExplore"){
 				if(!window.DM){
 					deleteExploredScene(msg.data.sceneId)
 				}
-			}
-			if (msg.eventType == "custom/myVTT/campaignData"){
+			} else if (msg.eventType == "custom/myVTT/campaignData"){
 				window.AVTT_CAMPAIGN_INFO = msg.data;
 				window.MB.checkHideSceneFromPlayers();
-			}
-			if(msg.eventType == "custom/myVTT/place-extras-token"){
+			} else if(msg.eventType == "custom/myVTT/place-extras-token"){
 				if(window.DM){
 					let left = parseInt(msg.data.centerView.x);
 					let top = parseInt(msg.data.centerView.y);
@@ -967,8 +1020,7 @@ class MessageBroker {
 						create_and_place_token(window.cached_monster_items[monsterId], undefined, undefined, left, top, undefined, undefined, true, msg.data.extraOptions)
 					});
 				}
-			}
-			if(msg.eventType == "custom/myVTT/createTimer"){
+			} else if(msg.eventType == "custom/myVTT/createTimer"){
 				const {type, message, startTime, duration, remove} = msg.data;
 				if(type === "gamelog"){
 					create_gamelog_timer(message, duration, startTime)
@@ -984,12 +1036,38 @@ class MessageBroker {
 					}
 					create_combat_tracker_timer(duration, startTime)
 				}
-			}
-			if (msg.eventType == "custom/myVTT/open-url-embed"){
+			} else if(msg.eventType == "custom/myVTT/cancelTimer"){
+				const {startTime} = msg.data;
+				if(window.chatTimers[startTime]){
+					clearInterval(window.chatTimers[startTime].interval);
+					delete window.chatTimers[startTime];
+					$(`.chatTimer[data-start="${startTime}"]`).remove();
+				}
+				return;
+			} else if(msg.eventType == "custom/myVTT/pauseTimer"){
+				const {startTime} = msg.data;
+				if(window.chatTimers[startTime]){
+					clearInterval(window.chatTimers[startTime].interval);
+				}
+				const pauseButton = $(`.chatTimer[data-start="${startTime}"] .timerPauseButton`);
+				pauseButton.text("play_arrow");
+				pauseButton.toggleClass("paused", true);
+				return;
+			} else if(msg.eventType == "custom/myVTT/restartTimer"){
+				const {startTime, newDuration} = msg.data;
+				const timerBox = $(`.chatTimer[data-start="${startTime}"]`);
+				const pauseButton = timerBox.find('.timerPauseButton');
+				pauseButton.text("pause");
+				pauseButton.toggleClass("paused", false);
+				if(window.chatTimers[startTime]){
+					clearInterval(window.chatTimers[startTime].interval);
+					window.chatTimers[startTime].interval = setTimerInterval(timerBox, startTime);
+				}
+				return;
+			} else if (msg.eventType == "custom/myVTT/open-url-embed"){
 				const url = msg.data;
 				display_url_embeded(url);
-			}
-			if (msg.eventType === "custom/myVTT/fetchscene") {
+			} else if (msg.eventType === "custom/myVTT/fetchscene") {
 
 				if(msg.data.sceneid.players){
 					if(msg.data.sceneid[window.PLAYER_ID] !== undefined)
@@ -1017,45 +1095,32 @@ class MessageBroker {
 					
 				}
 				delete window.startupSceneId; // we only want to prevent a double load of the initial scene, so we want to delete this no matter what.
-			}
-
-			if(msg.eventType == "custom/myVTT/update_dm_player_scenes"){
+			} else if(msg.eventType == "custom/myVTT/update_dm_player_scenes"){
 				if(window.DM){
 					window.splitPlayerScenes = msg.data.splitPlayerScenes;
 					did_update_scenes();
 				}
 				
-			}
-			if (msg.eventType == "custom/myVTT/scene") {
+			} else if (msg.eventType == "custom/myVTT/scene") {
 				self.handleScene(msg);
-			}
-			if (msg.eventType == "custom/myVTT/syncmeup") {
+			} else if (msg.eventType == "custom/myVTT/syncmeup") {
 				self.handleSyncMeUp(msg);
-			}
-			if (msg.eventType == "custom/myVTT/audioPlayingSyncMe") {
+			} else if (msg.eventType == "custom/myVTT/audioPlayingSyncMe") {
 				self.handleAudioPlayingSync(msg);
-			}
-			if(msg.eventType == ('custom/myVTT/character-update')){
+			} else if(msg.eventType == ('custom/myVTT/character-update')){
 				update_pc_with_data(msg.data.characterId, msg.data.pcData);
-			}
-			if(msg.eventType == ('character-sheet/character-update/fulfilled')) {
+			} else if(msg.eventType == ('character-sheet/character-update/fulfilled')) {
 				console.log('update_pc character-sheet/character-update/fulfilled', msg);
 				update_pc_with_api_call(msg.data?.characterId);
-			}
-
-			if (msg.eventType == "custom/myVTT/reveal") {
+			} else if (msg.eventType == "custom/myVTT/reveal") {
 				window.REVEALED.push(msg.data);
 				redraw_fog();
 				check_token_visibility(); // CHECK FOG OF WAR VISIBILITY OF TOKEN
-			}
-
-			if(msg.eventType== "custom/myVTT/fogdata"){ // WE RESEND ALL THE FOG EVERYTIME NOW
+			} else if(msg.eventType== "custom/myVTT/fogdata"){ // WE RESEND ALL THE FOG EVERYTIME NOW
 				window.REVEALED=msg.data;
 				redraw_fog();
 				check_token_visibility();
-			}
-
-			if(msg.eventType=="custom/myVTT/drawdata"){
+			} else if(msg.eventType=="custom/myVTT/drawdata"){
 				const wallsChanged = msg.data?.[0] == 'wallsChanged';
 				if(wallsChanged){
 					msg.data.shift();
@@ -1069,29 +1134,22 @@ class MessageBroker {
 				redraw_light();
 				if(wallsChanged)
 					redraw_fog();// for point line of sight fog tool that is line of sight bucket fill stopped by walls
-			}
-			if(msg.eventType=="custom/myVTT/forceRedrawLight"){
+			} else if(msg.eventType=="custom/myVTT/forceRedrawLight"){
 				redraw_light(true);
-			}
-			if (msg.eventType == "custom/myVTT/chat") { // DEPRECATED!!!!!!!!!
+			} else if (msg.eventType == "custom/myVTT/chat") { // DEPRECATED!!!!!!!!!
 				if(!window.NOTIFIEDOLDVERSION){
 					alert('One of the player is using AboveTT 0.0.51 or less. Please update everyone to 0.0.52 or higher');
 					window.NOTIFIEDOLDVERSION=true;
 				}
-			}
-			if (msg.eventType == "custom/myVTT/CT" && (!window.DM)) {
+			} else if (msg.eventType == "custom/myVTT/CT" && (!window.DM)) {
 				self.handleCT(msg.data);
-			}
-			if (msg.eventType == "custom/myVTT/highlight") {
+			} else if (msg.eventType == "custom/myVTT/highlight") {
 				if (msg.data.id in window.TOKEN_OBJECTS) {
 					window.TOKEN_OBJECTS[msg.data.id].highlight(true);
 				}
-			}
-			if (msg.eventType == "custom/myVTT/pointer") {
+			} else if (msg.eventType == "custom/myVTT/pointer") {
 				set_pointer(msg.data,(!msg.data.dm || (msg.data.dm && !msg.data.center_on_ping)));
-			}
-
-			if (msg.eventType == "custom/myVTT/lock") {
+			} else if (msg.eventType == "custom/myVTT/lock") {
 				if (window.DM)
 					return;
 				if (getPlayerIDFromSheet(msg.data.player_sheet) == window.PLAYER_ID) {
@@ -1125,8 +1183,7 @@ class MessageBroker {
 					}
 
 				}
-			}
-			if (msg.eventType == "custom/myVTT/unlock") {
+			} else if (msg.eventType == "custom/myVTT/unlock") {
 				if (window.DM)
 				{
 					return;
@@ -1139,27 +1196,42 @@ class MessageBroker {
 					$("#sheet iframe").css('opacity', '1');
 					$("#sheet iframe").attr('src', function(i, val) { return val; }); // RELOAD IFRAME
 				}
-			}
-
-			if (msg.eventType == "custom/myVTT/player_sheet_closed") {
+			} else if (msg.eventType == "custom/myVTT/player_sheet_closed") {
 				if (window.DM)
 				{
 					//$("[id='PlayerSheet"+getPlayerIDFromSheet(msg.data.player_sheet)+"']").attr('src', function(i, val) { return val; });
 					$("[id='PlayerSheet"+getPlayerIDFromSheet(msg.data.player_sheet)+"']").attr('data-changed', 'true');
-					return;
 				}
-			}
-			
-			
-			if(msg.eventType=="custom/myVTT/JournalChapters"){
+			} else if(msg.eventType=="custom/myVTT/JournalChapters"){
 				if(!window.DM){
 					window.JOURNAL.chapters=msg.data.chapters;
 					window.JOURNAL.build_journal();
 					window.JOURNAL.persist(true);
 				}
-			}
-			
-			if(msg.eventType=="custom/myVTT/note"){
+			} else if(msg.eventType=="custom/myVTT/Popup"){
+				if(!window.DM &&
+   				   !(msg.data.from && msg.data.from != window.PLAYER_ID) &&
+				   canHearWhisper(msg.data.whisper)) {
+					if(msg.data.delete == true){
+						$.magnificPopup.close();
+					} else {
+						const popup = {
+							items: { src: msg.data.src },
+							type: (msg.data.type || 'image'),
+							closeOnContentClick: true							
+						};
+						if(msg.data.timed) {
+							popup.callbacks = {
+								open: function() {
+									var self = this;
+									setTimeout(function() { self.close() }, msg.data.timed);
+								}
+							};
+						}
+						$.magnificPopup.open(popup);
+					}
+				}
+			} else if(msg.eventType=="custom/myVTT/note"){
 				if(!window.DM || (msg.data.from && msg.data.from != window.PLAYER_ID)){
 					if(msg.data.delete == true){
 						delete window.JOURNAL.notes[msg.data.id]
@@ -1204,8 +1276,7 @@ class MessageBroker {
 					window.JOURNAL.persist(true);
 
 				}
-			}
-			if(msg.eventType=="custom/myVTT/notesSync"){
+			} else if(msg.eventType=="custom/myVTT/notesSync"){
 				if(!window.DM){
 					for(let i in msg.data.notes){
 						let noteId = msg.data.notes[i].id;
@@ -1219,13 +1290,10 @@ class MessageBroker {
 					window.JOURNAL.build_journal();			
 					window.JOURNAL.persist(true);	
 				}
-			}
-			if(msg.eventType=="custom/myVTT/DMAvatar"){
+			} else if(msg.eventType=="custom/myVTT/DMAvatar"){
 				dmAvatarUrl = msg.data.avatar;
 				$(`.player-card[data-player-id=''] .player-token img`).attr('src', dmAvatarUrl);
-			}
-		
-			if(msg.eventType=="custom/myVTT/pausePlayer"){
+			} else if(msg.eventType=="custom/myVTT/pausePlayer"){
 				if(!window.DM){
 					$("#VTT").toggleClass('paused', msg.data.paused);
 				}
@@ -1246,9 +1314,7 @@ class MessageBroker {
 				else{
 					$(".paused-indicator").remove();
 				}
-			}
-			
-			if(msg.eventType=="custom/myVTT/playerjoin"){
+			} else if(msg.eventType=="custom/myVTT/playerjoin"){
 				if (window.DM) {										
 					if (msg.data == null || typeof msg.data.abovevtt_version === "undefined") {
 						// Player with version <= 0.64 - avoiding popping too many alert messages
@@ -1287,36 +1353,27 @@ class MessageBroker {
 						pc: read_pc_object_from_character_sheet(window.PLAYER_ID)
 					});
 				}
-			}
-			if(msg.eventType==="custom/myVTT/pcsync"){
+			} else if(msg.eventType==="custom/myVTT/pcsync"){
 				// a player just sent us their pc data, so let's update our window.pcs with what they gave us
 				if (msg.data && msg.data.player_id && msg.data.pc) {
 					update_pc_with_data(msg.data.player_id, msg.data.pc);
 				}
-			}
-			if(msg.eventType == "custom/myVTT/endplayerturn" && window.DM){
+			} else if(msg.eventType == "custom/myVTT/endplayerturn" && window.DM){
 				let tokenId = $("#combat_area tr[data-current=1]").attr('data-target');
 				if(tokenId.endsWith(`characters/${msg.data.from}`) || window.all_token_objects[tokenId].options.player_owned)
 					$("#combat_next_button").click();				
 
-			}
-			if(msg.eventType=="custom/myVTT/mixer"){
+			} else if(msg.eventType=="custom/myVTT/mixer"){
 				handle_mixer_event(msg.data);
-			}
-			if(msg.eventType=="custom/myVTT/soundpad"){
+			} else if(msg.eventType=="custom/myVTT/soundpad"){
 				build_soundpad(msg.data.soundpad, msg.data.playing);
-			}
-
-			if(msg.eventType=="custom/myVTT/playchannel"){
+			} else if(msg.eventType=="custom/myVTT/playchannel"){
 				audio_playchannel(msg.data.channel,msg.data.time,msg.data.volume);
-			}
-			if(msg.eventType=="custom/myVTT/pausechannel"){
+			} else if(msg.eventType=="custom/myVTT/pausechannel"){
 				audio_pausechannel(msg.data.channel);
-			}
-			if(msg.eventType=="custom/myVTT/changechannel"){
+			} else if(msg.eventType=="custom/myVTT/changechannel"){
 				audio_changesettings(msg.data.channel,msg.data.volume,msg.data.loop);
-			}
-			if(msg.eventType=="custom/myVTT/changeyoutube"){
+			} else if(msg.eventType=="custom/myVTT/changeyoutube"){
 				if(window.YTPLAYER?.setVolume){
 						window.YTPLAYER.setVolume(msg.data.volume*$("#master-volume input").val());
 				}
@@ -1325,12 +1382,7 @@ class MessageBroker {
 					$('video#scene_map').attr('data-volume', msg.data.volume/100)
 				}
 
-			}
-
-
-			
-
-			if(msg.eventType == "custom/myVTT/whatsyourdicerolldefault"){
+			} else if(msg.eventType == "custom/myVTT/whatsyourdicerolldefault"){
 				if( !window.JOINTHEDICESTREAM)
 					return;
 				if( (!diceplayer_id)  || (msg.data.to!= diceplayer_id) )
@@ -1351,9 +1403,7 @@ class MessageBroker {
 						streamid: diceplayer_id
 					});
 				}
-			}
-
-			if(msg.eventType == "custom/myVTT/turnoffsingledicestream"){
+			} else if(msg.eventType == "custom/myVTT/turnoffsingledicestream"){
 				let dicePeer = window.diceCurrentPeers.filter(d=> d.peer==msg.data.from)[0]
 				if(dicePeer === undefined || (msg.data.to != "everyone" && msg.data.to != diceplayer_id)){
 				 return;
@@ -1362,39 +1412,28 @@ class MessageBroker {
 				dicePeer.close();
 				if(msg.data.to != "everyone"){
 					window.MB.inject_chat({
-              player: window.PLAYER_NAME,
-              img: window.PLAYER_IMG,
-              text: `<span class="flex-wrap-center-chat-message">One of your dice stream connections has failed/disconnected. Try reconnecting to the dice stream if this was not intentional.<br/><br/></div>`,
-              whisper: window.PLAYER_NAME
-          });
+						player: window.PLAYER_NAME,
+						img: window.PLAYER_IMG,
+						text: `<span class="flex-wrap-center-chat-message">One of your dice stream connections has failed/disconnected. Try reconnecting to the dice stream if this was not intentional.<br/><br/></div>`,
+						whisper: window.PLAYER_NAME
+					});
 				}
-			}
-
-			if(msg.eventType == "custom/myVTT/disabledicestream"){
+			} else if(msg.eventType == "custom/myVTT/disabledicestream"){
 				enable_dice_streaming_feature(false);
-			}
-
-			if(msg.eventType == "custom/myVTT/showonlytodmdicestream"){
+			} else if(msg.eventType == "custom/myVTT/showonlytodmdicestream"){
 				if(!window.DM){		
 					hideDiceVideo(msg.data.streamid);
 				}		
 				else{
 					revealDiceVideo(msg.data.streamid);
 				}
-			}
-			if(msg.eventType == "custom/myVTT/hidemydicestream"){
+			} else if(msg.eventType == "custom/myVTT/hidemydicestream"){
 					hideDiceVideo(msg.data.streamid);
-			}
-			if(msg.eventType == "custom/myVTT/revealmydicestream"){
+			} else if(msg.eventType == "custom/myVTT/revealmydicestream"){
 					revealDiceVideo(msg.data.streamid);
-			}
-			if(msg.eventType == "custom/myVTT/enabledicestreamingfeature"){
+			} else if(msg.eventType == "custom/myVTT/enabledicestreamingfeature"){
 					enable_dice_streaming_feature(true);				
-			}
-					
-
-
-			if(msg.eventType == "custom/myVTT/wannaseemydicecollection"){
+			} else if(msg.eventType == "custom/myVTT/wannaseemydicecollection"){
 				if( !window.JOINTHEDICESTREAM)
 					return;
 				if( (!window.MYSTREAMID))
@@ -1418,21 +1457,21 @@ class MessageBroker {
 				peer.onconnectionstatechange=() => {
 					if(peer.connectionState=="connected"){
 						window.MB.inject_chat({
-                player: window.PLAYER_NAME,
-                img: window.PLAYER_IMG,
-                text: `<span class="flex-wrap-center-chat-message"><p>A dice stream peer has ${peer.connectionState}. <br/><br/></div>`,
-                whisper: window.PLAYER_NAME,
-	          });
+							player: window.PLAYER_NAME,
+							img: window.PLAYER_IMG,
+							text: `<span class="flex-wrap-center-chat-message"><p>A dice stream peer has ${peer.connectionState}. <br/><br/></div>`,
+							whisper: window.PLAYER_NAME,
+						});
 					}
-
+					
 					if(peer.connectionState=="closed" || peer.connectionState=="failed" || peer.connectionState == "disconnected"){
 						peer.restartIce();
 						window.MB.inject_chat({
-                player: window.PLAYER_NAME,
-                img: window.PLAYER_IMG,
-                text: `<span class="flex-wrap-center-chat-message"><p>A dice stream connection has ${peer.connectionState}.</p><p> An automatic reconnect is being attempted. </p><p>If you are still unable to see one or more of your groups dice you may have to manually disable then reenable your dice stream in the chat above.</p><br/><br/></div>`,
-                whisper: window.PLAYER_NAME,
-	          });	          
+							player: window.PLAYER_NAME,
+							img: window.PLAYER_IMG,
+							text: `<span class="flex-wrap-center-chat-message"><p>A dice stream connection has ${peer.connectionState}.</p><p> An automatic reconnect is being attempted. </p><p>If you are still unable to see one or more of your groups dice you may have to manually disable then reenable your dice stream in the chat above.</p><br/><br/></div>`,
+							whisper: window.PLAYER_NAME,
+						});	          
 					}
 				};
 				peer.onnegotiationneeded = () => {
@@ -1465,10 +1504,7 @@ class MessageBroker {
 					})
 				};				
 				window.STREAMPEERS[msg.data.from]=peer;				
-			}
-
-
-			if(msg.eventType == "custom/myVTT/okletmeseeyourdice"){
+			} else if(msg.eventType == "custom/myVTT/okletmeseeyourdice"){
 				if( !window.JOINTHEDICESTREAM)
 					return;
 				if( (!window.MYSTREAMID)  || (msg.data.to!= window.MYSTREAMID) )
@@ -1513,20 +1549,20 @@ class MessageBroker {
 				peer.onconnectionstatechange=() => {
 					if(peer.connectionState=="connected"){
 						window.MB.inject_chat({
-                player: window.PLAYER_NAME,
-                img: window.PLAYER_IMG,
-                text: `<span class="flex-wrap-center-chat-message"><p>A dice stream peer has ${peer.connectionState}. <br/><br/></div>`,
-                whisper: window.PLAYER_NAME,
-	          });
+							player: window.PLAYER_NAME,
+							img: window.PLAYER_IMG,
+							text: `<span class="flex-wrap-center-chat-message"><p>A dice stream peer has ${peer.connectionState}. <br/><br/></div>`,
+							whisper: window.PLAYER_NAME,
+						});
 					}
 					if((peer.connectionState=="closed") || (peer.connectionState=="failed" || peer.connectionState == "disconnected")){
 						peer.restartIce();
 						window.MB.inject_chat({
-                player: window.PLAYER_NAME,
-                img: window.PLAYER_IMG,
-                text: `<span class="flex-wrap-center-chat-message"><p>A dice stream connection has ${peer.connectionState}.</p><p> An automatic reconnect is being attempted. </p><p>If you are still unable to see one or more of your groups dice you may have to manually disable then reenable your dice stream in the chat above.</p><br/><br/></div>`,
-                whisper: window.PLAYER_NAME,
-	          });
+							player: window.PLAYER_NAME,
+							img: window.PLAYER_IMG,
+							text: `<span class="flex-wrap-center-chat-message"><p>A dice stream connection has ${peer.connectionState}.</p><p> An automatic reconnect is being attempted. </p><p>If you are still unable to see one or more of your groups dice you may have to manually disable then reenable your dice stream in the chat above.</p><br/><br/></div>`,
+							whisper: window.PLAYER_NAME,
+						});
 					}
 				};
 		
@@ -1566,9 +1602,7 @@ class MessageBroker {
 			});
 				
 				window.STREAMPEERS[msg.data.from] = peer;					
-			}
-
-			if(msg.eventType == "custom/myVTT/okseethem"){
+			} else if(msg.eventType == "custom/myVTT/okseethem"){
 				if( !window.JOINTHEDICESTREAM)
 					return;
 				if( (!window.MYSTREAMID)  || (msg.data.to!= window.MYSTREAMID) )
@@ -1577,17 +1611,11 @@ class MessageBroker {
 				let peer=window.STREAMPEERS[msg.data.from];
 				peer.setRemoteDescription(msg.data.answer);
 				console.log("fatto setRemoteDescription");
-			}
-
-
-
-			if (msg.eventType === "custom/myVTT/peerReady") {
+			} else if (msg.eventType === "custom/myVTT/peerReady") {
 				window.PeerManager.receivedPeerReady(msg);
-			}
-			if (msg.eventType === "custom/myVTT/peerConnect") {
+			} else if (msg.eventType === "custom/myVTT/peerConnect") {
 				window.PeerManager.receivedPeerConnect(msg);
-			}
-			if (msg.eventType === "custom/myVTT/videoPeerConnect") {
+			} else if (msg.eventType === "custom/myVTT/videoPeerConnect") {
 				if(msg.data.id != window.myVideoPeerID){
 					let call = window.videoPeer.call(msg.data.id, window.myLocalVideostream)
 					call.on('stream', (stream) => {
@@ -1600,12 +1628,9 @@ class MessageBroker {
 					window.currentPeers = window.currentPeers.filter(d=> d.peer != call.peer)
 					window.currentPeers.push(call);
 				}
-			}
-			if (msg.eventType === "custom/myVTT/videoPeerDisconnect") {
+			} else if (msg.eventType === "custom/myVTT/videoPeerDisconnect") {
 					$(`.video-meet-area video#${msg.data.id}`).remove();
-			}
-
-			if (msg.eventType === "custom/myVTT/diceVideoPeerConnect") {
+			} else if (msg.eventType === "custom/myVTT/diceVideoPeerConnect") {
 				if(msg.data.id != diceplayer_id){
 					let call = window.diceVideoPeer.call(msg.data.id, window.MYMEDIASTREAM)
 					call.on('stream', (stream) => {
@@ -1618,6 +1643,7 @@ class MessageBroker {
 					window.diceCurrentPeers = window.diceCurrentPeers.filter(d=> d.peer != call.peer)
 					window.diceCurrentPeers.push(call);
 				}
+				return;
 			}
 
 
@@ -1654,6 +1680,7 @@ class MessageBroker {
 		}
 	}
 	async handleScene (msg, forceRefresh=false) {
+		
 		console.debug("handlescene", msg);
 		window.LOADING = true;
 		window.MB.checkHideSceneFromPlayers();
@@ -1684,6 +1711,9 @@ class MessageBroker {
 			
 			const isSameTokenLight = window.CURRENT_SCENE_DATA.disableSceneVision == msg.data.disableSceneVision;																		
 			
+			if(!isCurrentScene){
+				add_zoom_to_storage();
+			}
 
 			if(isSameScaleAndMaps && !forceRefresh){
 				delete window.LOADING;
@@ -1716,7 +1746,8 @@ class MessageBroker {
 				$("#VTT").css("--scene-scale", scaleFactor)
 				window.CURRENT_SCENE_DATA.width = mapWidth;
 				window.CURRENT_SCENE_DATA.height = mapHeight;
-				await reset_canvas(false);
+				const continueLoading = await reset_canvas(false);
+				if(!continueLoading) return;
 
 				if(!isSameTokenLight){
 					for(let i in window.TOKEN_OBJECTS){
@@ -1907,7 +1938,12 @@ class MessageBroker {
 						}
 
 
-						await reset_canvas();
+						const continueLoading = await reset_canvas();
+						if(!continueLoading){
+							console.groupEnd();
+							window.MB.loadNextScene();
+							return;
+						}
         				await set_default_vttwrapper_size();
 						$('.import-loading-indicator .percentageLoaded').css('width', `20%`);	
 						remove_loading_overlay();
@@ -1980,20 +2016,15 @@ class MessageBroker {
 						update_pc_token_rows();
 						$('.import-loading-indicator').remove();
 						delete window.LOADING;
-						
 
-
-
+						redraw_light();
 						do_check_token_visibility();
-						
+						if($('#portal_config_window').length>0)
+							open_portal_config();
 						$('#loadingStyles').remove();
 
-						console.groupEnd()
-
-						
+						console.groupEnd()	
 						window.MB.loadNextScene();	
-						
-						
 					});
 				}
 			}
@@ -2004,6 +2035,7 @@ class MessageBroker {
 			remove_loading_overlay();
 			showError(e);
 		}
+		
 		remove_loading_overlay();
 		// console.groupEnd()
 	}
@@ -2112,8 +2144,8 @@ class MessageBroker {
 
 		if(data.dmonly && !(window.DM) && !local) // /dmroll only for DM of or the user who initiated it
 			return $("<div/>");
-				
-		if(data.whisper && (data.whisper!=window.PLAYER_NAME && !(Array.isArray(data.whisper) && data.whisper.includes(`${window.myUser}`))) && (!local))
+
+		if(!canHearWhisper(data.whisper) && (!local))
 			return $("<div/>");
 		//notify_gamelog();
 
@@ -2196,7 +2228,7 @@ class MessageBroker {
 
 		const centerView = data.highlightCenter == true;
 		delete msg.data.highlightCenter;
-
+		const ignoredSyncProperties = ["left", "top", "hidden", "scaleCreated", "groupId"]
 		if (msg.sceneId != window.CURRENT_SCENE_DATA.id || msg.loading) {
 			let gridSquares = parseFloat(data.gridSquares);
 			if (!isNaN(gridSquares)) {
@@ -2206,7 +2238,7 @@ class MessageBroker {
 			}
 			if (data.id in window.all_token_objects) {
 				for (let property in window.all_token_objects[data.id].options) {		
-					if(property == "left" || property == "top" || property == "hidden" || property == "scaleCreated")
+					if(ignoredSyncProperties.includes(property))
 						continue;
 					if(msg.loading){
 						data[property] = window.all_token_objects[data.id].options[property];
@@ -2238,8 +2270,9 @@ class MessageBroker {
 					delete window.visionBlockingTokenCache[data.id];
 				}
 			}
+			
 			for (let property in data) {
-				if(msg.sceneId != window.CURRENT_SCENE_DATA.id && (property == "left" || property == "top" || property == "hidden" || property == "scaleCreated"))
+				if(msg.sceneId != window.CURRENT_SCENE_DATA.id && ignoredSyncProperties.includes(property))
 					continue;	
 				if(window.all_token_objects[data.id] == undefined){
 					window.all_token_objects[data.id] = window.TOKEN_OBJECTS[data.id]	
@@ -2445,20 +2478,20 @@ class MessageBroker {
 	}
 
 
-	sendMessage(eventType, data,skipSceneId=false) {
+	sendMessage(eventType, data,skipSceneId=false, forceSceneId = undefined) {
 		let self = this;
 
 		//this.sendDDBMB(eventType,data); 
 
 		if(eventType.startsWith("custom")){
-			this.sendAboveMB(eventType,data,skipSceneId);
+			this.sendAboveMB(eventType,data,skipSceneId,forceSceneId);
 		}
 		else{
 			this.sendDDBMB(eventType,data);
 		}
 	}
 
-	sendAboveMB(eventType,data,skipSceneId=false){
+	sendAboveMB(eventType,data,skipSceneId=false, forceSceneId=undefined){
 		let self=this;
 		let message = {
 			action: "sendmessage",
@@ -2472,10 +2505,13 @@ class MessageBroker {
 
 		if(!["custom/myVTT/switch_scene","custom/myVTT/update_scene"].includes(eventType))
 			message.sequence=this.above_sequence++;
-
-		if(window.CURRENT_SCENE_DATA && !skipSceneId)
+		if(forceSceneId != undefined){
+			message.sceneId = forceSceneId;
+		} else if(window.CURRENT_SCENE_DATA && !skipSceneId){
 			message.sceneId=window.CURRENT_SCENE_DATA.id;
-		if(window.PLAYER_SCENE_ID)
+		}
+
+		if(forceSceneId == undefined && window.PLAYER_SCENE_ID)
 			message.playersSceneId = window.PLAYER_SCENE_ID;
 
 		const jsmessage=JSON.stringify(message);
@@ -2500,7 +2536,7 @@ class MessageBroker {
 				alertText = 'Check console warnings for more message data.'
 			}
 			
-			alert(`You reached the maximum message size for "${message.eventType.split('/')[message.eventType.split('/').length-1]}".\n\n${alertText}`);
+			showErrorMessage(`You reached the maximum message size for "${message.eventType.split('/')[message.eventType.split('/').length-1]}".\n\n${alertText}`);
 			return;
 		}
 

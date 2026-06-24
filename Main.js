@@ -157,17 +157,18 @@ function change_zoom(newZoom, x, y, reset = false) {
 	
     if(!window.WIZARDING)
 		draw_svg_grid(); // scale grid so lines are always visible
-	if(reset != true){
-		$(window).scrollLeft(pageX);
-		$(window).scrollTop(pageY);	
-	}
+
 
 	$('#VTTWRAPPER').css({
 		"--window-zoom": window.ZOOM,
 	})
 	debounce_font_change();	
 	set_default_vttwrapper_size();
-	if(reset == true){
+	if(reset != true){
+		$(window).scrollLeft(pageX);
+		$(window).scrollTop(pageY);	
+	}
+	else {
 		//this was changed from scrollIntoView to calculate the center and scrollTo as if loaded in an iframe it would scroll the parent window in firefox
 		const sceneMap = $("#scene_map")[0];
 
@@ -177,7 +178,7 @@ function change_zoom(newZoom, x, y, reset = false) {
 		let scrollX = Math.max(0, sceneMapCenterX - Math.round(window.innerWidth / 2));
 		const scrollY = Math.max(0, sceneMapCenterY - Math.round(window.innerHeight / 2));
 		if ($('#hide_rightpanel').hasClass('point-right') && $('.ct-sidebar.ct-sidebar--hidden').length == 0)
-			scrollX += 170 // 170 half of game log		
+			scrollX += get_sidebar_width() / 2 // offset by half the sidebar width so the scene centers in the visible area
 		window.scrollTo({ left: scrollX, top: scrollY, behavior: 'auto' });			
 	}
 
@@ -197,27 +198,29 @@ function add_zoom_to_storage() {
 	console.group("add_zoom_to_storage");
 	console.log("storing zoom");
 
-	if(window.ZOOM !== get_reset_zoom()) {
-		const zooms = JSON.parse(localStorage.getItem('zoom')) || [];
-		const zoomIndex = zooms.findIndex(zoom => zoom.title === window.CURRENT_SCENE_DATA.title);
-		const centerView = center_of_view(); 
-		const sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? 340 : 0);
-		if (zoomIndex !== -1) {
-			zooms[zoomIndex].zoom = window.ZOOM;
-			zooms[zoomIndex].leftOffset = window.scrollX + window.innerWidth/2 - sidebarSize/2;
-			zooms[zoomIndex].topOffset = window.scrollY + window.innerHeight/2;
-		}
-		else{
-			// zoom doesn't exist
-			zooms.push({
-				"title": window.CURRENT_SCENE_DATA.title,
-				"zoom":window.ZOOM,
-				"leftOffset": window.scrollX + window.innerWidth/2 - sidebarSize/2,
-				"topOffset": window.scrollY + window.innerHeight/2
-			});
-		}
-		localStorage.setItem('zoom', JSON.stringify(zooms));
-	} else {console.log("zoom has not changed, skipping storage")}
+	const currentDate = Date.now();
+	const zooms = JSON.parse(localStorage.getItem('zoom'))?.filter(z=> !z.title && z.expiryDate != undefined && z.expiryDate>currentDate) || []; // filter out old data that used to be based on scene title rather then id and remove older data to prevent long term storage issues
+	const centerView = center_of_view(); 
+	const sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? get_sidebar_width() : 0);
+	const saved = zooms.find(zoom => zoom.id === window.CURRENT_SCENE_DATA.id);
+	if (saved != undefined) {
+		saved.zoom = window.ZOOM;
+		saved.leftOffset = window.scrollX + window.innerWidth/2 - sidebarSize/2;
+		saved.topOffset = window.scrollY + window.innerHeight/2;
+		saved.expiryDate = currentDate + (30 * 24 * 60 * 60 * 1000) ;
+	}
+	else{
+		// zoom doesn't exist
+		zooms.push({
+			"zoom":window.ZOOM,
+			"leftOffset": window.scrollX + window.innerWidth/2 - sidebarSize/2,
+			"topOffset": window.scrollY + window.innerHeight/2,
+			"id": window.CURRENT_SCENE_DATA.id,
+			"expiryDate": currentDate + (30 * 24 * 60 * 60 * 1000) // 30 days from now
+		});
+	}
+	localStorage.setItem('zoom', JSON.stringify(zooms));
+	
 
 	console.groupEnd("add_zoom_to_storage")
 }
@@ -226,24 +229,22 @@ function add_zoom_to_storage() {
 * Sets default values for VTTWRAPPER and black_layer based off zoom.
 */
 function set_default_vttwrapper_size() {
-	const vttwrapper = $("#VTTWRAPPER");
-	const scene_map = $("#scene_map");
 	const black_layer = $("#black_layer");
-	const scalezoom = window.CURRENT_SCENE_DATA.scale_factor * window.ZOOM;
-	const w = $("#scene_map").width() * scalezoom;
-	const h = $("#scene_map").height() * scalezoom;
-	vttwrapper.width(w + 1400);
-	vttwrapper.height(h + 1400);
-	black_layer.width(w + 2000 + window.VTTMargin );
-	black_layer.height(h + 2000 + window.VTTMargin );
+	const sceneMapSize = getSceneMapSize();
+	const w = sceneMapSize.sceneWidth * window.ZOOM * window.CURRENT_SCENE_DATA.scale_factor;
+	const h = sceneMapSize.sceneHeight * window.ZOOM * window.CURRENT_SCENE_DATA.scale_factor;
+	black_layer.width(w + 2000 + window.VTTMargin);
+	black_layer.height(h + 2000 + window.VTTMargin);
+
 }
 
 /**
  * Removes the zoom for the current scene from local storage, applied when user click "fit zoom" button.
  */
-function remove_zoom_from_storage() {
-	const zooms = JSON.parse(localStorage.getItem('zoom')) || [];
-	const zoomIndex = zooms.findIndex(zoom => zoom.title === window.CURRENT_SCENE_DATA.title);
+function remove_zoom_from_storage(sceneId = window.CURRENT_SCENE_DATA.id) {
+	const currentDate = Date.now();
+	const zooms = JSON.parse(localStorage.getItem('zoom'))?.filter(z=> !z.title && z.expiryDate != undefined && z.expiryDate>currentDate) || [];
+	const zoomIndex = zooms.findIndex(zoom => zoom.id === sceneId);
 	if (zoomIndex !== -1) {
 		console.log("removing zoom from storage", zooms[zoomIndex]);
 		zooms.splice(zoomIndex, 1);
@@ -256,7 +257,7 @@ function remove_zoom_from_storage() {
 */
 function apply_zoom_from_storage() {
 	console.group("apply_zoom_from_storage");
-	const sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? 340 : 0);
+	const sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? get_sidebar_width() : 0);
 	let initial_x = isNaN(parseInt(window.CURRENT_SCENE_DATA.initial_x)) ? undefined : window.CURRENT_SCENE_DATA.initial_x - window.innerWidth/2 + sidebarSize/2;
 	let initial_y =  isNaN(parseInt(window.CURRENT_SCENE_DATA.initial_y)) ? undefined : window.CURRENT_SCENE_DATA.initial_y - window.innerHeight/2;
 	let initial_zoom =  isNaN(parseInt(window.CURRENT_SCENE_DATA.initial_zoom)) ? undefined : window.CURRENT_SCENE_DATA.initial_zoom;
@@ -269,8 +270,9 @@ function apply_zoom_from_storage() {
 	else{
 		const zoomState = localStorage.getItem("zoom");
 		if (zoomState != null) {
-			const zooms = JSON.parse(zoomState);
-			const zoomIndex = zooms.findIndex(zoom => zoom.title === window.CURRENT_SCENE_DATA.title);
+			const currentDate = Date.now();
+			const zooms = JSON.parse(zoomState)?.filter(z => !z.title && z.expiryDate != undefined && z.expiryDate>currentDate) || [];
+			const zoomIndex = zooms.findIndex(zoom => zoom.id === window.CURRENT_SCENE_DATA.id);
 			if(zoomIndex !== -1) {
 				console.log("restoring zoom level", zooms[zoomIndex]);
 				change_zoom(zooms[zoomIndex].zoom)
@@ -381,7 +383,7 @@ function get_reset_zoom() {
 	const w = $(window);
 	const scene_map = $("#scene_map");
 	const sf = window.CURRENT_SCENE_DATA.scale_factor;
-	const sidebar_open = ($('#hide_rightpanel').hasClass('point-right') && $('.ct-sidebar.ct-sidebar--hidden').length == 0) ? 340 : 0;
+	const sidebar_open = ($('#hide_rightpanel').hasClass('point-right') && $('.ct-sidebar.ct-sidebar--hidden').length == 0) ? get_sidebar_width() : 0;
 	const wH = w.height();
 	const mH = scene_map.height()*sf;
 	const wW = w.width()-sidebar_open;
@@ -437,14 +439,14 @@ function map_load_error_cb(e) {
 	$('#loadingStyles').remove();
 	console.error("map_load_error_cb src", src, e);
 	if (typeof src === "string") {
-		let specificMessage = `Please make sure the image is accessible to anyone on the internet.`;
 		if (src.includes("drive.google") || window.CURRENT_SCENE_DATA.map.includes("drive.google")) {
 			showGoogleDriveWarning();
 		}
-		else if (confirm(`Map could not be loaded!\n${specificMessage}\nYou may also need to disable ad blockers.\nWould you like to try loading the image in a separate tab to verify that it's accessible? If you are currently logged in to google, you will need to log out or open the image in a different browser or an incognito window to truly test it.`)) {
-			if (window.DM || confirm(`SPOILER ALERT!!!\nIf you click OK, you might see the entire map without fog of war. However, the map isn't loading at all so you will probably see a broken link. Are you sure you want to test this image?`)) {
-				window.open(window.CURRENT_SCENE_DATA.map, '_blank');
-			}
+		else {
+			let mapUrl = window.CURRENT_SCENE_DATA?.map || '';
+			let spoilerWarning = !window.DM ? '<br><b>Spoiler warning:</b> clicking this link may reveal the scene image if it is only failing to load in AboveVTT.<br>' : '';
+			let openLink = mapUrl ? `${spoilerWarning}<br><a target="_blank" href="${mapUrl}">Open map image in new tab</a>` : '';
+			showErrorMessage("Map could not be loaded.", `<p>Possible issues:</p>• The map URL may be blank or invalid<br>• If using a video map ensure the "video map" toggle is enabled<br>• The file may not be publicly accessible (check share settings on the host)<br>• The host may have rate limits or has removed the file<br>• An adblocker, VPN, or content filter may be blocking the image host${openLink}`);
 		}
 	}
 	delete window.LOADING;
@@ -463,6 +465,8 @@ function remove_loading_overlay() {
 	$("#loading_overlay").animate({ "opacity": 0 }, 1000, function() {
 		$("#loading_overlay").hide();
 	});
+	//convenient here to make the export before things get started and it's distracting
+	checkForExportRemind();
 }
 
 /**
@@ -515,15 +519,15 @@ async function load_scenemap(url, is_video = false, width = null, height = null,
 						e.target.setVolume(25);
 					e.target.playVideo();
 
-	        const loopTime = window.YTPLAYER.playerInfo.duration - 0.15;
+	        		const loopTime = window.YTPLAYER.playerInfo.duration - 0.15;
 
-	        window.YTINTERVAL = setInterval(function (){
-	          const current_time = window.YTPLAYER.getCurrentTime();
-	          if (current_time > loopTime) {
-	            	window.YTPLAYER.seekTo(0);
+					window.YTINTERVAL = setInterval(function (){
+						const current_time = window.YTPLAYER.getCurrentTime();
+						if (current_time > loopTime) {
+								window.YTPLAYER.seekTo(0);
 								window.YTPLAYER.playVideo();
-	          }
-	        }, 10);
+						}
+					}, 10);
 				}			
 			}
 		});
@@ -668,7 +672,7 @@ function set_pointer(data, dontscroll = false) {
 	if(!dontscroll){
 		let pageX = Math.round(data.x * window.ZOOM - (w.width() / 2));
 		let pageY = Math.round(data.y * window.ZOOM - (w.height() / 2));
-		let sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? 340 : 0);
+		let sidebarSize = ($('#hide_rightpanel.point-right').length>0 ? get_sidebar_width() : 0);
 		$("html,body").animate({
 			scrollTop: pageY + window.VTTMargin,
 			scrollLeft: pageX + window.VTTMargin + sidebarSize/2,
@@ -1262,6 +1266,8 @@ const MAX_ZOOM_STEP = 20
  * Register event for mousewheel zoom.
  */
 function init_mouse_zoom() {
+	if(window.mouseZoomInitialized) return;
+	window.mouseZoomInitialized = true;
 	window.addEventListener('wheel', function (e) {
 		if (e.ctrlKey) {
 			e.preventDefault();
@@ -1554,8 +1560,9 @@ function observe_character_sheet_companion(documentToObserve){
 		let tokenName = $(this).parent().find('.ddbc-extra-name').find("span").text()
 		console.log("pretending to add a companion ", tokenName)
 	}
-
-	let companion_observer = new MutationObserver(function() {
+	if(window.companion_observer) 
+		window.companion_observer.disconnect();
+	window.companion_observer = new MutationObserver(function() {
 		let extras = documentToObserve.find(".ct-extra-row__preview:not('.above-vtt-visited')");
 		if (extras.length > 0){
 			extras.wrap(function() {
@@ -1948,31 +1955,11 @@ function init_character_page_sidebar() {
 
 	$(".ct-sidebar__inner").off("click.setCondition").on("click.setCondition", ".set-conditions-button", function(clickEvent) {
 		let conditionName = $(clickEvent.target).parent().find("span").text();
-		$('body').append(`<style id='condition-click'>.ct-condition-manage-pane{visibility:hidden !important;}</style>`);
-		$('.ct-combat__statuses-group--conditions .ct-combat__summary-label:contains("Conditions"), .ct-combat-tablet__cta-button:contains("Conditions"), .ct-combat-mobile__cta-button:contains("Conditions")').click();
-		setTimeout(function(){
-			$('.ct-condition-manage-pane').css('visibility', 'hidden');
-			$(`.ct-sidebar__inner .ct-condition-manage-pane__condition-name:contains('${conditionName}') ~ .ct-condition-manage-pane__condition-toggle>[class*='styles_toggle'][aria-pressed="false"]`).click();
-		}, 30)
-		setTimeout(function(){
-			$(`#switch_gamelog`).click();
-			$("#condition-click").remove();
-		}, 40)
+		click_condition(conditionName, false);
 	});	
 	$(".ct-sidebar__inner").off("click.removeCondition").on("click.removeCondition", ".remove-conditions-button", function(clickEvent) {
 		let conditionName = $(clickEvent.target).parent().find("span").text();
-		$('body').append(`<style id='condition-click'>.ct-condition-manage-pane{visibility:hidden !important;}</style>`);
-
-		$('.ct-combat__statuses-group--conditions .ct-combat__summary-label:contains("Conditions"), .ct-combat-tablet__cta-button:contains("Conditions"), .ct-combat-mobile__cta-button:contains("Conditions")').click();
-		setTimeout(function(){
-			$('.ct-condition-manage-pane').css('visibility', 'hidden');
-			$(`.ct-sidebar__inner .ct-condition-manage-pane__condition-name:contains('${conditionName}') ~ .ct-condition-manage-pane__condition-toggle>[class*='styles_toggle'][aria-pressed="true"]`).click();
-		}, 30)
-		setTimeout(function(){
-			$(`#switch_gamelog`).click();
-			$("#condition-click").remove();
-		}, 40)
-
+		click_condition(conditionName);
 	});
 	$(".ct-character-header-info__content").on("click", function(){
 		setTimeout(function(){
@@ -2009,6 +1996,94 @@ function monitor_character_sidebar_changes() {
 
 
 
+const SIDEBAR_MIN_WIDTH = 340;
+const SIDEBAR_MAX_WIDTH = 600;
+
+function get_sidebar_width() {
+	const stored = get_avtt_setting_value('sidebarWidth');
+	const n = parseInt(stored, 10);
+	return (!isNaN(n) && n >= SIDEBAR_MIN_WIDTH && n <= SIDEBAR_MAX_WIDTH) ? n : SIDEBAR_MIN_WIDTH;
+}
+
+function apply_sidebar_width(newWidth) {
+	newWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, parseInt(newWidth, 10) || SIDEBAR_MIN_WIDTH));
+	document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
+	const widthStr = is_sidebar_visible() ? newWidth + 'px' : '0px';
+	$('canvas.dice-rolling-panel__container, .roll-mod-container').css('--sidebar-width', widthStr);
+	$('canvas.streamer-canvas').css('--sidebar-width', widthStr);
+	if (is_characters_page()) {
+		// On the characters page, .ct-sidebar__portal must stay at width:100% (see abovevtt.css ~6464)
+		// so popovers/menus position correctly. The visible sidebar inside it is sized via the
+		// --sidebar-width CSS var on .ct-sidebar[class*='styles_sidebar'] [class*='styles_content'].
+		$(".ct-sidebar__portal").css("width", "");
+	} else {
+		$(".sidebar--right").css("width", newWidth + "px");
+		$(".ct-sidebar__pane-content").css("width", newWidth + "px");
+	}
+	$(".sidebar__controls").width(newWidth);
+	const zoomOffset = $("#zoom_buttons").data("zoom-offset");
+	if (zoomOffset !== undefined) {
+		$("#zoom_buttons").css("right", (newWidth + zoomOffset) + "px");
+	}
+	if (is_characters_page()) {
+		reposition_player_sheet();
+	}
+	window.dispatchEvent(new Event('resize'));
+}
+
+function init_sidebar_resize_handle() {
+	$('#avtt-sidebar-resize-handle').remove();
+	const handle = $('<div id="avtt-sidebar-resize-handle"></div>');
+	$('body').append(handle);
+
+	let startX, startWidth;
+
+	handle.on('mousedown', function(e) {
+		e.preventDefault();
+		startX = e.clientX;
+		startWidth = get_sidebar_width();
+		$("#resizeDragMon, .note:has(iframe) form .mce-container-body, #sheet")
+			.append($('<div class="iframeResizeCover"></div>'));
+
+		$(document).on('mousemove.sidebarResize', function(e) {
+			const delta = startX - e.clientX;
+			const newWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, startWidth + delta));
+			document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
+			if (!is_characters_page()) {
+				$(".sidebar--right").css("width", newWidth + "px");
+				$(".ct-sidebar__pane-content").css("width", newWidth + "px");
+			}
+			$(".sidebar__controls").width(newWidth);
+			$('canvas.dice-rolling-panel__container, .roll-mod-container').css('--sidebar-width', newWidth + 'px');
+			$('canvas.streamer-canvas').css('--sidebar-width', newWidth + 'px');
+			const zoomOffset = $("#zoom_buttons").data("zoom-offset");
+			if (zoomOffset !== undefined) {
+				$("#zoom_buttons").css("right", (newWidth + zoomOffset) + "px");
+			}
+		});
+
+		function cleanupSidebarDrag() {
+			$(document).off('mousemove.sidebarResize');
+			$(window).off('mouseup.sidebarResize blur.sidebarResize');
+			$('.iframeResizeCover').remove();
+		}
+
+		$(window).one('mouseup.sidebarResize', function(e) {
+			cleanupSidebarDrag();
+			const delta = startX - e.clientX;
+			const newWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, startWidth + delta));
+			set_avtt_setting_value('sidebarWidth', newWidth);
+		});
+
+		$(window).one('blur.sidebarResize', function() {
+			cleanupSidebarDrag();
+			const cssVarWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width'));
+			const currentWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, cssVarWidth || SIDEBAR_MIN_WIDTH));
+			set_avtt_setting_value('sidebarWidth', currentWidth);
+		});
+	});
+}
+
 /**
  * Initializes the user interface.
  */
@@ -2028,12 +2103,11 @@ function init_ui() {
 	// ATTIVA GAMELOG
 	$(".glc-game-log").addClass("sidepanel-content");
 	$(".sidebar").css("z-index", 9999);
-	if (is_characters_page()) {
-		reposition_player_sheet();
-	}
-	$(".sidebar__controls").width(340);
 	// $(".ct-sidebar__control").width(340);
 	$("body").css("overflow", "scroll");
+
+	apply_sidebar_width(get_sidebar_width());
+	init_sidebar_resize_handle();
 
 	inject_chat_buttons();
 
@@ -2126,45 +2200,48 @@ function init_ui() {
             <path id="dragbox-rect2" d="M 0 0 L 0 1 M 1 0 L 1 1 M 0 0 L 1 0 M 0 1 L 1 1"  class="drag-box-w"/>
             </g>
             <rect id="selbox-rect" class="sel-box" visibility="hidden" x="0" y="0" width="1" height="1" rx="0.01" />
-            <g id="dragbox-inside"  visibility="hidden">
-            <path class="drag-box-b"
-             d="M 0.01 0.01 L 0.01 0.80 M 0.01 0.01 L 0.80 0.01 M 0.99 0.99 L 0.99 0.20 M 0.99 0.99 L 0.20 0.99 "/>
-            <path stroke-dasharray="2" class="drag-box-w"
-             d="M 0.01 0.01 L 0.01 0.80 M 0.01 0.01 L 0.80 0.01 M 0.99 0.99 L 0.99 0.20 M 0.99 0.99 L 0.20 0.99 "/> </g>
-        <g id="rot-grab" class="grabber" visibility="hidden"> <g class="grabber-icon-c">
-            <circle fill="#ced9e080" cx="12.5" cy="12.5" r="12.5" />
-            <path d="M12.5,17.125 c-2.59,0-4.695-2.1-4.695-4.697
-             c0-2.592,2.102-4.695,4.695-4.695 c2.595,0,4.697,2.103,4.697,4.695 C17.197,15.025,15.095,17.125,12.5,17.125z
-             M24.75,12.5 c0,0-6.147-6.637-12.25-6.637 C6.397,5.863,0.25,12.5,0.25,12.5 s6.147,6.635,12.25,6.635
-             c3.26,0,6.53-1.892,8.872-3.655 M12.5,10.127 c-1.27,0-2.3,1.033-2.3,2.302 c0,1.267,1.033,2.302,2.3,2.302
-             c1.27,0,2.302-1.033,2.302-2.302 C14.802,11.16,13.77,10.127,12.5,10.127z" />
-        </g></g>
+        
 		
-        <g id="group-rot-grab" class="grabber" visibility="hidden"> <g class="grabber-icon-r">
-			<circle fill="#ced9e080" cx="12.5" cy="12.5" r="12.5" />
-			<g id="aoeRotateSvg" transform="translate(3,1) scale(2.2)">
-				<polygon points="1.22 8.06 3.17 1.94 7.43 6.74 1.22 8.06" style="fill: #ced9e080; stroke: #000; stroke-miterlimit: 10;"/>
-				<g>
-					<path d="M1.22,8.78c-.06,0-.12,0-.18-.02-.19-.05-.34-.17-.44-.33-.1-.17-.12-.36-.07-.55.08-.32.37-.54.7-.54.06,0,.12,0,.18.02.19.05.34.17.44.33.1.17.12.36.07.55-.08.32-.37.54-.7.54Z" style="fill: #000;"/>
-					<path d="M1.22,7.84s.04,0,.06,0c.12.03.19.15.16.27-.03.11-.13.17-.21.17-.02,0-.04,0-.06,0-.12-.03-.19-.15-.16-.27.03-.11.13-.17.21-.17M1.22,6.84c-.54,0-1.04.36-1.18.91-.17.65.22,1.32.87,1.49.1.03.21.04.31.04.54,0,1.04-.36,1.18-.91.17-.65-.22-1.32-.87-1.49-.1-.03-.21-.04-.31-.04h0Z" style="fill: #000;"/>
-				</g>
-				<g>
-					<path d="M8.6,5.11c-.24-2.24-1.49-3.65-3.73-4.23" style="fill: none; stroke: #000; stroke-linecap: round; stroke-linejoin: round;"/>
-					<polygon points="9.55 4.78 8.63 6.55 7.55 4.87 9.55 4.78" style="fill: #000;"/>
-					<polygon points="5.34 0 3.45 .64 4.96 1.96 5.34 0" style="fill: #000;"/>
-				</g>
-			</g>
-			<g id="groupRotateSvg">
-				<path d="M12.499 14.453 Q11.693 14.453 11.12 13.88 q-0.573-0.574-0.573-1.38
-				Q10.547 11.693 11.121 11.12 q0.574-0.573 1.38-0.573 Q13.307 10.547 13.88 11.121 q0.573 0.574 0.573 1.38
-				Q14.453 13.307 13.879 13.88 q-0.574 0.573-1.38 0.573 Z M12.5 21.875 q-3.906 0-6.641-2.747 T3.125 12.474
-				h1.563 q0 3.255 2.278 5.547 T12.5 20.313 q3.264 0 5.539-2.274 Q20.313 15.765 20.313 12.5 t-2.274-5.539
-				Q15.765 4.688 12.5 4.688 q-1.797 0-3.359 0.794 T6.406 7.63 h2.709 v1.563 H3.698 V3.776 h1.563 v2.76
-				q1.38-1.615 3.261-2.513 T12.5 3.125 q1.953 0 3.659 0.742 t2.969 2.005 q1.263 1.263 2.005 2.969 T21.875 12.5
-				q0 1.953-0.742 3.659 t-2.005 2.969 q-1.263 1.263-2.969 2.005 T12.5 21.875 Z"/>
-			</g>
-        </g></g>
+		</g>
       </svg>`);
+
+	const rotDragbox = $(
+		`<svg id="rotDragbox" xmlns="http://www.w3.org/2000/svg">
+			<g id="rot-grab" class="grabber" visibility="hidden"> <g class="grabber-icon-c">
+				<circle fill="#ced9e080" cx="12.5" cy="12.5" r="12.5" />
+				<path d="M12.5,17.125 c-2.59,0-4.695-2.1-4.695-4.697
+				c0-2.592,2.102-4.695,4.695-4.695 c2.595,0,4.697,2.103,4.697,4.695 C17.197,15.025,15.095,17.125,12.5,17.125z
+				M24.75,12.5 c0,0-6.147-6.637-12.25-6.637 C6.397,5.863,0.25,12.5,0.25,12.5 s6.147,6.635,12.25,6.635
+				c3.26,0,6.53-1.892,8.872-3.655 M12.5,10.127 c-1.27,0-2.3,1.033-2.3,2.302 c0,1.267,1.033,2.302,2.3,2.302
+				c1.27,0,2.302-1.033,2.302-2.302 C14.802,11.16,13.77,10.127,12.5,10.127z" />
+			</g></g>
+			<g id="group-rot-grab" class="grabber" visibility="hidden"> <g class="grabber-icon-r">
+				<circle fill="#ced9e080" cx="12.5" cy="12.5" r="12.5" />
+				<g id="aoeRotateSvg" transform="translate(3,1) scale(2.2)">
+					<polygon points="1.22 8.06 3.17 1.94 7.43 6.74 1.22 8.06" style="fill: #ced9e080; stroke: #000; stroke-miterlimit: 10;"/>
+					<g>
+						<path d="M1.22,8.78c-.06,0-.12,0-.18-.02-.19-.05-.34-.17-.44-.33-.1-.17-.12-.36-.07-.55.08-.32.37-.54.7-.54.06,0,.12,0,.18.02.19.05.34.17.44.33.1.17.12.36.07.55-.08.32-.37.54-.7.54Z" style="fill: #000;"/>
+						<path d="M1.22,7.84s.04,0,.06,0c.12.03.19.15.16.27-.03.11-.13.17-.21.17-.02,0-.04,0-.06,0-.12-.03-.19-.15-.16-.27.03-.11.13-.17.21-.17M1.22,6.84c-.54,0-1.04.36-1.18.91-.17.65.22,1.32.87,1.49.1.03.21.04.31.04.54,0,1.04-.36,1.18-.91.17-.65-.22-1.32-.87-1.49-.1-.03-.21-.04-.31-.04h0Z" style="fill: #000;"/>
+					</g>
+					<g>
+						<path d="M8.6,5.11c-.24-2.24-1.49-3.65-3.73-4.23" style="fill: none; stroke: #000; stroke-linecap: round; stroke-linejoin: round;"/>
+						<polygon points="9.55 4.78 8.63 6.55 7.55 4.87 9.55 4.78" style="fill: #000;"/>
+						<polygon points="5.34 0 3.45 .64 4.96 1.96 5.34 0" style="fill: #000;"/>
+					</g>
+				</g>
+				<g id="groupRotateSvg">
+					<path d="M12.499 14.453 Q11.693 14.453 11.12 13.88 q-0.573-0.574-0.573-1.38
+					Q10.547 11.693 11.121 11.12 q0.574-0.573 1.38-0.573 Q13.307 10.547 13.88 11.121 q0.573 0.574 0.573 1.38
+					Q14.453 13.307 13.879 13.88 q-0.574 0.573-1.38 0.573 Z M12.5 21.875 q-3.906 0-6.641-2.747 T3.125 12.474
+					h1.563 q0 3.255 2.278 5.547 T12.5 20.313 q3.264 0 5.539-2.274 Q20.313 15.765 20.313 12.5 t-2.274-5.539
+					Q15.765 4.688 12.5 4.688 q-1.797 0-3.359 0.794 T6.406 7.63 h2.709 v1.563 H3.698 V3.776 h1.563 v2.76
+					q1.38-1.615 3.261-2.513 T12.5 3.125 q1.953 0 3.659 0.742 t2.969 2.005 q1.263 1.263 2.005 2.969 T21.875 12.5
+					q0 1.953-0.742 3.659 t-2.005 2.969 q-1.263 1.263-2.969 2.005 T12.5 21.875 Z"/>
+				</g>
+			</g>
+		</svg>		
+		`
+	)
 
 	const walls = $("<canvas id='walls_layer' class='TLA'/>");
 	walls.css("z-index", "19");
@@ -2254,7 +2331,7 @@ function init_ui() {
 	VTT.append(drawOverlay);
 	VTT.append(textDiv);
 	VTT.append(tempOverlay);
-	VTT.append(dragSelectBox);
+	VTT.append(dragSelectBox, rotDragbox);
 	VTT.append(walls);
 	VTT.append(elev);
 	VTT.append(weather);
@@ -2277,23 +2354,19 @@ function init_ui() {
 	wrapper = $("<div id='VTTWRAPPER' class='TLA'/>");
 	wrapper.css("margin-left", `${window.VTTMargin}px`);
 	wrapper.css("margin-top", `${window.VTTMargin}px`);
-	wrapper.css("paddning-right", "200px");
+	wrapper.css("padding-right", "200px");
 	wrapper.css("padding-bottom", "200px");
-	wrapper.width(window.width);
-	wrapper.height(window.height);
+
 
 	wrapper.append(VTT);
 	$("body").append(wrapper);
 
 	black_layer = $("<div id='black_layer' class='TLA'/>");
-	black_layer.width(window.width+window.VTTMargin);
-	black_layer.height(window.height+window.VTTMargin);
 	black_layer.css("background", "black");
 	black_layer.css("opacity", "0");
 	$("body").append(black_layer);
 	black_layer.animate({ opacity: "1" }, 1000);
 	black_layer.css("z-index", "1");
-
 	black_layer.off('contextmenu').on('contextmenu', function(e){
 		e.preventDefault();
 	})
@@ -2315,14 +2388,17 @@ function init_ui() {
 	init_combat_tracker();
 
 	token_menu();
+	
 	install_grabbers(); //do it once instead of every time
-
 	// EXPERIMENTAL DRAG TO MOVE
 	let  curDown = false,
 		curYPos = 0,
 		curXPos = 0;
 
 	// Function separated so it can be dis/enabled
+	const throttleScroll = throttle((scrollOptions) => {
+		requestAnimationFrame(function(){window.scrollTo(scrollOptions)})
+	}, 30)
 	function mousemove(m) {
 		if (curDown) {
 			let scrollOptions = {
@@ -2330,9 +2406,7 @@ function init_ui() {
 				top: window.scrollY + curYPos - m.pageY,
 				behavior: "instant"
 			}
-			requestAnimationFrame(function(){
-				window.scrollTo(scrollOptions)
-			});
+			throttleScroll(scrollOptions)
 		}
 	}
 
@@ -2397,23 +2471,32 @@ function init_ui() {
 			}
 		}
 	}
-
+	function set_paste_location(event){
+		window.cursor_x = event.pageX;
+		window.cursor_y = event.pageY;
+	}
+	function enable_paste_mouse_move(){
+		document.addEventListener('mousemove', set_paste_location, { passive: true });
+	}
+	function disable_paste_mouse_move(){
+		document.removeEventListener('mousemove', set_paste_location);
+	}
 	// Helper function to disable window mouse handlers, required when we
 	// do token dragging operations with measure paths
 	window.disable_window_mouse_handlers = function () {
-
 		$(window.document).off("mousemove.mouseHandler", mousemove);
 		$(window.document).off("mousedown.mouseHandler", mousedown);
 		$(window.document).off("mouseup.mouseHandler", mouseup);
+		disable_paste_mouse_move();
 	}
 
 	// Helper function to enable mouse handlers, required when we
 	// do token dragging operations with measure paths
 	window.enable_window_mouse_handlers = function () {
-
 		$(window.document).on("mousemove.mouseHandler", mousemove);
 		$(window.document).on("mousedown.mouseHandler", mousedown);
 		$(window.document).on("mouseup.mouseHandler", mouseup);
+		enable_paste_mouse_move();
 	}
 
 	window.enable_window_mouse_handlers();
@@ -2443,7 +2526,7 @@ function init_buttons() {
 	if ($("#fog_menu").length > 0) {
 		return; // only need to do this once
 	}
-	let buttons = $(`<div class="ddbc-tab-options--layout-pill"></div>`);
+	let buttons = $(`<div class="ddbc-tab-options--layout-pill main-top-buttons"></div>`);
 	$("body").append(buttons);
 
 	buttons.append($("<button style='display:inline; width:75px;' id='select-button' data-name='Select (S)' class='drawbutton hasTooltip hideable ddbc-tab-options__header-heading' data-shape='rect' data-function='select'><spam class='button-text'><u>S</u>ELECT</span></button>"));
@@ -2514,7 +2597,7 @@ function init_zoom_buttons() {
 	zoom_section.append(youtube_controls_button);
 	if(window.DM) {
 		
-		const dm_screen_button = $(`<div id='dm_screen_button' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Show/Hide DM Screen'> 
+		const dm_screen_button = $(`<div id='dm_screen_button' class='ddbc-tab-options--layout-pill hasTooltip button-icon hideable' data-name='Open DM Screen'> 
 			<div class="ddbc-tab-options__header-heading">
 					<span class="material-symbols-outlined" style="font-size: 20px;">
 						scrollable_header
@@ -2868,7 +2951,9 @@ function init_zoom_buttons() {
 			$(window).off('scroll.resetToLockedPos')
 		})
 	}
-	const gridZoomConversion = $(`<div id='grid_zoom_conversion' class='ddbc-tab-options--layout-pill hideable'><div class='ddbc-tab-options__header-heading hasTooltip button-icon' data-name='Set grid visual size to match stored size'><svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24.73 24.74">
+
+	const displayGridZoomConversion = window.EXPERIMENTAL_SETTINGS?.gridZoomConversion;
+	const gridZoomConversion = $(`<div id='grid_zoom_conversion' style='${displayGridZoomConversion ? '' : 'display: none;'}' class='ddbc-tab-options--layout-pill hideable'><div class='ddbc-tab-options__header-heading hasTooltip button-icon' data-name='Set grid visual size to match stored size'><svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24.73 24.74">
   <g>
     <path d="M1.5,8.5c.15,0-1.39,0-1.24,0h.72" style="fill: none; stroke: var(--font-color, #231f20); stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
     <line x1="3.67" y1="8.5" x2="21.14" y2="8.5" style="fill: none; stroke: var(--font-color, #231f20); stroke-dasharray: 3.58 2.69; stroke-linecap: round; stroke-linejoin: round; stroke-width: .5px;"/>
@@ -2931,12 +3016,53 @@ function init_zoom_buttons() {
 	zoom_section.append(hide_interface);
 
 	$(".avtt-sidebar-controls").append(zoom_section);
-	if (window.DM || is_spectator_page()) {
-		zoom_section.css("right","371px");
-	} else {
-		zoom_section.css("right","420px");
+	const zoomOffset = (window.DM || is_spectator_page()) ? 31 : 80;
+	zoom_section.css("right", (get_sidebar_width() + zoomOffset) + "px");
+	zoom_section.data("zoom-offset", zoomOffset);
+}
+
+function checkForExportRemind() {
+	if(!window.DM) return;
+	function daysPassedSinceExport(campaignId) {
+		const storageKey = `AVTT-exportStamp-${campaignId || window.CAMPAIGN_INFO.id}`;	
+		const lastSaved = localStorage.getItem(storageKey);
+		return lastSaved ? (Date.now() - parseInt(lastSaved, 10)) / 86400000 : NaN;
+	}
+
+	function showExportReminder() {
+		let exportReminder = $(`#exportReminder`);
+		if($(`#exportReminder`).length > 0) {
+			$(`#exportReminder`).show();
+			return;
+		}
+		exportReminder = find_or_create_generic_draggable_window("exportReminder", "Export Reminder", false, false, '#exportReminder', 'fit-content', '10%', '10%', '10%', false, '', false, true);	
+		exportReminder.append(
+			$(`<div style="background: #fff;
+								padding: 20px;
+								display: flex;
+								align-items: center;
+								flex-direction: column;
+								gap: 5px;
+								font-size: 16px;
+								font-weight: bold;
+							">
+			<span>It is time to do an export of this campaign.</span>
+			<button id="exportRemindButton">Export</button>
+			</div>`)
+		);
+		$('#exportRemindButton').click(function (e) {
+			e.stopPropagation();
+			export_file('', true);
+			$(`#exportReminder .title_bar_close_button`).click();
+		});
+	}
+	const remindSetting = get_avtt_setting_value('exportRemind');
+	const days = daysPassedSinceExport();
+	if(remindSetting != 0 && (isNaN(days) || days > parseInt(remindSetting))) {
+		showExportReminder();
 	}
 }
+
 
 /**
  * Show loading screen.
@@ -3163,6 +3289,10 @@ function init_help_menu() {
 						<dl>
 							<dt>${getShiftKeyName()}+W</dt>
 							<dd>Toggle always show walls. Will also show 'hidden icon' doors/windows.</dd>
+						</dl>
+						<dl>
+							<dt>${getShiftKeyName()}+P</dt>
+							<dd>Open portal config window.</dd>
 						</dl>
 						<dl>
 							<dt>${getShiftKeyName()}+E</dt>
@@ -3486,7 +3616,7 @@ function toggle_player_sheet_size() {
  */
 function reposition_player_sheet() {
 
-	let sidebarWidth = is_sidebar_visible() ? 340 : 0;
+	let sidebarWidth = is_sidebar_visible() ? get_sidebar_width() : 0;
 	let playableSpace = window.innerWidth - sidebarWidth;
 	let forceLayout = "none";
 
@@ -3697,7 +3827,7 @@ function toggle_sidebar_visibility() {
  * It will also adjust the position of the character sheet .
  */
 function show_sidebar(dispatchResize = true) {
-
+	$('#avtt-sidebar-resize-handle').show();
 	let toggleButton = $("#hide_rightpanel");
 	toggleButton.addClass("point-right").removeClass("point-left");
 	toggleButton.attr('data-visible', 1);
@@ -3716,8 +3846,8 @@ function show_sidebar(dispatchResize = true) {
 	} else {
 		$("#sheet").removeClass("sidebar_hidden");
 	}
-	$('canvas.dice-rolling-panel__container, .roll-mod-container').css('--sidebar-width', '340px');
-	$('canvas.streamer-canvas').css('--sidebar-width', '340px');
+	$('canvas.dice-rolling-panel__container, .roll-mod-container').css('--sidebar-width', get_sidebar_width() + 'px');
+	$('canvas.streamer-canvas').css('--sidebar-width', get_sidebar_width() + 'px');
 	if(dispatchResize)
 		window.dispatchEvent(new Event('resize'));
 	addGamelogPopoutButton()
@@ -3867,13 +3997,14 @@ function hide_sidebar(triggerResize = true) {
 	toggleButton.addClass("point-left").removeClass("point-right");
 	toggleButton.attr('data-visible', 0);
 	window.showPanel = false;
+	$('#avtt-sidebar-resize-handle').hide();
 	if (is_characters_page() && window.innerWidth < 1024) {
 		if($(`[class*='styles_mobileNav']>div`).length == 0)
 			$(`[class*='styles_mobileNav']>button`).click();
 		
 	} else {
 		let sidebar = is_characters_page() ? $(".ct-sidebar__portal") : $(".sidebar--right");
-		sidebar.css("transform", "translateX(340px)");
+		sidebar.css("transform", `translateX(${get_sidebar_width()}px)`);
 		$('#combat_carousel_container.tracker-list').toggleClass('sidebarClosed', true)
 	}
 
@@ -3900,7 +4031,7 @@ function adjust_site_bar() {
 	let fullWidth = "100%";
 	if (!is_player_sheet_full_width()) {
 		let sheetWidth =  window.innerWidth < 1200 ? 550 : 620;
-		let sidebarWidth = is_sidebar_visible() ? 340 : 0;
+		let sidebarWidth = is_sidebar_visible() ? get_sidebar_width() : 0;
 		fullWidth = `${sheetWidth + sidebarWidth}px`;
 	}
 

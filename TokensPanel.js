@@ -73,12 +73,13 @@ async function getOpen5e(results = [], search = ''){
         15: 'Plant',
         16: 'Undead'
     }
-    const maxCR = (monster_search_filters?.challengeRatingMax) ? monster_search_filters?.challengeRatingMax : '';
-    const minCR = (monster_search_filters?.challengeRatingMin) ? monster_search_filters?.challengeRatingMin : '';
+    const maxCR = (monster_search_filters?.challengeRatingMax) ? convert_challenge_rating_id(monster_search_filters?.challengeRatingMax) : '';
+    const minCR = (monster_search_filters?.challengeRatingMin) ? convert_challenge_rating_id(monster_search_filters?.challengeRatingMin) : '';
     const monsterTypes = (monster_search_filters?.monsterTypes) ? monster_search_filters.monsterTypes.map(item=> item = ddbMonsterTypes[item]).toString() : '';
     
 
-    let api_url = `https://api.open5e.com/monsters/?slug__in=&slug__iexact=&slug=&name__iexact=&name=&cr=&cr__range=&cr__gt=${minCR}&cr__gte=&cr__lt=${maxCR}&cr__lte=&armor_class=&armor_class__range=&armor_class__gt=&armor_class__gte=&armor_class__lt=&armor_class__lte=&type__iexact=&type=&type__in=${monsterTypes}&type__icontains=&page_no=&page_no__range=&page_no__gt=&page_no__gte=&page_no__lt=&page_no__lte=&document__slug__iexact=&document__slug=&document__slug__in=&document__slug__not_in=&name__icontains=${search}&limit=10`
+    let api_url = `https://api.open5e.com/v2/creatures/?name__icontains=${search}&type=${monsterTypes}&challenge_rating__lte=${maxCR}&challenge_rating__gte=${minCR}&limit=10`
+
     let jsonData = {}
     await $.getJSON(api_url, function(data){
         jsonData = data;
@@ -94,8 +95,8 @@ async function getOpen5e(results = [], search = ''){
 
     return open5e_monsters;
 }
-async function getGroupOpen5e(slugin){
-    let api_url = `https://api.open5e.com/monsters/?ordering=name&slug__in=${slugin}&slug__iexact=&slug=&name__iexact=&name=&cr=&cr__range=&cr__gt=&cr__gte=&cr__lt=&cr__lte=&armor_class=&armor_class__range=&armor_class__gt=&armor_class__gte=&armor_class__lt=&armor_class__lte=&type__iexact=&type=&type__in=&type__icontains=&page_no=&page_no__range=&page_no__gt=&page_no__gte=&page_no__lt=&page_no__lte=&document__slug__iexact=&document__slug=&document__slug__in=&document__slug__not_in=&limit=10`
+async function getGroupOpen5e(keys){
+    let api_url = `https://api.open5e.com/v2/creatures/?key__in=${keys}&limit=10`
     let jsonData = {}
     await $.getJSON(api_url, function(data){
         jsonData = data;
@@ -769,7 +770,7 @@ async function enable_draggable_token_creation(html, specificImage = undefined) 
                     helper.attr("src", specificImage);
                 } else {      
                     let src = random_image_for_item(draggedItem);
-                    if(draggedItem.type == ItemType.PC){
+                    if(draggedItem.type == ItemType.PC && find_token_customization(draggedItem.type, draggedItem.id)?.tokenOptions?.defaultImage == undefined){
                         src = window.all_token_objects?.[draggedItem.id]?.options?.imgsrc || src;
                     }  
                     helper.attr("data-src", src);
@@ -1007,7 +1008,11 @@ function update_pc_token_rows() {
             });    
             let customizations = find_token_customization(listItem.type, listItem.id);
             
-            let rowImage = (customizations?.tokenOptions?.alternativeImages?.length > 0) ? customizations?.tokenOptions?.alternativeImages[0] : pc.image;
+            let rowImage =  customizations?.tokenOptions?.defaultImage != undefined 
+                                ? customizations.tokenOptions.defaultImage 
+                                : (customizations?.tokenOptions?.alternativeImages?.length > 0) 
+                                    ? customizations?.tokenOptions?.alternativeImages[0] 
+                                    : pc.image;
             if (rowImage.startsWith('above-bucket-not-a-url')){
                 getAvttStorageUrl(avttTokensApplyThumbnailPrefix(rowImage), true).then((url) => {
                     row.find(".token-image").attr('src', url)
@@ -1113,7 +1118,7 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
         console.warn("create_and_place_token was called without a listItem");
         return;
     }
-
+    
     if (listItem.isTypeFolder() || listItem.isTypeEncounter()) {
 
         let tokensToPlace = [];
@@ -1187,6 +1192,8 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
 
     if(options.alternativeImagesCustomizations != undefined && options.alternativeImagesCustomizations[options.imgsrc] != undefined){
         const visionOptions = {
+            'devilsight': {...options.devilsight},
+            'truesight': {...options.truesight},
             'vision': {...options.vision},
             'light1': {...options.light1},
             'light2': {...options.light2}
@@ -1198,6 +1205,12 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
         }
         if(options.vision != undefined && options.vision?.feet == undefined && visionOptions?.vision?.feet != undefined){
             options.vision.feet = visionOptions.vision.feet;
+        }
+        if(options.devilsight != undefined && options.devilsight?.feet == undefined && devilsightOptions?.devilsight?.feet != undefined){
+            options.devilsight.feet = devilsightOptions.devilsight.feet;
+        }
+        if(options.truesight != undefined && options.truesight?.feet == undefined && truesightOptions?.truesight?.feet != undefined){
+            options.truesight.feet = truesightOptions.truesight.feet;
         }
          if(options.light1 != undefined && options.light1?.feet == undefined && visionOptions?.light1?.feet != undefined){
             options.light1.feet = visionOptions.light1.feet;
@@ -1270,6 +1283,9 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
                 options = {...options, ...window.all_token_objects[options.id].options}
                 if (specificImage) { 
                     options = { ...options, ...options.alternativeImagesCustomizations?.[specificImage], imgsrc: chosenImage };
+                }       
+                else if (options.defaultImage !== undefined) {
+                     options = { ...options, ...options.alternativeImagesCustomizations?.[specificImage], imgsrc: chosenImage };
                 }
             }
             options.color = color_from_pc_object(pc);
@@ -1343,17 +1359,26 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
                     }
                     break;
             }
-            if(listItem.monsterData.senses.length > 0 && foundOptions.vision == undefined){
-                let darkvision = 0;
-                for(let i=0; i < listItem.monsterData.senses.length; i++){
-                    const ftPosition = listItem.monsterData.senses[i].notes.indexOf('ft.')
-                    const range = parseInt(listItem.monsterData.senses[i].notes.slice(0, ftPosition));
-                    if(range > darkvision)
-                        darkvision = range;
+            if(listItem.monsterData.senses.length > 0){
+               
+                const vision = get_monster_senses(listItem.monsterData.senses);
+                if(foundOptions.vision == undefined){
+                    options.vision = {
+                        feet: vision.darkvision.toString(),
+                        color: (window.TOKEN_SETTINGS?.vision?.color) ? window.TOKEN_SETTINGS.vision.color : 'rgba(142, 142, 142, 1)'
+                    }
                 }
-                options.vision = {
-                    feet: darkvision.toString(),
-                    color: (window.TOKEN_SETTINGS?.vision?.color) ? window.TOKEN_SETTINGS.vision.color : 'rgba(142, 142, 142, 1)'
+                if(foundOptions.truesight == undefined){
+                    options.truesight = {
+                        feet: vision.truesight.toString(),
+                        color: (window.TOKEN_SETTINGS?.truesight?.color) ? window.TOKEN_SETTINGS.truesight.color : 'rgba(142, 142, 142, 1)'
+                    }
+                }
+                if(foundOptions.devilsight == undefined){
+                    options.devilsight = {
+                        feet: vision.devilsight.toString(),
+                        color: (window.TOKEN_SETTINGS?.devilsight?.color) ? window.TOKEN_SETTINGS.devilsight.color : 'rgba(142, 142, 142, 1)'
+                    }
                 }
             }
             break;
@@ -1384,10 +1409,10 @@ async function create_and_place_token(listItem, hidden = undefined, specificImag
             }
             options.armorClass = listItem.monsterData.armorClass;
             options.monster = "open5e";
-            options.stat = listItem.monsterData.slug;
+            options.stat = listItem.monsterData.key;
             placedCount = 1;
             for (let tokenId in window.TOKEN_OBJECTS) {
-                if (window.TOKEN_OBJECTS[tokenId].options.monster === listItem.monsterData.slug || window.TOKEN_OBJECTS[tokenId].options.stat === listItem.monsterData.slug) {
+                if (window.TOKEN_OBJECTS[tokenId].options.monster === listItem.monsterData.key || window.TOKEN_OBJECTS[tokenId].options.stat === listItem.monsterData.key) {
                     placedCount++;
                 }
             }
@@ -1778,15 +1803,20 @@ function alternative_images_for_item(listItem) {
  * @returns {string} the url an image associated with the provided listItem
  */
 function random_image_for_item(listItem, specificImage) {
-    let validSpecifiedImage = parse_img(specificImage);
+    const validSpecifiedImage = parse_img(specificImage);
     if (validSpecifiedImage !== undefined && validSpecifiedImage.length > 0) {
         console.debug("random_image_for_item validSpecifiedImage", validSpecifiedImage);
         return validSpecifiedImage
     }
-
-    let alternativeImages = alternative_images_for_item(listItem);
+    const customizations = find_token_customization(listItem.type, listItem.id);
+    const validDefaultImage = parse_img(customizations?.tokenOptions?.defaultImage);
+    if (validDefaultImage !== undefined && validDefaultImage.length > 0) {
+        console.debug("random_image_for_item validDefaultImage", validDefaultImage);
+        return validDefaultImage
+    }
+    const alternativeImages = alternative_images_for_item(listItem);
     if (alternativeImages !== undefined && alternativeImages.length > 0) {
-        let randomIndex = getRandomInt(0, alternativeImages.length);
+        const randomIndex = getRandomInt(0, alternativeImages.length);
         console.debug("random_image_for_item", alternativeImages, randomIndex);
         return parse_img(alternativeImages[randomIndex]);
     } else {
@@ -2702,7 +2732,7 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
             token = window.TOKEN_OBJECTS[id]
             if (token){
                 token.options.alternativeImages = customization.tokenOptions.alternativeImages;
-                token.sync(await $.extend(true, {}, token.options))
+                token.sync()
             }
         }
         if(['.mp4', '.webm', '.m4v'].some(d => type.includes(d))){
@@ -3040,47 +3070,80 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
     if (!specificBorderColorValue || (listItem.isTypePC() && targetOptions.playerThemeBorder != false)) {
         borderColorWrapper.hide();
     }
-
+    //TO DO VISION UPDATE: add detection for pc/monsters
+    if(customization.tokenOptions.devilsight?.feet == undefined){
+        customization.tokenOptions.devilsight = {
+            feet: '0',
+            color: window.TOKEN_SETTINGS?.devilsight?.color ? window.TOKEN_SETTINGS?.devilsight?.color : 'rgba(142, 142, 142, 1)'
+        }
+    }
+    if(customization.tokenOptions.truesight?.feet == undefined){
+        customization.tokenOptions.truesight = {
+            feet: '0',
+            color: window.TOKEN_SETTINGS?.truesight?.color ? window.TOKEN_SETTINGS?.truesight?.color : 'rgba(142, 142, 142, 1)'
+        }
+    }
+    let vision = {
+        darkvision: 0,
+        devilsight: 0,
+        truesight: 0
+    }
+    if(listItem.isTypePC()){
+        let pcData = find_pc_by_player_id(listItem.id);
+        let vision = {
+            darkvision: 0,
+            devilsight: 0,
+            truesight: 0
+        }
+        if(pcData.senses.length > 0)
+        {
+            const pcSenses = {
+                darkvision: "darkvision",
+                tremorsense: "darkvision",
+                blindsight: "truesight",
+                truesight: "truesight"
+            }
+            for(let i=0; i < pcData.senses.length; i++){
+                const name = pcData.senses[i].name?.toLowerCase();
+                const ftPosition = pcData.senses[i].distance.indexOf('ft.');
+                const range = parseInt(pcData.senses[i].distance.slice(0, ftPosition));
+                if(range > vision[pcSenses[name]])
+                    vision[pcSenses[name]] = range;
+            }
+        }
+        customization.tokenOptions.vision = {
+            feet: vision.darkvision.toString(),
+            color: window.TOKEN_SETTINGS?.vision?.color ? window.TOKEN_SETTINGS?.vision?.color : 'rgba(142, 142, 142, 1)'
+        }
+        customization.tokenOptions.truesight = {
+            feet: vision.truesight.toString(),
+            color: (window.TOKEN_SETTINGS?.truesight?.color) ? window.TOKEN_SETTINGS.truesight.color : 'rgba(142, 142, 142, 1)'
+        }
+        customization.tokenOptions.devilsight = {
+            feet: vision.devilsight.toString(),
+            color: (window.TOKEN_SETTINGS?.devilsight?.color) ? window.TOKEN_SETTINGS.devilsight.color : 'rgba(142, 142, 142, 1)'
+        }
+    }
+    else if(listItem.isTypeMonster() || listItem.isTypeOpen5eMonster()){
+        vision = get_monster_senses(listItem.monsterData.senses);
+    }
     if(customization.tokenOptions.vision?.feet == undefined){
-        if(listItem.isTypePC()){
-            let pcData = find_pc_by_player_id(listItem.id);
-            let darkvision = 0;
-            if(pcData.senses.length > 0)
-            {
-                for(let i=0; i < pcData.senses.length; i++){
-                    const ftPosition = pcData.senses[i].distance.indexOf('ft.');
-                    const range = parseInt(pcData.senses[i].distance.slice(0, ftPosition));
-                    if(range > darkvision)
-                        darkvision = range;
-                }
-            }
-            customization.tokenOptions.vision = {
-                feet: darkvision.toString(),
-                color: window.TOKEN_SETTINGS?.vision?.color ? window.TOKEN_SETTINGS?.vision?.color : 'rgba(142, 142, 142, 1)'
-            }
+        customization.tokenOptions.vision = {
+            feet: vision.darkvision.toString(),
+            color: window.TOKEN_SETTINGS?.vision?.color ? window.TOKEN_SETTINGS?.vision?.color : 'rgba(142, 142, 142, 1)'
         }
-        else if(listItem.isTypeMonster() || listItem.isTypeOpen5eMonster()){
-            let darkvision = 0;
-            if(listItem.monsterData.senses.length > 0)
-            {
-                for(let i=0; i < listItem.monsterData.senses.length; i++){
-                    const ftPosition = listItem.monsterData.senses[i].notes.indexOf('ft.')
-                    const range = parseInt(listItem.monsterData.senses[i].notes.slice(0, ftPosition));
-                    if(range > darkvision)
-                        darkvision = range;
-                }
-            }
+    }
+    if(customization.tokenOptions.truesight?.feet == undefined){
+        customization.tokenOptions.truesight = {
+            feet: vision.truesight.toString(),
+            color: (window.TOKEN_SETTINGS?.truesight?.color) ? window.TOKEN_SETTINGS.truesight.color : 'rgba(142, 142, 142, 1)'
+        }
+    }
+    if(customization.tokenOptions.devilsight?.feet == undefined){
 
-            customization.tokenOptions.vision = {
-                feet: darkvision.toString(),
-                color: window.TOKEN_SETTINGS?.vision?.color ? window.TOKEN_SETTINGS?.vision?.color : 'rgba(142, 142, 142, 1)'
-            }
-        }
-        else{
-            customization.tokenOptions.vision = {
-                feet: '60',
-                color: window.TOKEN_SETTINGS?.vision?.color ? window.TOKEN_SETTINGS?.vision?.color : 'rgba(142, 142, 142, 1)'
-            }
+        customization.tokenOptions.devilsight = {
+            feet: vision.devilsight.toString(),
+            color: (window.TOKEN_SETTINGS?.devilsight?.color) ? window.TOKEN_SETTINGS.devilsight.color : 'rgba(142, 142, 142, 1)'
         }
     }
     if(customization.tokenOptions.light1?.feet == undefined){
@@ -3096,13 +3159,16 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
         }
     }
 
-
-    let uniqueVisionFeet = customization.tokenOptions.vision.feet;
-    let uniqueVisionColor = customization.tokenOptions.vision.color;
-    let uniqueLight1Feet = customization.tokenOptions.light1.feet;
-    let uniqueLight2Feet = customization.tokenOptions.light2.feet;
-    let uniqueLight1Color = customization.tokenOptions.light1.color;
-    let uniqueLight2Color = customization.tokenOptions.light2.color;
+    const uniqueDevilsightFeet = customization.tokenOptions.devilsight.feet;
+    const uniqueDevilsightColor = customization.tokenOptions.devilsight.color;
+    const uniqueTruesightFeet = customization.tokenOptions.truesight.feet;
+    const uniqueTruesightColor = customization.tokenOptions.truesight.color;
+    const uniqueVisionFeet = customization.tokenOptions.vision.feet;
+    const uniqueVisionColor = customization.tokenOptions.vision.color;
+    const uniqueLight1Feet = customization.tokenOptions.light1.feet;
+    const uniqueLight2Feet = customization.tokenOptions.light2.feet;
+    const uniqueLight1Color = customization.tokenOptions.light1.color;
+    const uniqueLight2Color = customization.tokenOptions.light2.color;
 
     const lightOption = {
     name: "auraislight",
@@ -3138,6 +3204,28 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
                     <div class="token-image-modal-footer-select-wrapper" style="padding-left: 2px">
                         <div class="token-image-modal-footer-title">Color</div>
                         <input class="spectrum" name="visionColor" value="${uniqueVisionColor}" >
+                    </div>
+                </div>
+                <div class="menu-vision-aura">
+                    <h3 style="margin-bottom:0px;">Devilsight</h3>
+                    <div class="token-image-modal-footer-select-wrapper" style="padding-left: 2px">
+                        <div class="token-image-modal-footer-title">Radius (${window.CURRENT_SCENE_DATA.upsq})</div>
+                        <input class="vision-radius" name="devilsight" type="text" value="${uniqueDevilsightFeet}" style="width: 3rem" />
+                    </div>
+                    <div class="token-image-modal-footer-select-wrapper" style="padding-left: 2px">
+                        <div class="token-image-modal-footer-title">Color</div>
+                        <input class="spectrum" name="devilsightColor" value="${uniqueDevilsightColor}" >
+                    </div>
+                </div>
+                <div class="menu-vision-aura">
+                    <h3 style="margin-bottom:0px;">Truesight</h3>
+                    <div class="token-image-modal-footer-select-wrapper" style="padding-left: 2px">
+                        <div class="token-image-modal-footer-title">Radius (${window.CURRENT_SCENE_DATA.upsq})</div>
+                        <input class="vision-radius" name="truesight" type="text" value="${uniqueTruesightFeet}" style="width: 3rem" />
+                    </div>
+                    <div class="token-image-modal-footer-select-wrapper" style="padding-left: 2px">
+                        <div class="token-image-modal-footer-title">Color</div>
+                        <input class="spectrum" name="truesightColor" value="${uniqueTruesightColor}" >
                     </div>
                 </div>
                 <div class="menu-inner-aura">
@@ -3345,9 +3433,13 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
     let tokenOptionsButton = build_override_token_options_button(sidebarPanel, listItem, placedToken, targetOptions, function(name, value) {
         customization.setTokenOption(name, value);
     }, function () {
+        let devilsightInput = $("input[name='devilsightColor']").spectrum("get");
+        let truesightInput = $("input[name='truesightColor']").spectrum("get");
         let visionInput = $("input[name='visionColor']").spectrum("get");
         let light1Input = $("input[name='light1Color']").spectrum("get");
         let light2Input = $("input[name='light2Color']").spectrum("get");
+        customization.setTokenOption('devilsight.color', `rgba(${devilsightInput._r}, ${devilsightInput._g}, ${devilsightInput._b}, ${devilsightInput._a})`);
+        customization.setTokenOption('truesight.color', `rgba(${truesightInput._r}, ${truesightInput._g}, ${truesightInput._b}, ${truesightInput._a})`);
         customization.setTokenOption('vision.color', `rgba(${visionInput._r}, ${visionInput._g}, ${visionInput._b}, ${visionInput._a})`);
         customization.setTokenOption(`light1.color`, `rgba(${light1Input._r}, ${light1Input._g}, ${light1Input._b}, ${light1Input._a})`);
         customization.setTokenOption(`light2.color`, `rgba(${light2Input._r}, ${light2Input._g}, ${light2Input._b}, ${light2Input._a})`);
@@ -3498,8 +3590,8 @@ function display_builtin_token_details_modal(listItem, placedToken) {
 }
 
 function build_token_div_for_sidebar_modal(imageUrl, listItem, placedToken) {
-    let parsedImage = parse_img(imageUrl);
     let options = find_token_options_for_list_item(listItem);
+    let parsedImage = parse_img(imageUrl);
     if (placedToken) {
         options = {...placedToken.options};
     }
@@ -3554,7 +3646,8 @@ function redraw_token_images_in_modal(sidebarPanel, listItem, placedToken, drawI
         alternativeImages = alternativeImages.concat(placedToken.options.alternativeImages);
     }
     alternativeImages = alternativeImages.concat(alternative_images_for_item(listItem).map(image => parse_img(image)));
-
+    const customization = find_token_customization(listItem.type, listItem.id);
+    const defaultImage = customization?.tokenOptions?.defaultImage;
     let placedImg = parse_img(placedToken?.options?.imgsrc);
     if (placedImg.length > 0 && !alternativeImages.includes(placedImg)) {
         // the placedToken image has been changed by the user so put it at the front
@@ -3562,6 +3655,8 @@ function redraw_token_images_in_modal(sidebarPanel, listItem, placedToken, drawI
         tokenDiv.attr("data-token-id", placedToken.options.id);
         if((currentlySelectedToken != undefined && tokenDiv.find('.div-token-image')?.attr('src') == currentlySelectedToken) || (selectedTokenImage != undefined && tokenDiv.find('.div-token-image')?.attr('src') == selectedTokenImage))
             tokenDiv.toggleClass('selected', true);
+        if(defaultImage != undefined && defaultImage == placedImg)
+            tokenDiv.toggleClass('default-token-image');
         modalBody.append(tokenDiv);
     }
 
@@ -3592,6 +3687,8 @@ function redraw_token_images_in_modal(sidebarPanel, listItem, placedToken, drawI
                     let tokenDiv = build_token_div_for_sidebar_modal(alternativeImages[index], listItem, placedToken);
                     if((currentlySelectedToken != undefined && tokenDiv.find('.div-token-image')?.attr('src') == currentlySelectedToken) || (selectedTokenImage != undefined && tokenDiv.find('.div-token-image')?.attr('src') == selectedTokenImage))
                         tokenDiv.toggleClass('selected', true);
+                    if(defaultImage != undefined && defaultImage == alternativeImages[index])
+                        tokenDiv.toggleClass('default-token-image');
                     modalBody.append(tokenDiv);
                     index++;
                 }
@@ -3613,6 +3710,8 @@ function redraw_token_images_in_modal(sidebarPanel, listItem, placedToken, drawI
     for (let i = 0; i < alternativeImages.length; i++) {
         if (drawInline) {
             let tokenDiv = build_token_div_for_sidebar_modal(alternativeImages[i], listItem, placedToken);
+            if(defaultImage != undefined && defaultImage == alternativeImages[i])
+                tokenDiv.toggleClass('default-token-image');
             modalBody.append(tokenDiv);
         } else {
             if(i<13){
@@ -3922,6 +4021,7 @@ function open_monster_item_iframe(listItem) {
         "border": "none",
         "z-index": 10
     });
+
     tokensPanel.container.append(iframe);
 
     let rowHtml = find_html_row(listItem, tokensPanel.body);
@@ -3933,14 +4033,43 @@ function open_monster_item_iframe(listItem) {
             // it was just created. no need to do anything until it actually loads something
             return;
         }
-
         let contents = $(event.target).contents();
-        contents.find("#site > footer").hide();
-        contents.find("#site-main > header.main").hide();
-        contents.find("#site-main").css("padding-top", 0);
-        contents.find(".site-bar").hide();
-        contents.find(".ad-container").hide();
-        contents.find(".homebrew-comments").hide();
+        contents.find("head").append(`
+			<style>
+                #site > footer,
+                #site-main > header.main,
+                .site-bar,
+                .ad-container,
+                .homebrew-comments,
+                #mega-menu-target {
+                    display:none !important;
+                }
+                #site-main{
+                    padding-top:0;
+                }
+                .more-info.details-more-info
+                {
+                    padding: 8;
+                }
+                .mon-stat-block{
+                    column-count:1
+                }
+                button.avtt-roll-button {
+                    /* lifted from DDB encounter stat blocks  */
+                    color: #b43c35;
+                    border: 1px solid #b43c35;
+                    border-radius: 4px;
+                    background-color: #fff;
+                    white-space: nowrap;
+                    font-size: 14px;
+                    font-weight: 600;
+                    font-family: Roboto Condensed,Open Sans,Helvetica,sans-serif;
+                    line-height: 18px;
+                    letter-spacing: 1px;
+                    padding: 1px 4px 0;
+                }
+			</style>
+		`);
 
         // move the image below the stat block
         let image = contents.find(".detail-content > .image");
@@ -3959,34 +4088,14 @@ function open_monster_item_iframe(listItem) {
             $("#monster-details-page-iframe").remove();
         });
 
-        contents.find(".main.content-container").attr("style", "padding:0!important");
-        contents.find(".more-info.details-more-info").css("padding", "8");
-        contents.find(".mon-stat-block").css("column-count", "1");
+        contents.find(".main.content-container").attr("style", "padding:0!important")
         contents.find("a").attr("target", "_blank");
 
         scan_creature_pane(contents, listItem.monsterData.name, listItem.monsterData.avatarUrl);
-
-        contents.find("body").append(`<style>
-            button.avtt-roll-button {
-                /* lifted from DDB encounter stat blocks  */
-                color: #b43c35;
-                border: 1px solid #b43c35;
-                border-radius: 4px;
-                background-color: #fff;
-                white-space: nowrap;
-                font-size: 14px;
-                font-weight: 600;
-                font-family: Roboto Condensed,Open Sans,Helvetica,sans-serif;
-                line-height: 18px;
-                letter-spacing: 1px;
-                padding: 1px 4px 0;
-            }
-            </style>
-        `);
-
+        tokensPanel.remove_sidebar_loading_indicator();
     });
 
-
+    tokensPanel.display_sidebar_loading_indicator('Loading Fallback Monster Sheet');
     iframe.attr("src", listItem.monsterData.url);
 }
 
@@ -4049,8 +4158,9 @@ function display_monster_filter_modal() {
         console.group("observe_filters")
         let mutation_target = $(event.target).contents()[0];
         let mutation_config = { attributes: false, childList: true, characterData: false, subtree: true };
-
-        let filter_observer = new MutationObserver(function() {
+        if(window.filter_observer)
+            window.filter_observer.disconnect();
+        window.filter_observer = new MutationObserver(function() {
             let filterButton = $(event.target).contents().find(".monster-listing__header button");
             let monsterListing = $(event.target).contents().find(".qa-monster-filters:not('above-loaded')")
             if (filterButton.length > 0 || monsterListing.length>0){
@@ -4116,7 +4226,7 @@ function display_monster_filter_modal() {
                 iframe.css({ "z-index": 10 });
             }
         });
-        filter_observer.observe(mutation_target,mutation_config);
+        window.filter_observer.observe(mutation_target,mutation_config);
         console.groupEnd()
     });
     iframe.attr("src", `https://www.dndbeyond.com/encounter-builder`);
@@ -4194,15 +4304,17 @@ function register_custom_token_image_context_menu() {
         selector: ".custom-token-image-item, #token-change-image-modal .example-token",
         build: function(element, e) {
             let items = {};
-            let foundElement = find_sidebar_list_item(element)
-            let tokenChangeImage = element.parents().find('#token-change-image-modal').length>0
+            let itemToPlace = find_sidebar_list_item(element)
+            let tokenChangeImage = element.parents().find('#token-change-image-modal').length>0;
             if (!element.hasClass("change-token-image-item") && !tokenChangeImage) {
+                const rootId = RootFolder.allValues().find(d => itemToPlace.folderPath.includes(d.path) && d.name !='')?.id;
+                const tokenCustomization = find_or_create_token_customization(itemToPlace.type, itemToPlace.id, itemToPlace.parentId, rootId);
+                const defaultImage = tokenCustomization?.tokenOptions?.defaultImage;
+                const imgSrc = element.find(".token-image").attr("data-src");
                 items.place = {
                     name: "Place Token",
                     callback: function (itemKey, opt, originalEvent) {
-                        let itemToPlace = find_sidebar_list_item(opt.$trigger);
                         let specificImage = undefined;
-                        let imgSrc = opt.$trigger.find(".token-image").attr("src");
                         if (imgSrc !== undefined && imgSrc.length > 0) {
                             specificImage = imgSrc;
                         }
@@ -4212,15 +4324,39 @@ function register_custom_token_image_context_menu() {
                 items.placeHidden = {
                     name: "Place Hidden Token",
                     callback: function (itemKey, opt, originalEvent) {
-                        let itemToPlace = find_sidebar_list_item(opt.$trigger);
                         let specificImage = undefined;
-                        let imgSrc = opt.$trigger.find(".token-image").attr("src");
                         if (imgSrc !== undefined && imgSrc.length > 0) {
                             specificImage = imgSrc;
                         }
                         create_and_place_token(itemToPlace, true, specificImage);
                     }
                 };
+                
+                const alternativeImages = alternative_images_for_item(itemToPlace);
+                if(alternativeImages?.length>1){
+                    items.setAsDefault = {
+                        name: defaultImage == imgSrc ? "Disable Default Image" : "Set as Default Image",
+                        callback: function (itemKey, opt, originalEvent) {
+                            let specificImage = undefined;
+                            const currentDefault = $('.default-token-image');
+                            currentDefault.addClass('removeTransition');
+                            currentDefault.removeClass('default-token-image');
+                            if (defaultImage != imgSrc && imgSrc !== undefined && imgSrc.length > 0) {
+                                tokenCustomization.tokenOptions.defaultImage = imgSrc;
+                                opt.$trigger.addClass('default-token-image');
+                            } else{
+                                delete tokenCustomization.tokenOptions.defaultImage
+                            }
+                            setTimeout(function(){
+                                currentDefault.removeClass('removeTransition');
+                            }, 200)
+                            const row = build_sidebar_list_row(itemToPlace);
+                            enable_draggable_token_creation(row);                  
+                            $(`.sidebar-list-item-row[id="${itemToPlace.id}"]`).replaceWith(row);
+                            persist_token_customization(tokenCustomization);
+                        }
+                    };
+                }
             }
             items.copy = {
                 name: "Copy Url",
@@ -4253,7 +4389,7 @@ function register_custom_token_image_context_menu() {
                     window.MB.inject_chat(msgdata)
                 }
             };
-            if (!$('.token-image-modal-url-label-add-wrapper .token-image-modal-footer-title').text().includes('Replace') && !element.hasClass("change-token-image-item") && foundElement?.type !== 'builtinToken' && foundElement?.type !== 'ddbToken') {
+            if (!$('.token-image-modal-url-label-add-wrapper .token-image-modal-footer-title').text().includes('Replace') && !element.hasClass("change-token-image-item") && itemToPlace?.type !== 'builtinToken' && itemToPlace?.type !== 'ddbToken') {
                 items.border = "---";
                 items.remove = {
                     name: "Remove",
@@ -4436,8 +4572,12 @@ function create_token_copy_inside(listItem, open5e = false){
         options.sizeId = listItem.monsterData.sizeId;
         // TODO: handle custom sizes
     }
-
-    let darkvision = 0;
+    
+    let vision = {
+        darkvision: 0,
+        devilsight: 0,
+        truesight: 0
+    }
     if(window.monsterListItems){
         let monsterSidebarListItem = open5e ? window.open5eListItems.filter((d) => listItem.id == d.id)[0] : window.monsterListItems.filter((d) => listItem.id == d.id)[0]; 
         if(!monsterSidebarListItem){
@@ -4451,18 +4591,21 @@ function create_token_copy_inside(listItem, open5e = false){
            
         if(monsterSidebarListItem){
             if(monsterSidebarListItem.monsterData.senses.length > 0){
-                for(let i=0; i < monsterSidebarListItem.monsterData.senses.length; i++){
-                    const ftPosition = monsterSidebarListItem.monsterData.senses[i].notes.indexOf('ft.')
-                    const range = parseInt(monsterSidebarListItem.monsterData.senses[i].notes.slice(0, ftPosition));
-                    if(range > darkvision)
-                        darkvision = range;
-                }
+                vision = get_monster_senses(monsterSidebarListItem.monsterData.senses, vision);
             }
         }
     } 
     options.vision = {
-        feet: darkvision.toString(),
+        feet: foundOptions.vision?.feet == undefined ? vision.darkvision.toString() : foundOptions.vision.feet,
         color: (window.TOKEN_SETTINGS?.vision?.color) ? window.TOKEN_SETTINGS.vision.color : 'rgba(142, 142, 142, 1)'
+    }
+    options.truesight = {
+        feet: foundOptions.truesight?.feet == undefined ? vision.truesight.toString() : foundOptions.truesight.feet,
+        color: (window.TOKEN_SETTINGS?.truesight?.color) ? window.TOKEN_SETTINGS.truesight.color : 'rgba(142, 142, 142, 1)'
+    }
+    options.devilsight = {
+        feet: foundOptions.devilsight?.feet == undefined ? vision.devilsight.toString() : foundOptions.devilsight.feet,
+        color: (window.TOKEN_SETTINGS?.devilsight?.color) ? window.TOKEN_SETTINGS.devilsight.color : 'rgba(142, 142, 142, 1)'
     }
     
     options.monster = 'customStat'
@@ -4776,7 +4919,7 @@ function update_open5e_item_cache(newItems, callback=()=>{}) {
    
    const promise = new Promise((resolve, reject) =>{
         newItems.forEach(async (item, index, array) => {
-            cached_open5e_items[item.monsterData.slug] = item
+            cached_open5e_items[item.monsterData.key] = item
             if(index === array.length-1) {
               resolve();
             }
@@ -4787,31 +4930,32 @@ function update_open5e_item_cache(newItems, callback=()=>{}) {
 }
 function convert_open5e_monsterData(monsterData){
         monsterData.isHomebrew = true;
+        monsterData.open5e = true;
         monsterData.stats = [
         {
             "statId": 1,
             "name": null,
-            "value": monsterData.strength
+            "value": monsterData.ability_scores?.strength
         },
         {
             "statId": 2,
             "name": null,
-            "value": monsterData.dexterity
+            "value": monsterData.ability_scores?.dexterity
         },
         {
             "statId": 3,
             "name": null,
-            "value": monsterData.constitution
+            "value": monsterData.ability_scores?.constitution
         },
         {
             "statId": 4,
             "name": null,
-            "value": monsterData.intelligence
+            "value": monsterData.ability_scores?.intelligence
         },
         {
             "statId": 5,
             "name": null,
-            "value": monsterData.wisdom
+            "value": monsterData.ability_scores?.wisdom
         },
         {
             "statId": 6,
@@ -4819,93 +4963,48 @@ function convert_open5e_monsterData(monsterData){
             "value": monsterData.charisma
         }];
 
-        monsterData.passivePerception = monsterData.perception + 10;
-   
-
-        if(monsterData.special_abilities?.length>0){
-            monsterData.specialTraitsDescription = monsterData.special_abilities.map(action => {
+        monsterData.passivePerception = monsterData.passive_perception || monsterData.skill_bonuses_all?.perception + 10;
+        
+        const convertOpen5eEntry = (entry) => {
+          return entry.map(action => {
                 let desc = ``
                 if(action.desc == undefined && action.description != undefined){
                     action.desc = action.description;
                 }else if(action.desc == undefined){
                     action.desc ='';
                 }
-                if(action.name == 'Spellcasting'){
-                    actionDesc = action.desc.replace(/Cantrips|[0-9]+[A-Za-z][A-Za-z]-level|[0-9]+[A-Za-z][A-Za-z]\slevel/g, '</p><p>$&');
+                if(action.name.includes('Spellcasting')){
+                    actionDesc = action.desc.replaceAll(/_([^_]+)_/g, '$1').replaceAll(/(-\s+)?\*\*([^*]+)\*\*/g, '$2 ').replaceAll(/At Will|Cantrips|[0-9]+[A-Za-z][A-Za-z]-level|[0-9]+[A-Za-z][A-Za-z]\slevel|\d+\/Day/gi, '<br><br>$&');
                     desc = `<p><em><strong>${action.name}.</strong></em> ${actionDesc}</p>`;
                 }
                 else{
-                    desc = `<p><em><strong>${action.name}.</strong></em> ${action.desc.replace(/\n/g, `<br />`)}</p>`
+                    desc = `<p><em><strong>${action.name}.</strong></em> ${action.desc.replace(/\n/g, `<br />`).replaceAll(/_([^_]+)_/g, '<em>$1</em>').replaceAll(/(-\s+)?\*\*([^*]+)\*\*/g, '<strong>$2</strong>')}</p>`
                 }
                 desc = desc.replace(/\d\dd\d\d\s[+-]\s\d|\d\dd\d\s[+-]\s\d|\dd\d\d\s[+-]\s\d|\dd\d\s[+-]\s\d|\d\dd\d\d|\d\dd\d|\dd\d\d|\dd\d/g, `<span data-dicenotation='$&' data-rolltype='damage' data-rollaction='damage'>$&</span>`);
                 desc = desc.replace(/\s[+-]\d\d\s|\s[+-]\d\s/g, `<span data-dicenotation='1d20$&' data-rollaction='attack'>$&</span> `);
                 desc = desc.replace(`(<span`, `<span`).replace(`span>)`, `span>`);
                 return desc;
-            }).join("");
+            }).join(""); 
+        };
+
+
+        if(monsterData.traits?.length>0){
+            monsterData.specialTraitsDescription = convertOpen5eEntry(monsterData.traits);
         }
-               
+        
         if(monsterData.actions?.length>0){
-            monsterData.actionsDescription = monsterData.actions.map(action => {
-                if(action.desc == undefined && action.description != undefined){
-                    action.desc = action.description;
-                }else if(action.desc == undefined){
-                    action.desc ='';
-                }
-                let desc = `<p><em><strong>${action.name}.</strong></em> ${action.desc}</p>`
-                desc = desc.replace(/\d\dd\d\d\s[+-]\s\d|\d\dd\d\s[+-]\s\d|\dd\d\d\s[+-]\s\d|\dd\d\s[+-]\s\d|\d\dd\d\d|\d\dd\d|\dd\d\d|\dd\d/g, `<span data-dicenotation='$&' data-rolltype='damage' data-rollaction='damage'>$&</span>`);
-                desc = desc.replace(/\s[+-]\d\d\s|\s[+-]\d\s/g, `<span data-dicenotation='1d20$&' data-rollaction='attack'>$&</span> `);
-                desc = desc.replace(`(<span`, `<span`).replace(`span>)`, `span>`);
-                return desc;
-            }).join("");
+            const actions = monsterData.actions.filter(action => action.action_type == "ACTION");
+            const reactions = monsterData.actions.filter(action => action.action_type == "REACTION");
+            const bonusActions = monsterData.actions.filter(action => action.action_type == "BONUS_ACTION");
+            const legendaryActions = monsterData.actions.filter(action => action.action_type == "LEGENDARY_ACTION");
+            monsterData.actionsDescription = convertOpen5eEntry(actions);
+            monsterData.reactionsDescription = convertOpen5eEntry(reactions);
+            monsterData.bonusActionsDescription = convertOpen5eEntry(bonusActions);
+            monsterData.legendaryActionsDescription = convertOpen5eEntry(legendaryActions);
         }
-    
-        if(monsterData.bonus_actions?.length>0){
-            monsterData.bonusActionsDescription = monsterData.bonus_actions.map(action => {
-                if(action.desc == undefined && action.description != undefined){
-                    action.desc = action.description;
-                }else if(action.desc == undefined){
-                    action.desc ='';
-                }
-                let desc = `<p><em><strong>${action.name}.</strong></em> ${action.desc}</p>`
-                desc = desc.replace(/\d\dd\d\d\s[+-]\s\d|\d\dd\d\s[+-]\s\d|\dd\d\d\s[+-]\s\d|\dd\d\s[+-]\s\d|\d\dd\d\d|\d\dd\d|\dd\d\d|\dd\d/g, `<span data-dicenotation='$&' data-rolltype='damage' data-rollaction='damage'>$&</span>`);
-                desc = desc.replace(/\s[+-]\d\d\s|\s[+-]\d\s/g, `<span data-dicenotation='1d20$&' data-rollaction='attack'>$&</span> `);
-                desc = desc.replace(`(<span`, `<span`).replace(`span>)`, `span>`);
-                return desc;
-            }).join("");
-        }
-   
-        if(monsterData.reactions?.length>0){
-            monsterData.reactionsDescription = monsterData.reactions.map(action => {
-                if(action.desc == undefined && action.description != undefined){
-                    action.desc = action.description;
-                }else if(action.desc == undefined){
-                    action.desc ='';
-                }
-                let desc = `<p><em><strong>${action.name}.</strong></em> ${action.desc}</p>`
-                desc = desc.replace(/\d\dd\d\d\s[+-]\s\d|\d\dd\d\s[+-]\s\d|\dd\d\d\s[+-]\s\d|\dd\d\s[+-]\s\d|\d\dd\d\d|\d\dd\d|\dd\d\d|\dd\d/g, `<span data-dicenotation='$&' data-rolltype='damage' data-rollaction='damage'>$&</span>`);
-                desc = desc.replace(/\s[+-]\d\d\s|\s[+-]\d\s/g, `<span data-dicenotation='1d20$&' data-rollaction='attack'>$&</span> `);
-                desc = desc.replace(`(<span`, `<span`).replace(`span>)`, `span>`);
-                return desc;
-            }).join("");
-        }
- 
-        if(monsterData.legendary_actions?.length>0){
-            monsterData.legendaryActionsDescription = monsterData.legendary_actions.map(action => {
-                if(action.desc == undefined && action.description != undefined){
-                    action.desc = action.description;
-                }else if(action.desc == undefined){
-                    action.desc ='';
-                }
-                let desc = `<p><em><strong>${action.name}.</strong></em> ${action.desc}</p>`
-                desc = desc.replace(/\d\dd\d\d\s[+-]\s\d|\d\dd\d\s[+-]\s\d|\dd\d\d\s[+-]\s\d|\dd\d\s[+-]\s\d|\d\dd\d\d|\d\dd\d|\dd\d\d|\dd\d/g, `<span data-dicenotation='$&' data-rollaction='damage'>$&</span>`);
-                desc = desc.replace(/\s[+-]\d\d\s|\s[+-]\d\s/g, `<span data-dicenotation='1d20$&' data-rollaction='attack'>$&</span> `);
-                desc = desc.replace(`(<span`, `<span`).replace(`span>)`, `span>`);
-                return desc;
-            }).join("");
-        }
-       
+
         let convertedSkills = [];
-        Object.entries(monsterData.skills).forEach(([key, value]) => {  
+        Object.entries(monsterData.skill_bonuses).forEach(([key, value]) => {  
             if(key == "athletics"){
                 convertedSkills.push({skillId: 2, value: value, additionalBonus: null})
             }
@@ -4965,114 +5064,122 @@ function convert_open5e_monsterData(monsterData){
 
 
         let convertedSenses = [];
-
-        monsterData.senses = monsterData.senses.split(', ');
-        let sensesArray = [];
-        for(let i = 0; i < monsterData.senses.length; i++){
-            let currentSense = monsterData.senses[i].split(' ');
-            if(currentSense[0] == "blindsight"){
-                convertedSenses.push({senseId: 1, notes: `${currentSense[1]} ${currentSense[2]}`})
-            }
-            else if(currentSense[0] == "darkvision"){
-                convertedSenses.push({senseId: 2, notes: `${currentSense[1]} ${currentSense[2]}`})
-            }
-            else if(currentSense[0] == "tremorsense"){
-                convertedSenses.push({senseId: 3, notes: `${currentSense[1]} ${currentSense[2]}`})
-            }        
-            else if(currentSense[0] == "truesight"){
-                convertedSenses.push({senseId: 4, notes: `${currentSense[1]} ${currentSense[2]}`})
-            }  
-
+        //TO DO VISION UPDATE: senseId's here to reference for fetching other senses
+        if(monsterData.blindsight_range){
+            convertedSenses.push({senseId: 1, notes: `${monsterData.blindsight_range} ft.`})
         }
+        if(monsterData.darkvision_range){
+            convertedSenses.push({senseId: 2, notes: `${monsterData.darkvision_range} ft.`})
+        }
+        if(monsterData.tremorsense_range){
+            convertedSenses.push({senseId: 3, notes: `${monsterData.tremorsense_range} ft.`})
+        }
+        if(monsterData.truesight_range){
+            convertedSenses.push({senseId: 4, notes: `${monsterData.truesight_range} ft.`})
+        }
+         
         monsterData.senses = convertedSenses;
 
-        if(monsterData.cr >= 1){
-          monsterData.challengeRatingId = monsterData.cr + 4
+        if(monsterData.challenge_rating >= 1){
+          monsterData.challengeRatingId = monsterData.challenge_rating + 4
         }
-        else if(monsterData.cr == 0){
+        else if(monsterData.challenge_rating == 0){
           monsterData.challengeRatingId = 1
         }
-        else if(monsterData.cr == 0.125){
+        else if(monsterData.challenge_rating == 0.125){
           monsterData.challengeRatingId = 2
         }
-        else if(monsterData.cr == 0.25){
+        else if(monsterData.challenge_rating == 0.25){
           monsterData.challengeRatingId = 3
         }
-        else if(monsterData.cr == 0.5){
+        else if(monsterData.challenge_rating == 0.5){
           monsterData.challengeRatingId = 4
         }
-        monsterData.sourceId = monsterData.document__title;    
-        monsterData.sourcePageNumber = monsterData.page_no;
+        monsterData.sourceId = monsterData.document?.key;    
         monsterData.hitPointDice = {};
+        if(!monsterData.hit_dice){
+            monsterData.hitPointDice.diceCount = 0;
+            monsterData.hitPointDice.diceValue = 0;
+            monsterData.hitPointDice.fixedValue = monsterData.hit_points;
+        }else{
+            const hitDiceMatch = monsterData.hit_dice.match(/(\d*)d(\d+)(\+(\d+))?/);
+            if(hitDiceMatch){
+                monsterData.hitPointDice.diceCount = hitDiceMatch[1] ? parseInt(hitDiceMatch[1]) : 1;
+                monsterData.hitPointDice.diceValue = parseInt(hitDiceMatch[2]);
+                if(hitDiceMatch[4]){
+                    monsterData.hitPointDice.fixedValue = parseInt(hitDiceMatch[4]);
+                }
+            }
+        }
+        
         monsterData.hitPointDice.diceString = monsterData.hit_dice;
         monsterData.averageHitPoints = monsterData.hit_points;
         monsterData.armorClass = monsterData.armor_class;
-        monsterData.armorClassDescription = monsterData.armor_desc;  
+        monsterData.armorClassDescription = monsterData.armor_detail;  
 
-        if(monsterData.size == 'Tiny'){
+        if(monsterData.size.name == 'Tiny'){
             monsterData.sizeId = 2
         }
-        else if(monsterData.size == 'Small' ){
+        else if(monsterData.size.name == 'Small' ){
             monsterData.sizeId = 3
         }
-        else if(monsterData.size == 'Medium' ){
+        else if(monsterData.size.name == 'Medium' ){
             monsterData.sizeId = 4
         }
-        else if(monsterData.size == 'Large' ){
+        else if(monsterData.size.name == 'Large' ){
             monsterData.sizeId = 5
         }
-        else if(monsterData.size == 'Huge' ){
+        else if(monsterData.size.name == 'Huge' ){
             monsterData.sizeId = 6
         }
-        else if(monsterData.size == 'Gargantuan' ){
+        else if(monsterData.size.name == 'Gargantuan' ){
             monsterData.sizeId = 7
         }
 
         monsterData.savingThrows = [];
-        if(monsterData.strength_save != null){
-            monsterData.savingThrows.push({statId: 1, bonusModifier: null})
-        }
-        if(monsterData.dexterity_save != null){
-            monsterData.savingThrows.push({statId: 2, bonusModifier: null})
-        }
-        if(monsterData.constitution_save != null){
-            monsterData.savingThrows.push({statId: 3, bonusModifier: null})
-        }
-        if(monsterData.intelligence_save != null){
-            monsterData.savingThrows.push({statId: 4, bonusModifier: null})
-        }
-        if(monsterData.wisdom_save != null){
-            monsterData.savingThrows.push({statId: 5, bonusModifier: null})
-        }
-        if(monsterData.charisma_save != null){
-            monsterData.savingThrows.push({statId: 6, bonusModifier: null})
-        }
-        
-        
-
-        monsterData.movements = [];
-        Object.entries(monsterData.speed).forEach(([key, value]) => {
-          key = key.replace(/\b[a-z]/g, function(letter) {
-            return letter.toUpperCase();
-          });
-          if(key == 'Walk'){
-            monsterData.movements.push({movementId: 1, speed: value, name: key})
-          }
-          else if(key == 'Burrow'){
-            monsterData.movements.push({movementId: 2, speed: value, name: key})
-          }
-          else if(key == 'Climb'){
-            monsterData.movements.push({movementId: 3, speed: value, name: key})
-          }
-          else if(key == 'Fly'){
-            monsterData.movements.push({movementId: 4, speed: value, name: key})
-          }
-          else if(key == 'Swim'){
-            monsterData.movements.push({movementId: 5, speed: value, name: key})
-          }
+        Object.entries(monsterData.saving_throws).forEach(([key, value]) => {
+            if(key == "strength"){
+                monsterData.savingThrows.push({statId: 1, bonusModifier: value})
+            }
+            else if(key == "dexterity"){
+                monsterData.savingThrows.push({statId: 2, bonusModifier: value})
+            }
+            else if(key == "constitution"){
+                monsterData.savingThrows.push({statId: 3, bonusModifier: value})
+            }
+            else if(key == "intelligence"){
+                monsterData.savingThrows.push({statId: 4, bonusModifier: value})
+            }
+            else if(key == "wisdom"){
+                monsterData.savingThrows.push({statId: 5, bonusModifier: value})
+            }
+            else if(key == "charisma"){
+                monsterData.savingThrows.push({statId: 6, bonusModifier: value})
+            }
         });
 
+        monsterData.movements = [];
+        const distanceUnit = monsterData.speed.unit;
+        const hover = monsterData.speed.hover;
+        Object.entries(monsterData.speed).forEach(([key, value]) => {
+            if(key == "walk"){
+                monsterData.movements.push({movementId: 1, speed: `${value} ${distanceUnit}`, name: "walk"})
+            }
+            else if(key == "burrow"){
+                monsterData.movements.push({movementId: 2, speed: `${value} ${distanceUnit}`, name: "burrow"})
+            }
+            else if(key == "climb"){
+                monsterData.movements.push({movementId: 3, speed: `${value} ${distanceUnit}`, name: "climb"})
+            }
+            else if(key == "fly"){
+                monsterData.movements.push({movementId: 4, speed: `${value} ${distanceUnit}`, name: hover == true ? "hover" : "fly"})
+            }
+            else if(key == "swim"){
+                monsterData.movements.push({movementId: 5, speed: `${value} ${distanceUnit}`, name: "swim"})
+            }
+        })
 
+        monsterData.languages = monsterData.languages.as_string;
 
         return monsterData;
 }

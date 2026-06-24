@@ -105,7 +105,7 @@ function add_ability_tracker_inputs_on_each(target, tokenId){
 		target.find('strong').each(function(){
 			let currentElement = $(this).nextUntil('strong').addBack();
 			if (currentElement.find(".injected-input").length == 0) {
-				const matchForEachSlot = currentElement.text().match(/([0-9])\/Day each:|([0-9])\/Day:/gi)
+				const matchForEachSlot = currentElement.text().match(/([0-9]+)\/Day each:|([0-9]+)\/Day:/gi)
 
 				if (matchForEachSlot){
 					let numberFound = parseInt(matchForEachSlot[0]);
@@ -141,7 +141,7 @@ function add_ability_tracker_inputs_on_each(target, tokenId){
 		target.find(".mon-stat-block__description-block-content > p").each(function() {
 			let currentElement = $(this).clone();
 			if (currentElement.find(".injected-input").length == 0) {
-				const matchForEachSlot = currentElement.text().match(/([0-9])\/Day each:/i)
+				const matchForEachSlot = currentElement.text().match(/([0-9]+)\/Day each:/i)
 				if (matchForEachSlot){
 					let numberFound = parseInt(matchForEachSlot[1]);
 					$(this).children().each(function (indexInArray, valueOfElement) { 
@@ -251,9 +251,9 @@ function add_ability_tracker_inputs(target, tokenId) {
 			return;
 
 		if ($(this).find(".injected-input").length === 0) {
-			processInput(element, /\(([0-9]) slots?\)/, "slots remaining")
-			processInput(element, /\(([0-9])\/Day\)/i, "remaining")
-			processInput(element, /can take ([0-9]) legendary actions/i, "Legendary Actions remaining", false)
+			processInput(element, /\(?([0-9]+) slots?\)?/, "slots remaining")
+			processInput(element, /\(?([0-9]+)\/Day\)?/i, "remaining")
+			processInput(element, /can take ([0-9]+) legendary actions/i, "Legendary Actions remaining", false)
 		}
 		element = null
 	});	

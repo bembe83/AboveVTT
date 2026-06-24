@@ -2,7 +2,7 @@
 	"manifest_version": 3,
 	"name": "AboveVTT",
 	"description": "Integrated VTT for D&DBeyond",
-	"version": "1.53",
+	"version": "1.56",
 	"content_scripts": [
 		{
 			"matches": [
@@ -60,7 +60,7 @@
 			"DDBApi.js",
 			"AjaxQueueModule.js",
 			"CoreFunctions.js",
-			"CampaignPage.js",
+			"CampaignPage.mjs",
 			"Startup.mjs",
 			"CharactersPage.js",
 			"EncounterHandler.js",

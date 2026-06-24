@@ -1,8 +1,6 @@
 var altHeld = false;
 var ctrlHeld = false;
 var shiftHeld = false;
-var cursor_x = -1;
-var cursor_y = -1;
 var arrowKeysHeld = [0, 0, 0, 0];
 
 const sb_scroll_style = "avtt-scroll-hidden"
@@ -283,13 +281,14 @@ Mousetrap.bind('w', function () {
 Mousetrap.bind('shift+w', function () {
     if(window.DM){
         $('#show_walls').toggleClass(['button-enabled', 'ddbc-tab-options__header-heading--is-active']);
-        redraw_light_walls(false, false, false);
+        redraw_light_walls();
     }
 
 });
 Mousetrap.bind('j', function () {
     if(window.DM){
         $('#snap_walls').toggleClass(['button-enabled', 'ddbc-tab-options__header-heading--is-active']);
+        window.SNAP_WALLS = $('#snap_walls').hasClass('button-enabled');
     }
 });
     
@@ -321,21 +320,20 @@ if(is_spectator_page()){
         sendPointerEvent('#lock_view_button')
     });
 }
-Mousetrap.bind('esc', function () {     //deselect all buttons
-
+Mousetrap.bind('esc', function (e) {     //deselect all buttons
+    clear_temp_canvas();
     close_splash();
     $('#displayedDiceFormula').remove();
     delete window.numpadRollFormulaMod;
     delete window.numpadRollFormula;
+    dialogCloser(e, true);
 
-    stop_drawing();
-
-    if(!$("#wall_button").hasClass("button-enabled")){
-        $('#select-button').click();
-    }
-    else{
-        redraw_light_walls(false, false, false);
-    }
+    //reselect the current menu to trigger draw stop/reset, allows cancelling polygons or other drawings
+    //ensure menu stays open if it was open, as clicking the button again would close it
+    const enabledMenuHeader = $('.main-top-buttons>.drawbutton.button-enabled');
+    const visibleMenu = $('.top_menu.visible');
+    enabledMenuHeader.click();
+    visibleMenu.toggleClass('visible', true); 
 
     close_token_context_menu();
     $(".draggable-token-creation").addClass("drag-cancelled");
@@ -354,13 +352,14 @@ Mousetrap.bind('esc', function () {     //deselect all buttons
         // only close the sidebar if there isn't something on the screen explicitly trying to keep it open
         close_sidebar_modal();
     }
+    deselect_all_tokens();
     remove_tooltip();
     removeError();
 });
 
 //Throttle so the token doesn't immediately fly off map if button is held and set trailing only we can register diagonal movement as 1 move.
 const throttleMoveRequest = throttle(() => {
-    requestAnimationFrame(moveKeyWatch);
+    moveKeyWatch();
 }, 25, {leading: false, trailing: true})
 
 
@@ -540,7 +539,11 @@ Mousetrap.bind('mod+c', function(e) {
     }
     
 });
-
+Mousetrap.bind('shift+p', function(e) {
+    if(!window.DM)
+        return;
+    open_portal_config();
+});
 
 Mousetrap.bind('mod+v', async function(e) {
     if (await avttHandleFilePickerPaste(e)) {
@@ -603,11 +606,6 @@ Mousetrap.bind('mod+a', function (e) {
     }
 });
 
-document.onmousemove = function(event)
-{
- window.cursor_x = event.pageX;
- window.cursor_y = event.pageY;
-}
 
 Mousetrap.bind(['backspace', 'del'], function(e) {
     delete_selected_tokens();
