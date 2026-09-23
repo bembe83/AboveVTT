@@ -9,9 +9,17 @@ const sb_scroll_style = "avtt-scroll-hidden"
 
 function init_keypress_handler(){
 
+document.addEventListener('keydown', (e) => {
+  if (!window.DRAGGING) return;
 
+  if (e.repeat && !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+}, true);
+document.addEventListener('keydown', pcTemplateTabKey);
 Mousetrap.bind('c', function () {       //combat tracker
-        $('#combat_button').click()
+    $('#combat_button').click()
 });
 
 
@@ -105,7 +113,7 @@ Mousetrap.bind('shift+v', function () {
 
 Mousetrap.bind('=', function () {       //zoom plus
     if($('.roll-mod-container').hasClass('show')){
-        $('.roll-button-mod.plus').click();
+        $('.roll-button-mod.plus').trigger('pointerdown');;
     }
     else if(window.numpadRollFormula != undefined){
         if(window.numpadRollFormulaMod == undefined)
@@ -152,6 +160,7 @@ Mousetrap.bind('b', function () {       //zoom plus
 });
 Mousetrap.bind('shift+b', function () {       //zoom plus
     popout_all_selected_token_stat();
+    shiftHeld = false;
 });
 Mousetrap.bind('h', function () {       //zoom plus
     const selectedTokens = window.CURRENTLY_SELECTED_TOKENS;
@@ -168,7 +177,7 @@ Mousetrap.bind('h', function () {       //zoom plus
 }); 
 Mousetrap.bind('+', function () {       //zoom plus
     if($('.roll-mod-container').hasClass('show')){
-        $('.roll-button-mod.plus').click();
+        $('.roll-button-mod.plus').trigger('pointerdown');
     }
     else if(window.numpadRollFormula != undefined){
         if(window.numpadRollFormulaMod == undefined)
@@ -183,7 +192,7 @@ Mousetrap.bind('+', function () {       //zoom plus
 
 Mousetrap.bind('-', function () {       //zoom minus
     if($('.roll-mod-container').hasClass('show')){
-        $('.roll-button-mod.minus').click();
+        $('.roll-button-mod.minus').trigger('pointerdown');
     }
     else if(window.numpadRollFormula != undefined){
         if(window.numpadRollFormulaMod == undefined)
@@ -197,7 +206,13 @@ Mousetrap.bind('-', function () {       //zoom minus
 });
 Mousetrap.bind('enter', function () {       //zoom minus
     if($('.roll-mod-container').hasClass('show')){
-        $('.roll-mod-container>.roll-button').click(); 
+        const pointerEvent = new MouseEvent('pointerdown', {
+            bubbles: true,
+            cancelable: true,
+            clientX: 0,
+            clientY: 0
+        });
+        $('#sendRoll')[0].dispatchEvent(pointerEvent);
     }   
     else if(window.numpadRollFormula != undefined){
         if(window.numpadRollFormulaMod == undefined)
@@ -225,7 +240,7 @@ Mousetrap.bind('enter', function () {       //zoom minus
     }
 });
 
-Mousetrap.bind('ctrl+space', function (e) {    
+Mousetrap.bind('mod+space', function (e) {    
     e.preventDefault();
     $('#combat_area tr[data-current=1] .findTokenCombatButton').click();
 });
@@ -288,6 +303,7 @@ Mousetrap.bind('shift+w', function () {
 Mousetrap.bind('j', function () {
     if(window.DM){
         $('#snap_walls').toggleClass(['button-enabled', 'ddbc-tab-options__header-heading--is-active']);
+        window.SNAP_WALLS = $('#snap_walls').hasClass('button-enabled');
     }
 });
     
@@ -448,7 +464,7 @@ Mousetrap.bind('right', function (e) {
 }, 'keyup');
 
 Mousetrap.bind('alt', function () {
-    if (altHeld) 
+    if (altHeld || window.DRAGGING) 
         return;
     
     altHeld = true;
@@ -491,7 +507,9 @@ Mousetrap.bind('shift', function () {
 }, 'keyup');
 
 
-Mousetrap.bind('mod', function () {
+Mousetrap.bind('mod', function (e) {
+    e.stopImmediatePropagation();
+    if (e.repeat) return;
     if (ctrlHeld == true && window.toggleSnap == true) 
         return;
     
@@ -538,13 +556,17 @@ Mousetrap.bind('mod+c', function(e) {
     }
     
 });
-
+Mousetrap.bind('shift+p', function(e) {
+    if(!window.DM)
+        return;
+    open_portal_config();
+});
 
 Mousetrap.bind('mod+v', async function(e) {
     if (await avttHandleFilePickerPaste(e)) {
         return;
     }
-    if($('#temp_overlay:hover').length>0){
+    if($('#temp_overlay:hover, #capture_mouse:hover').length>0){
         if(window.TOKEN_PASTE_BUFFER?.[0]?.wall == undefined){
             paste_selected_tokens(window.cursor_x, window.cursor_y);
         }else{
@@ -598,7 +620,7 @@ Mousetrap.bind('mod+a', function (e) {
     } else if($('#select-button').hasClass('button-enabled')){ //select all tokens
         e.preventDefault();
         select_all_tokens();
-    }
+    } 
 });
 
 
@@ -670,12 +692,21 @@ function key_rotation(angle) {
         key_rotation_angle = 0;
         grouprotate_create();
     }
-    key_rotation_done = setTimeout(() => {
+    const commitRotate = function(){
+        clearTimeout(key_rotation_done);
         window.key_rotation_pause = true;
         key_rotation_done = null;
         grouprotate_commit(key_rotation_angle);
-        draw_selected_token_bounding_box();	        
-    }, 1000);
+        draw_selected_token_bounding_box();	
+    }
+    key_rotation_done = setTimeout(commitRotate, 1000);
+
+    $(document).off('pointerdown.commitRotate').one('pointerdown.commitRotate', function(){
+        $(document).off('pointerdown.commitRotate');
+        if(key_rotation_done == null)
+            return;
+        commitRotate()    
+    })
     key_rotation_angle += (360 + angle) % 360;
     grouprotate_rotate(key_rotation_angle);
 }
@@ -688,21 +719,11 @@ Mousetrap.bind(']', () => key_rotation(rotate_by_gridtype()));
 Mousetrap.bind('shift+[', () => key_rotation(-10));
 Mousetrap.bind('shift+]', () => key_rotation(10));
     
-var rotationKeyPresses = [];
-window.addEventListener("keydown", async (event) => {
-    const arrowKeys = [ 'ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown' ];
-    if (event.shiftKey && arrowKeys.includes(event.key) ) {
-        rotationKeyPresses.push(event.key)
-    }
-    if((event.ctrlKey || event.metaKey) && event.key == 'a' && event.target.tagName == 'INPUT'){
-        event.target.select();
-    }
-});
-window.addEventListener("keyup", async (event) => {
-    if (!event.shiftKey) {
-        rotationKeyPresses = [];
-        return;
-    }
+let rotationKeyPresses = [];
+
+Mousetrap.bind(['shift+left', 'shift+up', 'shift+right', 'shift+down'], async (event) => {
+
+    rotationKeyPresses.push(event.key)
     if (rotationKeyPresses.includes('ArrowDown') && rotationKeyPresses.includes('ArrowLeft')) {
         rotate_selected_tokens(45, true);
     } else if (rotationKeyPresses.includes('ArrowLeft') && rotationKeyPresses.includes('ArrowUp')) {
@@ -861,27 +882,27 @@ function hide_scrollbar() {
         const style = document.createElement("style");
         style.id = sb_scroll_style
         style.textContent = `
-    body::-webkit-scrollbar {
-        width: 0px;
-        height: 0px;
-    }
-    body::-webkit-scrollbar-track {
-        background: transparent !important;
-    }
-    body::-webkit-scrollbar-thumb {
-        background-color: transparent;
-        border-radius: 6px;
-        border: none;
-    }
-    body::-webkit-scrollbar-corner {
-        background: transparent;
-    }
-    .sidebar__pane-content {
-        box-shadow: none;
-    }
-    html {
-        scrollbar-width: none;
-    }
+            body::-webkit-scrollbar {
+                width: 0px !important;
+                height: 0px !important;
+            }
+            body::-webkit-scrollbar-track {
+                background: transparent !important;
+            }
+            body::-webkit-scrollbar-thumb {
+                background-color: transparent !important;
+                border-radius: 6px !important;
+                border: none !important;
+            }
+            body::-webkit-scrollbar-corner {
+                background: transparent !important;
+            }
+            .sidebar__pane-content {
+                box-shadow: none !important;
+            }
+            html {
+                scrollbar-width: none !important;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -982,4 +1003,78 @@ async function avttHandleFilePickerPaste(e) {
         }
     }
     return false;
+}
+
+
+function pcTemplateFocusTarget(sheetEl) {
+    const targets = [];
+    sheetEl.querySelectorAll('td, th, [contenteditable]:not(a)').forEach((el) => {
+        if (el.classList.contains('table-row-drag-handle') || el.classList.contains('header-spacer') || el.classList.contains('add-table-row')) {
+            return;
+        }
+        if (el.offsetParent === null) {
+            return; 
+        }
+        if (!el.isContentEditable) {
+            return;
+        }
+        if (el.matches('td, th')) {
+            targets.push(el);
+        } else {
+            if (el.closest('td, th')) {
+                return; 
+            }
+            targets.push(el);
+        }
+    });
+    return targets;
+}
+
+function placeCaretAtStart(el) {
+    if (typeof el.focus === 'function') {
+        el.focus();
+    }
+    const ownerDocument = el.ownerDocument || document;
+    const ownerWindow = ownerDocument.defaultView || window;
+    const range = ownerDocument.createRange();
+    range.setStart(el, 0);
+    range.collapse(true);
+    const selection = ownerWindow.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+function pcTemplateTabKey(e) {
+    if (e.key !== 'Tab') {
+        return;
+    }
+    const ownerDocument = e.target?.ownerDocument || document;
+    const ownerWindow = ownerDocument.defaultView || window;
+    const selection = ownerWindow.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+        return;
+    }
+    let anchorEl = selection.anchorNode;
+    if (anchorEl && anchorEl.nodeType === Node.TEXT_NODE) {
+        anchorEl = anchorEl.parentElement;
+    }
+    if (!anchorEl) {
+        return;
+    }
+    const sheet = anchorEl.closest('.dnd-sheet');
+    if (!sheet) {
+        return; // not inside a stat sheet, let default Tab behavior happen
+    }
+    const current = anchorEl.closest('td, th') || anchorEl.closest('[contenteditable]:not(a)');
+    if (!current) {
+        return;
+    }
+    const targets = pcTemplateFocusTarget(sheet);
+    const currentIndex = targets.indexOf(current);
+    if (currentIndex === -1) {
+        return;
+    }
+    const nextIndex = (currentIndex + (e.shiftKey ? -1 : 1) + targets.length) % targets.length;
+    e.preventDefault();
+    placeCaretAtStart(targets[nextIndex]);
 }

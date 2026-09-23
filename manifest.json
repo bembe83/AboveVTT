@@ -2,7 +2,7 @@
 	"manifest_version": 3,
 	"name": "AboveVTT",
 	"description": "Integrated VTT for D&DBeyond",
-	"version": "1.54",
+	"version": "1.60",
 	"content_scripts": [
 		{
 			"matches": [
@@ -15,6 +15,19 @@
 			"js": [
 				"Load.js"
 			]
+		},
+		{
+			"matches": [
+				"https://www.dndbeyond.com/campaigns/*",
+				"https://www.dndbeyond.com/characters*"
+			],
+			"exclude_matches": [
+				"https://www.dndbeyond.com/campaigns/join/*"
+			],
+			"js": [
+				"LoadStart.js"
+			],
+			"run_at": "document_start"
 		}
 	],
 	"host_permissions": [
@@ -98,14 +111,15 @@
 			"PeerManager.js",
 			"PeerCommunication.js",
 			"peerVideo.js",
-			"peerDice.js",
 			"onedrive/*",
 			"godice-roller.bundle.js",
 			"WeatherOverlay.js",
 			"iframe.html",
 			"avttS3Upload.js",
 			"loadFrame.js",
-			"Load.js"	
+			"Load.js",
+			"LoadStart.js",
+			"DDBMb.js"
 			],
 			"matches": [ "*://*.dndbeyond.com/*" ]	
 		}

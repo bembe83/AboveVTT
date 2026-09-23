@@ -25,25 +25,8 @@
             console.log("⛔  AVTT: no extension loading here.")
             return; //don't load anything
         }
-    } else{
-        //Load this as soon as possible for new dice
-        function interceptRollEvent(e) {
-            if(e.button == 2) return;
-            const newDice = $("[class*='DiceContainer_button']").length > 0;
-            if(!newDice) return;
-            const target = $(e.target);
-            // allow hit dice and death saves roll to go through ddb for auto heals - maybe setup our own message by put to https://character-service.dndbeyond.com/character/v5/life/hp/damage-taken later
-            if (target.closest('.ct-reset-pane__hitdie-manager-dice').length>0 || target.closest('[class*="styles_heading__"]').find('>h2').text().trim().match(/^death saves$/gi))
-                return;
-            const rollButton = target.closest(`.integrated-dice__container:not('.above-combo-roll'):not('.above-aoe'):not(.avtt-roll-formula-button)`);
-            if (!rollButton.length) return;
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            e.stopPropagation();
-            rollDiceButton(e, rollButton[0]);
-        }
-        window.addEventListener('pointerdown', interceptRollEvent, true);
-    }
+    } 
+        
 
     //setup to work in both contexts
     const getExtURL = runtime?.getURL ? ((url) => runtime.getURL(url))
@@ -102,8 +85,7 @@
         "built-in-tokens.js",
         "PeerManager.js",
         "PeerCommunication.js",
-        "peerVideo.js",
-        "peerDice.js",		
+        "peerVideo.js",	
         "DiceRoller.js",
         "DMScreen.js",
         "Main.js",
@@ -115,13 +97,13 @@
     	"WeatherOverlay.js"
     ]
     const avttCharacterScripts = [
-        "Load.js", //load Loader on character sheets to support DBB Character Overhaul Extension
-        // External Dependencies
+        // External Dependencies	
         "jquery-3.6.0.min.js",
-        "jquery.contextMenu.js",	
+        "jquery.contextMenu.js",   
         "purify.min.js",	
         "ajaxQueue/ajaxQueueIndex.mjs",
         // AboveVTT Files
+        "Load.js", //load this script to support iframe inject
         "CoreFunctions.js", // Make sure CoreFunctions executes first
         "DDBApi.js",
         "MonsterDice.js",
@@ -173,6 +155,7 @@
     }
     
     async function inject(pgType, where) {
+        const isIframe = where.defaultView && where.defaultView.self !== where.defaultView.top;
         console.log("⌛ AVTT Loading", pgType, (isIframe && window.parent) ? ("parent: " + pageType(window.parent.location)) : "");        
         if(pgType.startsWith("vtt-")) {
             const loadingOverlay = where.createElement('div');
@@ -196,7 +179,7 @@
         
         injectStyles(pgType === "char" ? simpleAvttStyles : avttStyles, where);
         const scripts = pgType === "char" ?
-              avttCharacterScripts
+                isIframe ? ["DDBMb.js", ...avttCharacterScripts] : avttCharacterScripts               
               : pgType === "gamelog" ? [
                   "jquery.magnific-popup.min.js",
                   "purify.min.js",
@@ -226,8 +209,8 @@
                   "Settings.js",
                   "CampaignPage.mjs"
               ] : [
-                    "Load.js",//load Loader on VTT full pages (for iframe inject - see below)
                     ...avttScripts,
+                    "Load.js",//load Loader on VTT full pages (for iframe inject - see below)
                    (pgType.endsWith("-dm") ? "SceneData.js" : "CharactersPage.js"),
                   ];
         if(pgType.startsWith("vtt-")) scripts.push("Startup.mjs");        

@@ -125,6 +125,29 @@ function init_combat_tracker(){
 			});
 		}
 	});
+
+	ct_inside.off('contextmenu').on('contextmenu', 'tr[data-target]', function(e){	
+		noisy_log("context_menu_flyout contextmenu event", e);
+		e.preventDefault();
+		e.stopPropagation();
+		if (window.DRAGGING || $(".pause_click").length > 0) {
+			clearTimeout(contextMenuLongPressTimer);
+			return;
+		}
+		const target = $(e.currentTarget);
+		const ctContainer = target.closest('#combat_tracker_inside');
+		const position = ctContainer.position();
+		let newLeft = position.left + ctContainer.width() + 230;
+		if(newLeft + 230 > window.innerWidth) {
+			newLeft = position.left;
+		}
+		e.clientX = newLeft;
+		if(e.touches && e.touches.length > 0) {
+			e.touches[0].clientX = newLeft;
+		}
+		token_context_menu_expanded([target.attr("data-target")], e);
+	});
+
 	ct_title_bar_settings.click(function(){openCombatTrackerSettings()});
 	ct_title_bar.append(ct_title_bar_settings);
 	ct_title_bar.append(ct_title_bar_exit);
@@ -201,7 +224,7 @@ function init_combat_tracker(){
 		let tokenID = $("#combat_area tr[data-current]").attr('data-target');
 		if(window.TOKEN_OBJECTS[tokenID] != undefined){
 			window.TOKEN_OBJECTS[tokenID].options.round = window.ROUND_NUMBER;
-			window.TOKEN_OBJECTS[tokenID].update_and_sync();
+			window.TOKEN_OBJECTS[tokenID].place_sync_persist();
 		}
 	});
 	
@@ -277,7 +300,6 @@ function init_combat_tracker(){
 		current=$("#combat_area tr[data-current=1]");
 		let currentTarget = current.attr('data-target');
 		if(current.length==0){
-			console.log('nessuno selezionato');
 			$($("#combat_area tr:not([skipTurn])")[0]).attr('data-current','1');
 			currentTarget = $("#combat_area tr[data-current=1]").attr('data-target');
 			if(window.TOKEN_OBJECTS[currentTarget] != undefined){
@@ -356,7 +378,7 @@ function init_combat_tracker(){
 			if(window.TOKEN_OBJECTS[currentTarget] != undefined){
 				delete window.TOKEN_OBJECTS[currentTarget].options.current;
 				delete window.TOKEN_OBJECTS[currentTarget].options.round;
-				window.TOKEN_OBJECTS[currentTarget].place_sync_persist();;
+				window.TOKEN_OBJECTS[currentTarget].place_sync_persist();
 			}
 			if(window.TOKEN_OBJECTS[newTarget] != undefined){
 				adjust_age(window.TOKEN_OBJECTS[newTarget], 1)
@@ -389,7 +411,7 @@ function init_combat_tracker(){
 	});
 	let rollplayerinit=$('<button id="rollplayerinit" class="roll-init-button">Roll Initiative</button>');
 	rollplayerinit.click(function(){
-		$(`.ct-combat__summary-group--initiative button.integrated-dice__container`).click();
+		$(`.ct-combat__summary-group--initiative button.integrated-dice__container`)[0].dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
 	});
 	
 	
@@ -445,6 +467,23 @@ function init_combat_tracker(){
 		init_carousel_combat_tracker()
 	}
 }
+const debounceNextSelect = mydebounce(async (token, domToken) => {
+	$(`.tokenselected`).removeClass('tokenselected');
+	$(`:is(#combat_area, #combat_area_carousel) tr.selected-token`).removeClass('selected-token');		
+	const promise = new Promise(async (resolve) => {
+		await forSelTokensAsync((t) => {
+			t.selected = false;
+		});
+		window.CURRENTLY_SELECTED_TOKENS = []
+		resolve();
+	});
+	promise.then(() => {
+		$(`:is(#combat_area, #combat_area_carousel) tr[data-target='${token.options.id}']`).addClass('selected-token');		
+		token.selected = true;
+		domToken.addClass('tokenselected');
+		do_draw_selected_token_bounding_box();
+	});
+}, 100);
 function highlight_scroll_next(currentTarget){
 	let combatSettingData = getCombatTrackerSettings();
 	if(combatSettingData['scroll_to_next'] != '1' && combatSettingData['select_next'] != '1')
@@ -463,8 +502,8 @@ function highlight_scroll_next(currentTarget){
 	const tokenOwned = window.DM || isPlayerToken || targetToken.options.player_owned == true;
 	const tokenShared = tokenOwned || window.TOKEN_OBJECTS[tokenId].options.share_vision == true || window.TOKEN_OBJECTS[tokenId].options.share_vision == window.myUser || (window.TOKEN_OBJECTS[tokenId].options.share_vision && is_spectator_page()) 
 
-	if(combatSettingData['select_next'] == '1' && targetToken.selected == false && (tokenShared || tokenOwned)){
-		domToken.click();
+	if(combatSettingData['select_next'] == '1' && (tokenShared || tokenOwned)){
+		debounceNextSelect(targetToken, domToken);
 	}
 	if(combatSettingData['scroll_to_next'] == '1' && tokenVisible){	
 		targetToken.highlight();			
@@ -755,16 +794,9 @@ function update_carousel_combat_tracker(){
 	    }
 
 	    table.find(`tr[data-target='${firstTokenId}']`).toggleClass('first-in-round', true);
-		const images = table.find(`tr td:first-of-type img[data-id^='above-bucket-not-a-url']`);
-
-		for(let image of images){
-			image = $(image);
-			const imageId = image.attr('data-id');
-			updateImgSrc(imageId, image, image.is('video'), true)
-		}
-
-
-	    if(window.DM){
+		const images = table.find(`tr td:first-of-type img`);
+	    
+		if(window.DM){
 	    		carouselContainer.find('#combat_prev_button, #combat_next_button').remove();
 	    		const prevButtonClone = $('#combat_prev_button').clone(true, true);
 			    const nextButtonClone = $('#combat_next_button').clone(true, true);
@@ -772,7 +804,7 @@ function update_carousel_combat_tracker(){
 			    prevButtonClone.text('<');
 			    nextButtonClone.text('>');
 			    carouselContainer.append(prevButtonClone, table, nextButtonClone);
-	    }
+	    }	
 	    else{
 
     		carouselContainer.find('#endplayerturn').remove();
@@ -782,6 +814,15 @@ function update_carousel_combat_tracker(){
 
 	    	
 	    }
+
+		for(let image of images){
+			image = $(image);
+			const imageId = image.attr('data-id');
+			updateImgSrc(imageId, image, image.is('video'), true)
+		}
+
+
+
     }
 
 
@@ -1120,9 +1161,15 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 	entry.attr("data-target",token.options.id);	
 	entry.attr("ishidden", token.options.hidden);
 	if(token.options.combatGroup && !token.options.combatGroupToken){
-		entry.attr("skipTurn", token.options.combatGroup);
-		if(window.expandedGroupIds != undefined && window.expandedGroupIds.includes(token.options.combatGroup))
-			entry.toggleClass('showGroupTokens', true)	
+		if(window.all_token_objects[token.options.combatGroup] === undefined){
+			delete token.options.combatGroup;
+		}
+		else{
+			entry.attr("skipTurn", token.options.combatGroup);
+			if(window.expandedGroupIds != undefined && window.expandedGroupIds.includes(token.options.combatGroup))
+				entry.toggleClass('showGroupTokens', true)	
+		}
+
 	}
 	entry.addClass("CTToken");
 	if(window.DM && !token.options.combatGroupToken){
@@ -1312,26 +1359,28 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 	// token update logic for hp pulls hp from token hpbar, so update hp bar manually
 	if (!token.isPlayer()) {
 		const debounceChange = mydebounce(function(token){
-			token.update_and_sync();
+			token.sync();
 		}, 1500)
 		hp_input.change(function(e) {
 			let selector = "div[data-id='" + token.options.id + "']";
 			let old = $("#tokens").find(selector);
-		
-			if ($(this).val().trim().startsWith("+") || $(this).val().trim().startsWith("-")) {
-				$(this).val(Math.max(0, parseInt(token.hp) + parseInt($(this).val())));
-			}
+			let value = $(this).val().trim();
+			value = calculate_hp(value, token.hp);
+			if (value === undefined)
+				return;
 
-			old.find(".hp").val($(this).val().trim());	
-
-			if(window.all_token_objects[token.options.id] != undefined){
-				window.all_token_objects[token.options.id].hp = $(this).val();
-				debounceChange(window.all_token_objects[token.options.id]);
-			}			
+			const tokenObj = window.all_token_objects[token.options.id];
+			window.all_token_objects[token.options.id].totalHp = value;
+			
 			if(window.TOKEN_OBJECTS[token.options.id] != undefined){		
-				window.TOKEN_OBJECTS[token.options.id].hp = $(this).val();
-				debounceChange(window.TOKEN_OBJECTS[token.options.id]);
-			}			
+				window.TOKEN_OBJECTS[token.options.id].totalHp = value;
+				token.place();
+			}		
+			
+			$(this).val(tokenObj.hp);
+			tokenObj.sync();
+			tokenObj.update_combat_tracker()
+			tokenObj.update_quick_roll();	
 		});
 		hp_input.click(function(e) {
 			$(e.target).select();
@@ -1339,38 +1388,49 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 		maxhp_input.change(function(e) {
 			let selector = "div[data-id='" + token.options.id + "']";
 			let old = $("#tokens").find(selector);
+			let value = $(this).val().trim();
+			
+			value = calculate_hp(value, token.maxHp);
+			if (value === undefined)
+				return;
+			$(this).val(value)
 
-			if ($(this).val().trim().startsWith("+") || $(this).val().trim().startsWith("-")) {
-				$(this).val(Math.max(0, token.maxHp + parseInt($(this).val())));
-			}
-
-			old.find(".max_hp").val($(this).val().trim());
-			if(window.all_token_objects[token.options.id] != undefined){
-				window.all_token_objects[token.options.id].maxHp = $(this).val();
-				debounceChange(window.all_token_objects[token.options.id]);
-			}
+			const tokenObj = window.all_token_objects[token.options.id];
+			tokenObj.maxHp = value;	
 			if(window.TOKEN_OBJECTS[token.options.id] != undefined){		
-				window.TOKEN_OBJECTS[token.options.id].maxHp = $(this).val();
-				debounceChange(window.TOKEN_OBJECTS[token.options.id]);
-			}			
+				window.TOKEN_OBJECTS[token.options.id].maxHp = value;
+				token.place();
+			}
+									
+			tokenObj.sync();
+			tokenObj.update_combat_tracker()
+			tokenObj.update_quick_roll();		
 		});
 		maxhp_input.click(function(e) {
 			$(e.target).select();
 		});
-
+		const debounceTriggerChange = mydebounce(function(input) {
+			input.trigger('change');
+		}, 1500);
 		hp_input.on('wheel', function(e) {
+			const input = $(this);
+			if(!input.is(':focus'))
+				return;
 			e.preventDefault();
 			const delta = e.originalEvent.deltaY < 0 ? 1 : -1;
-			const current = parseInt(token.hp) || 0;
-			$(this).val(Math.max(0, current + delta));
-			$(this).trigger('change');
+			const current = parseInt(input.val()) || 0;
+			input.val(Math.max(0, current + delta));
+			debounceTriggerChange(input);
 		});
 		maxhp_input.on('wheel', function(e) {
+			const input = $(this);
+			if(!input.is(':focus'))
+				return;
 			e.preventDefault();
 			const delta = e.originalEvent.deltaY < 0 ? 1 : -1;
-			const current = parseInt(token.maxHp) || 0;
-			$(this).val(Math.max(1, current + delta));
-			$(this).trigger('change');
+			const current = parseInt(input.val()) || 0;
+			input.val(Math.max(1, current + delta));
+			debounceTriggerChange(input);
 		});
 	}
 	else {
@@ -1431,7 +1491,7 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 
 
 
-	del=$('<button class="removeTokenCombatButton" style="font-size:10px;"><svg class="delSVG" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"/></svg></button>');
+	const del=$('<button class="removeTokenCombatButton" style="font-size:10px;"><svg class="delSVG" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"/></svg></button>');
 	del.click(
 		function(){
 			if(!token.options.combatGroupToken){
@@ -1463,7 +1523,7 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 	}
 	
 	if(!token.isPlayer()){
-		stat=$('<button class="openSheetCombatButton" style="font-size:10px;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
+		const stat=$('<button class="openSheetCombatButton" style="font-size:10px;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
 		
 		stat.click(function(){			
 			if(token.options.statBlock){
@@ -1471,7 +1531,9 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 				if(pcURL){
 					open_player_sheet(pcURL, undefined, token.options.name);
 				}else{
-					load_monster_stat(undefined, token.options.id, customStatBlock)
+					const monsterId = !customStatBlock && token.options.statBlock == token.options.monster ? token.options.monster : undefined;
+					if(!customStatBlock && !monsterId) return;
+					load_monster_stat(monsterId, token.options.id, customStatBlock)
 				}
 
 				return;
@@ -1485,13 +1547,13 @@ function ct_add_token(token,persist=true,disablerolling=false, adv=false, dis=fa
 			}
 
 
-			ct_show_checkbox = $(`<input id="`+token.options.id+`hideCombatTrackerInput"type='checkbox' class="combatHideFromPlayerInput" style="font-size:10px;" class='hideInPlayerCombatCheck' target_id='`+token.options.id+`' checked='`+token.options.ct_show+`'/>`);
+			const ct_show_checkbox = $(`<input id="`+token.options.id+`hideCombatTrackerInput"type='checkbox' class="combatHideFromPlayerInput" style="font-size:10px;" class='hideInPlayerCombatCheck' target_id='`+token.options.id+`' checked='`+token.options.ct_show+`'/>`);
 
 
-			eye_button = $('<button class="hideFromPlayerCombatButton" style="font-size:10px;"></button>');
+			const eye_button = $('<button class="hideFromPlayerCombatButton" style="font-size:10px;"></button>');
 
-			open_eye = $('<svg xmlns="http://www.w3.org/2000/svg" class="openEye" height="24" width="24" viewBox="0 0 24 24"><path xmlns="http://www.w3.org/2000/svg" d="M12 16Q13.875 16 15.188 14.688Q16.5 13.375 16.5 11.5Q16.5 9.625 15.188 8.312Q13.875 7 12 7Q10.125 7 8.812 8.312Q7.5 9.625 7.5 11.5Q7.5 13.375 8.812 14.688Q10.125 16 12 16ZM12 14.2Q10.875 14.2 10.088 13.412Q9.3 12.625 9.3 11.5Q9.3 10.375 10.088 9.587Q10.875 8.8 12 8.8Q13.125 8.8 13.913 9.587Q14.7 10.375 14.7 11.5Q14.7 12.625 13.913 13.412Q13.125 14.2 12 14.2ZM12 19Q8.35 19 5.35 16.962Q2.35 14.925 1 11.5Q2.35 8.075 5.35 6.037Q8.35 4 12 4Q15.65 4 18.65 6.037Q21.65 8.075 23 11.5Q21.65 14.925 18.65 16.962Q15.65 19 12 19ZM12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5ZM12 17Q14.825 17 17.188 15.512Q19.55 14.025 20.8 11.5Q19.55 8.975 17.188 7.487Q14.825 6 12 6Q9.175 6 6.812 7.487Q4.45 8.975 3.2 11.5Q4.45 14.025 6.812 15.512Q9.175 17 12 17Z"/></svg>');
-			closed_eye = $('<svg class="closedEye" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><path xmlns="http://www.w3.org/2000/svg" d="M16.1 13.3 14.65 11.85Q14.875 10.675 13.975 9.65Q13.075 8.625 11.65 8.85L10.2 7.4Q10.625 7.2 11.062 7.1Q11.5 7 12 7Q13.875 7 15.188 8.312Q16.5 9.625 16.5 11.5Q16.5 12 16.4 12.438Q16.3 12.875 16.1 13.3ZM19.3 16.45 17.85 15.05Q18.8 14.325 19.538 13.462Q20.275 12.6 20.8 11.5Q19.55 8.975 17.212 7.487Q14.875 6 12 6Q11.275 6 10.575 6.1Q9.875 6.2 9.2 6.4L7.65 4.85Q8.675 4.425 9.75 4.212Q10.825 4 12 4Q15.775 4 18.725 6.087Q21.675 8.175 23 11.5Q22.425 12.975 21.488 14.238Q20.55 15.5 19.3 16.45ZM19.8 22.6 15.6 18.45Q14.725 18.725 13.838 18.863Q12.95 19 12 19Q8.225 19 5.275 16.913Q2.325 14.825 1 11.5Q1.525 10.175 2.325 9.037Q3.125 7.9 4.15 7L1.4 4.2L2.8 2.8L21.2 21.2ZM5.55 8.4Q4.825 9.05 4.225 9.825Q3.625 10.6 3.2 11.5Q4.45 14.025 6.787 15.512Q9.125 17 12 17Q12.5 17 12.975 16.938Q13.45 16.875 13.95 16.8L13.05 15.85Q12.775 15.925 12.525 15.962Q12.275 16 12 16Q10.125 16 8.812 14.688Q7.5 13.375 7.5 11.5Q7.5 11.225 7.537 10.975Q7.575 10.725 7.65 10.45ZM13.525 10.725Q13.525 10.725 13.525 10.725Q13.525 10.725 13.525 10.725Q13.525 10.725 13.525 10.725Q13.525 10.725 13.525 10.725Q13.525 10.725 13.525 10.725Q13.525 10.725 13.525 10.725ZM9.75 12.6Q9.75 12.6 9.75 12.6Q9.75 12.6 9.75 12.6Q9.75 12.6 9.75 12.6Q9.75 12.6 9.75 12.6Q9.75 12.6 9.75 12.6Q9.75 12.6 9.75 12.6Z"/></svg>');
+			const open_eye = $('<svg xmlns="http://www.w3.org/2000/svg" class="openEye" height="24" width="24" viewBox="0 0 24 24"><path xmlns="http://www.w3.org/2000/svg" d="M12 16Q13.875 16 15.188 14.688Q16.5 13.375 16.5 11.5Q16.5 9.625 15.188 8.312Q13.875 7 12 7Q10.125 7 8.812 8.312Q7.5 9.625 7.5 11.5Q7.5 13.375 8.812 14.688Q10.125 16 12 16ZM12 14.2Q10.875 14.2 10.088 13.412Q9.3 12.625 9.3 11.5Q9.3 10.375 10.088 9.587Q10.875 8.8 12 8.8Q13.125 8.8 13.913 9.587Q14.7 10.375 14.7 11.5Q14.7 12.625 13.913 13.412Q13.125 14.2 12 14.2ZM12 19Q8.35 19 5.35 16.962Q2.35 14.925 1 11.5Q2.35 8.075 5.35 6.037Q8.35 4 12 4Q15.65 4 18.65 6.037Q21.65 8.075 23 11.5Q21.65 14.925 18.65 16.962Q15.65 19 12 19ZM12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5Q12 11.5 12 11.5ZM12 17Q14.825 17 17.188 15.512Q19.55 14.025 20.8 11.5Q19.55 8.975 17.188 7.487Q14.825 6 12 6Q9.175 6 6.812 7.487Q4.45 8.975 3.2 11.5Q4.45 14.025 6.812 15.512Q9.175 17 12 17Z"/></svg>');
+			const closed_eye = $('<svg class="closedEye" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><path xmlns="http://www.w3.org/2000/svg" d="M16.1 13.3 14.65 11.85Q14.875 10.675 13.975 9.65Q13.075 8.625 11.65 8.85L10.2 7.4Q10.625 7.2 11.062 7.1Q11.5 7 12 7Q13.875 7 15.188 8.312Q16.5 9.625 16.5 11.5Q16.5 12 16.4 12.438Q16.3 12.875 16.1 13.3ZM19.3 16.45 17.85 15.05Q18.8 14.325 19.538 13.462Q20.275 12.6 20.8 11.5Q19.55 8.975 17.212 7.487Q14.875 6 12 6Q11.275 6 10.575 6.1Q9.875 6.2 9.2 6.4L7.65 4.85Q8.675 4.425 9.75 4.212Q10.825 4 12 4Q15.775 4 18.725 6.087Q21.675 8.175 23 11.5Q22.425 12.975 21.488 14.238Q20.55 15.5 19.3 16.45ZM19.8 22.6 15.6 18.45Q14.725 18.725 13.838 18.863Q12.95 19 12 19Q8.225 19 5.275 16.913Q2.325 14.825 1 11.5Q1.525 10.175 2.325 9.037Q3.125 7.9 4.15 7L1.4 4.2L2.8 2.8L21.2 21.2ZM5.55 8.4Q4.825 9.05 4.225 9.825Q3.625 10.6 3.2 11.5Q4.45 14.025 6.787 15.512Q9.125 17 12 17Q12.5 17 12.975 16.938Q13.45 16.875 13.95 16.8L13.05 15.85Q12.775 15.925 12.525 15.962Q12.275 16 12 16Q10.125 16 8.812 14.688Q7.5 13.375 7.5 11.5Q7.5 11.225 7.537 10.975Q7.575 10.725 7.65 10.45ZM13.525 10.725Q13.525 10.725 13.525 10.725Q13.525 10.725 13.525 10.725Q13.525 10.725 13.525 10.725Q13.525 10.725 13.525 10.725Q13.525 10.725 13.525 10.725Q13.525 10.725 13.525 10.725ZM9.75 12.6Q9.75 12.6 9.75 12.6Q9.75 12.6 9.75 12.6Q9.75 12.6 9.75 12.6Q9.75 12.6 9.75 12.6Q9.75 12.6 9.75 12.6Q9.75 12.6 9.75 12.6Z"/></svg>');
 			eye_button.click(function(){
 				$("#"+token.options.id+"hideCombatTrackerInput").click();
 			});

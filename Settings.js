@@ -45,7 +45,7 @@ function token_setting_options() {
 				{ value: "aura-bloodied-50", label: "Aura Bloodied 50", description: "Tokens will have a red aura when bloodied" },			
 				{ value: "condition-bloodied-50", label: "Condition Bloodied 50", description: "Tokens will have the bloodied condition automatically applied." },	
 				{ value: "bar", label: "HP Meter", description: "How this meter is displayed depends on token type. Color blind alternative to auras." },
-				
+				{ value: "boss", label: "Boss Meter", description: "A large HP meter is displayed at the" },
 				{ value: "none", label: "None", description: "Tokens will not have a health visual" }
 			],
 			defaultValue: "aura",
@@ -250,11 +250,32 @@ function token_setting_options() {
 			label: "Token Name Adjustment",
 			type: 'dropdown',
 			options: [
-				{ value: "count", label: "Count", description: "Tokens's name have a number appended to them." },
-				{ value: "personality", label: "Personality Trait", description: "Tokens's name have a personaility trait prepended." },
-				{ value: "none", label: "None", description: "Tokens's name will not be modified." }
+				{ value: "count", label: "Count", description: "Tokens names have an ascending number appended to them." },
+				{ value: "random", label: "Random Number", description: "Tokens names have a random number appended to them." },
+				{ value: "personality", label: "Personality Trait", description: "Tokens names have a personaility trait prepended." },
+				{ value: "none", label: "None", description: "Tokens names will not be modified." }
 			],
 			defaultValue: "count"
+		},
+		{
+			name: "squareAura",
+			label: "Square Aura",
+			type: "toggle",
+			options: [
+				{ value: true, label: "Square", description: "The token's aura is a square when enabled and a circle otherwise." },
+				{ value: false, label: "Circle", description: "The token's aura is a square when enabled and a circle otherwise." }
+			],
+			defaultValue: false
+		},
+		{
+			name: "squareLight",
+			label: "Square Vision/Light",
+			type: "toggle",
+			options: [
+				{ value: true, label: "Square", description: "The token's vision/light is a square when enabled and a circle otherwise." },
+				{ value: false, label: "Circle", description: "The token's vision/light is a square when enabled and a circle otherwise." }
+			],
+			defaultValue: false
 		},
 		{
 			name: "auraislight",
@@ -315,16 +336,16 @@ function token_setting_options() {
 	];
 }
 
-function avtt_settings() {
+function avtt_settings(campaignSettings = false) {
 	let settings = [
-
+		
 		{
 			name: "iconUi",
 			label: "Mobile/Icon UI",
 			type: "toggle",
 			options: [
-				{ value: true, label: "Enable", description: `` },
-				{ value: false, label: "Disable", description: `` }
+				{ value: true, label: "Enable", description: `Adjusts the ui to be text based along the top, or icon based on the left side` },
+				{ value: false, label: "Disable", description: `Adjusts the ui to be text based along the top, or icon based on the left side` }
 			],
 			defaultValue: true,
 			class: 'ui',
@@ -354,47 +375,16 @@ function avtt_settings() {
 			class: 'ui',
 			global: 1
 		},
-		{	
-			name: "gridZoomConversion",
-			label: "Store Grid Visual Size",
-			description: "<p>This allows you to save a grid visual size. This is useful for in person play where you want to quickly set the grid size to match physical mini sizes.</p><p>The stored value will be based on the current scenes grid size and zoom level. It will then be able to calculate the correct zoom level to make the grid match the stored visual size on any scene. This may be different per device so you will have to store the value on the device you plan on adjusting zoom to match the stored visual size.</p><p>A quick toggle button will be added to the right side buttons when a value is stored</p>",
-			buttonText: ["Clear", "Store"],
-			type: "customButton",
-			customFunction: [
-				function (clickEvent, body) {
-					clear_avtt_setting('gridZoomConversion');
-					showTempMessage(`Grid visual size cleared`, { fadeDelay: 600, fadeTime: 400 });
-					$("#grid_zoom_conversion").css('display', 'none');
-				}, function (clickEvent, body) {
-					set_avtt_setting_value('gridZoomConversion', window.ZOOM*parseFloat(window.CURRENT_SCENE_DATA.hpps));
-					showTempMessage(`Grid visual size stored`, { fadeDelay: 600, fadeTime: 400 });
-					$("#grid_zoom_conversion").css('display', '');
-				}
-			],
-			class: 'ui'
-		},
 		{
-			name: "disableCombatText",
-			label: "Disable DM Damage Button Text",
+			name: "2024Tooltips",
+			label: "Force 2024 Spell/Item Tooltips",
 			type: "toggle",
 			options: [
-				{ value: true, label: "Enable", description: `If enabled removes the scrolling text on tokens displayed to DM when using gamelog damage buttons.` },
-				{ value: false, label: "Disable", description: `If enabled removes the scrolling text on tokens displayed to DM when using gamelog damage buttons.` }
+				{ value: true, label: "Enable", description: `While enabled 2014 spell tooltips will be updated to 2024` },
+				{ value: false, label: "Disable", description: `While enabled 2014 spell tooltips will be updated to 2024` }
 			],
 			defaultValue: false,
-			class: 'ui',
-			global: 1
-		},
-		{
-			name: 'streamDiceRolls',
-			label: 'Stream Dice Rolls',
-			type: 'toggle',
-			options: [
-				{ value: true, label: "Streaming", description: `When you roll DDB dice (to Everyone), all players who also enable this feature will see your rolls and you will see theirs. Disclaimer: the dice will start small then grow to normal size after a few rolls. They will be contained to the smaller of your window or the sending screen size.` },
-				{ value: false, label: "Not Streaming", description: `When you enable this, DDB dice rolls will be visible to you and all other players who also enable this. Disclaimer: the dice will start small then grow to normal size after a few rolls. They will be contained to the smaller of your window or the sending screen size.` }
-			],
-			defaultValue: false,
-			class: 'stream'
+			class: 'ui'
 		},
 		{
 			name: 'iframeStatBlocks',
@@ -406,17 +396,6 @@ function avtt_settings() {
 			],
 			defaultValue: false,
 			class: 'debug',
-		},
-		{
-			name: "peerStreaming",
-			label: "Allow Streaming Cursor/Ruler",
-			type: "toggle",
-			options: [
-				{ value: true, label: "Allow", description: `If you are experiencing performance issues or if you have slow internet, you may want to disable this.` },
-				{ value: false, label: "Never", description: `If you are experiencing performance issues or if you have slow internet, you may want to disable this.` }
-			],
-			defaultValue: false,
-			class: 'stream'
 		},
 		{
 			name: 'alwaysShowSplash',
@@ -444,9 +423,67 @@ function avtt_settings() {
 		}
 	];
 
-	if (window.DM) {
-		// Remove the `dm` an option for the DM and tweak the descriptions to remove references to the DM.
-		settings.push(
+	if((window.DM && !campaignSettings) || is_spectator_page()){
+		settings.push({
+			name: 'streamDiceRolls',
+			label: 'Stream Dice Rolls',
+			type: 'toggle',
+			options: [
+				{ value: true, label: "Streaming", description: `You will see DDB dice rolls from all players with this enabled. Note players can see your rolls if not rolling to self regardless.` },
+				{ value: false, label: "Not Streaming", description: `You will not see DDB dice rolls from other players. Note players can still see your rolls if not rolling to self.` }
+			],
+			defaultValue: false,
+			class: 'stream'
+		});
+	}
+	settings.push({
+			name: "peerStreaming",
+			label: "Allow Streaming Cursor/Ruler",
+			type: "toggle",
+			options: [
+				{ value: true, label: "Allow", description: `If you are experiencing performance issues or if you have slow internet, you may want to disable this.` },
+				{ value: false, label: "Never", description: `If you are experiencing performance issues or if you have slow internet, you may want to disable this.` }
+			],
+			defaultValue: false,
+			class: 'stream'
+	})
+	if(!campaignSettings){
+		settings.push({	
+			name: "gridZoomConversion",
+			label: "Store Grid Visual Size",
+			description: "<p>This allows you to save a grid visual size. This is useful for in person play where you want to quickly set the grid size to match physical mini sizes.</p><p>The stored value will be based on the current scenes grid size and zoom level. It will then be able to calculate the correct zoom level to make the grid match the stored visual size on any scene. This may be different per device so you will have to store the value on the device you plan on adjusting zoom to match the stored visual size.</p><p>A quick toggle button will be added to the right side buttons when a value is stored</p>",
+			buttonText: ["Clear", "Store"],
+			type: "customButton",
+			customFunction: [
+				function (clickEvent, body) {
+					clear_avtt_setting('gridZoomConversion');
+					showTempMessage(`Grid visual size cleared`, { fadeDelay: 600, fadeTime: 400 });
+					$("#grid_zoom_conversion").css('display', 'none');
+				}, function (clickEvent, body) {
+					showTempMessage(`Grid visual size stored`, { fadeDelay: 600, fadeTime: 400 });
+					set_avtt_setting_value('gridZoomConversion', window.ZOOM*parseFloat(window.CURRENT_SCENE_DATA.hpps));
+					$("#grid_zoom_conversion").css('display', '');
+				}
+			],
+			class: 'ui'
+		})
+	}
+
+	if (window.DM && !campaignSettings) {
+		// DM only settings - does not show up in suggsted settings for players
+			settings.push(
+			{
+				name: "disableCombatText",
+				label: "Disable DM Damage Button Text",
+				type: "toggle",
+				options: [
+					{ value: true, label: "Enable", description: `If enabled removes the scrolling text on tokens displayed to DM when using gamelog damage buttons.` },
+					{ value: false, label: "Disable", description: `If enabled removes the scrolling text on tokens displayed to DM when using gamelog damage buttons.` }
+				],
+				defaultValue: false,
+				class: 'ui',
+				global: 1
+			},
 			{
 				name: "receiveCursorFromPeers",
 				label: "Cursors You See",
@@ -487,6 +524,7 @@ function avtt_settings() {
 				label: "Token Settings Defaults",
 				buttonText: "Edit",
 				type: "customButton",
+				description: "Set settings used when tokens are placed on a scene. Will be overridden by folder/token specific defaults.",
 				customFunction: function (clickEvent, body) {
 					build_and_display_sidebar_flyout(clickEvent.clientY, function (flyout) {
 						let optionsContainer = build_sidebar_token_options_flyout(token_setting_options(), window.TOKEN_SETTINGS, function (name, value) {
@@ -535,6 +573,7 @@ function avtt_settings() {
 				label: "Scene Settings Defaults",
 				buttonText: "Edit",
 				type: "customButton",
+				description: "Set new scene default settings.",
 				customFunction: function (clickEvent, body) {
 					const self=this;
 					build_and_display_sidebar_flyout(clickEvent.clientY, function (flyout) {
@@ -621,6 +660,17 @@ function avtt_settings() {
 		class: 'ui',
 		global: 1
 	})
+	settings.push({
+		name: "circleIsSquare",
+		label: "Circle AoE is Square",
+		type: "toggle",
+		options: [
+			{ value: true, label: "Enable", description: `If enabled any circle AoE dropped from a statblock/player sheet will be placed as a square instead` },
+			{ value: false, label: "Disable", description: `If enabled any circle AoE dropped from a statblock/player sheet will be placed as a square instead` }
+		],
+		defaultValue: false,
+		class: 'ui'
+	})
 	settings.push(
 	{
 		name: "godiceRoller",
@@ -699,22 +749,6 @@ function avtt_settings() {
 	
 	settings.push(
 	{
-		name: "exportRemind",
-		label: "Export Reminder",
-		type: "dropdown",
-		options: [
-			{ value: 0, label: "Never", description: `No reminder` },
-			{ value: 1, label: "Daily", description: `Daily reminder` },
-			{ value: 7, label: "Weekly", description: `Weekly reminder` },
-			{ value: 30, label: "Monthly", description: `Monthly reminder` }	
-		],
-		defaultValue: 0,
-		class: 'ui',
-		global: 1
-	})
-	
-	settings.push(
-	{
 		name: "monsterCritType",
 		label: "Monster Action Crit Type",
 		type: "dropdown",
@@ -731,6 +765,7 @@ function avtt_settings() {
 		name: 'quickToggleDefaults',
 		label: 'Quick Toggle Defaults on Load',
 		type: 'flyoutButton',
+		description: "Set initial states for right side quick toggle buttons.",
 		options: [
 			{ name: "selectedTokenVision", label: "Selected Token Vision", defaultValue: false, dmOnly: false, type: 'toggle',options: [
 				{ value: true, label: "Enabled", description: `` },
@@ -773,6 +808,7 @@ function avtt_settings() {
 	settings.push({
 		name: 'quickRoll',
 		label: 'Numkey Quick Roll options',
+		description: 'Edit the quick roll formulas for number keys',
 		type: 'flyoutButton',
 		options: [
 			{
@@ -854,7 +890,53 @@ function avtt_settings() {
         },
 		class: 'ui'
 	})
+	if(window.DM && !campaignSettings){
+		settings.push(
+		{
+			name: "exportRemind",
+			label: "Export Reminder",
+			type: "dropdown",
+			options: [
+				{ value: 0, label: "Never", description: `No reminder` },
+				{ value: 1, label: "Daily", description: `Daily reminder` },
+				{ value: 7, label: "Weekly", description: `Weekly reminder` },
+				{ value: 30, label: "Monthly", description: `Monthly reminder` }	
+			],
+			defaultValue: 0,
+			class: 'ui',
+			global: 1
+		})
+		settings.push({
+			name: 'campaignDefaults',
+			label: 'Campagn Suggested Defaults',
+			type: 'flyoutButton',
+			description: "Edit suggested defaults for player settings. You and players can then match these settings with 'Match DM Suggested Settings' below.",
+			sortCategory: true,
+			options: avtt_settings(true),
+			defaultValue: {},
+			class: 'defaults'
+		})
+	}
 
+	if(!campaignSettings){
+		settings.push({	
+			name: "matchCampaignSettings",
+			label: "Match DM Suggested Settings",
+			description: "If the DM has suggested settings for this campaign match those settings here.",
+			buttonText: ["Set"],
+			type: "customButton",
+			customFunction: [
+				function (clickEvent, body) {
+					window.EXPERIMENTAL_SETTINGS = window.AVTT_CAMPAIGN_INFO.campaignSettings;
+					persist_experimental_settings();
+					$('#settings-panel .sidebar-panel-body').empty();
+					init_settings();
+					showTempMessage(`Settings Matched and Saved`, { fadeDelay: 600, fadeTime: 400 });
+				}
+			],
+			class: 'defaults'
+		})
+	}
 
 
 	if (AVTT_ENVIRONMENT.versionSuffix) {
@@ -987,10 +1069,17 @@ function get_avtt_setting_value(name) {
 	if (name === "aggressiveErrorMessages" && is_release_build()) {
 		return false; // never allow this in a release build
 	}
+	let setValue;
 	switch (name) {
 		case "iframeStatBlocks": return should_use_iframes_for_monsters();
+		case "campaignDefaults":
+			setValue = $.extend({}, window.EXPERIMENTAL_SETTINGS[name], window.AVTT_CAMPAIGN_INFO.campaignSettings);
+			if (setValue !== undefined) {
+				return setValue;
+			}
+			return get_avtt_setting_default_value(name);
 		default:
-			const setValue = window.EXPERIMENTAL_SETTINGS[name];
+			setValue = window.EXPERIMENTAL_SETTINGS[name];
 			if (setValue !== undefined) {
 				return setValue;
 			}
@@ -1001,7 +1090,7 @@ function get_avtt_setting_is_global(name) {
 	return avtt_settings().find(s => s.name === name)?.global === 1;
 }
 function set_avtt_setting_value(name, newValue) {
-	console.log(`set_avtt_setting_value ${name} is now ${newValue}`);
+	noisy_log(`set_avtt_setting_value ${name} is now ${newValue}`);
 
 	// store the setting
 	window.EXPERIMENTAL_SETTINGS[name] = newValue;
@@ -1015,17 +1104,6 @@ function set_avtt_setting_value(name, newValue) {
 				use_iframes_for_monsters();
 			} else {
 				stop_using_iframes_for_monsters();
-			}
-			break;
-		case "streamDiceRolls":
-			// TODO: change this to use window.EXPERIMENTAL_SETTINGS[name] instead of using special logic
-			if (newValue === true || newValue === false) {
-				window.JOINTHEDICESTREAM = newValue;
-				enable_dice_streaming_feature(newValue)
-			} else {
-				const defaultValue = get_avtt_setting_default_value(name);
-				window.JOINTHEDICESTREAM = defaultValue;
-				enable_dice_streaming_feature(defaultValue);
 			}
 			break;
 		case "peerStreaming":
@@ -1163,7 +1241,7 @@ function persist_default_scene_settings(settings, callback) {
     if (typeof callback !== 'function') {
         callback = function(){};
     }	    
-    console.log("persist_default_scene_settings", settings, JSON.stringify(settings));
+    noisy_log("persist_default_scene_settings", settings, JSON.stringify(settings));
     try{
         localStorage.setItem(`SceneDefaults-${window.gameId}`, JSON.stringify(settings));
         
@@ -1174,9 +1252,13 @@ function persist_default_scene_settings(settings, callback) {
     window.SCENE_DEFAULT_SETTINGS = settings;
     callback();
 }
-
+const debounceCampaignSettings = mydebounce(()=>{
+	AboveApi.setCampaignData(window.AVTT_CAMPAIGN_INFO);
+	window.MB.sendMessage("custom/myVTT/campaignData", window.AVTT_CAMPAIGN_INFO);
+}, 5000)
 function init_settings() {
-
+	let suggestedCampaignSettings = window.AVTT_CAMPAIGN_INFO.campaignSettings ?? {};
+	window.EXPERIMENTAL_SETTINGS = $.extend({}, suggestedCampaignSettings, window.EXPERIMENTAL_SETTINGS);
 	let body = settingsPanel.body;
 
 	body.append(`<h2 style='margin-top:10px; padding-bottom:2px;margin-bottom:2px; text-align:center'><img width='200px' src='${window.EXTENSION_PATH}assets/logo.png'><div style='margin-left:20px; display:inline;vertical-align:bottom;'>${window.AVTT_VERSION}${AVTT_ENVIRONMENT.versionSuffix}</div></h2>`);
@@ -1263,8 +1345,11 @@ function init_settings() {
 					  	 set_avtt_setting_value(name, newValue);
 					  	 container.remove();	
 					  });
-					}
-					else{
+					} else if(name == "2024Tooltips"){
+						window.tooltipCache = {};
+						window.spellIdCache = {};
+						set_avtt_setting_value(name, newValue);
+					} else{
 						set_avtt_setting_value(name, newValue);
 					}	
 				});
@@ -1277,8 +1362,15 @@ function init_settings() {
 			case "flyoutButton":
 				inputWrapper = build_flyout_input(setting, currentValue, function(name, newValue){
 					set_avtt_setting_value(name, newValue);
-					if(name == 'quickToggleDefaults')
-						window.defaultToggles = newValue;
+					switch (name) {
+						case "quickToggleDefaults":
+							window.defaultToggles = newValue;
+							break;
+						case "campaignDefaults":
+							window.AVTT_CAMPAIGN_INFO.campaignSettings = newValue;
+							debounceCampaignSettings();
+							break;
+					}
 				})
 				break;
 			case "text":
@@ -1348,7 +1440,6 @@ function init_settings() {
 }
 
 function redraw_settings_panel_token_examples(settings) {
-	console.log("redraw_settings_panel_token_examples", settings);
 	let mergedSettings = {...window.TOKEN_SETTINGS};
 	if (settings !== undefined) {
 		mergedSettings = {...mergedSettings, ...settings};
@@ -1363,7 +1454,7 @@ function redraw_settings_panel_token_examples(settings) {
 }
 
 function build_example_token(options, size=90) {
-	let mergedOptions = {...default_options(), ...window.TOKEN_SETTINGS, ...options};
+	let mergedOptions = $.extend(true, {}, default_options(), window.TOKEN_SETTINGS, options);
 	let hpnum;
 	switch (mergedOptions['defaultmaxhptype']) {
 		case 'max':
@@ -1394,6 +1485,7 @@ function build_example_token(options, size=90) {
 		mergedOptions.age = 1;
 	}
 	mergedOptions.exampleToken = true;
+	delete mergedOptions.name; // don't display example token names
 	// TODO: this is horribly inneficient. Clean up token.place and then update this
 	let token = new Token(mergedOptions);
 	token.place(0);
@@ -1431,7 +1523,7 @@ function build_example_token(options, size=90) {
 // used for settings tab, and tokens tab configuration modals. For placed tokens, see `build_options_flyout_menu`
 // updateValue: function(name, newValue) {} // only update the data here
 // didChange: function() {} // do ui things here
-function build_sidebar_token_options_flyout(availableOptions, setValues, updateValue, didChange, showExtraOptions=false, genericFlyout=false, convertToDropdowns=false) {
+function build_sidebar_token_options_flyout(availableOptions, setValues, updateValue, didChange, showExtraOptions=false, genericFlyout=false, convertToDropdowns=false, setting = {sortCategory: false}) {
 	if (typeof updateValue !== 'function') {
 		updateValue = function(name, newValue){
 			console.warn("build_sidebar_token_options_flyout was not given an updateValue function so we can't set ", name, "to", value);
@@ -1439,12 +1531,23 @@ function build_sidebar_token_options_flyout(availableOptions, setValues, updateV
 	}
 	if (typeof didChange !== 'function') {
 		didChange = function(){
-			console.log("build_sidebar_token_options_flyout was not given adidChange function");
+			noisy_log("build_sidebar_token_options_flyout was not given adidChange function");
 		};
 	}
 
 	let container = $(`<div class="sidebar-token-options-flyout-container prevent-sidebar-modal-close"></div>`);
-
+	if(setting.sortCategory){
+		container.append(`
+		<br />
+		<h3 class="token-image-modal-footer-title no-bottom-margin-setting" >Campaign Suggested Settings</h3>
+		<div class="sidebar-panel-header-explanation"><b>These settings values will be set for users for any setting they have not set themselves. Some settings can have an impact on performance. Settings are saved to this campaign but ordered the same as the main window for convenience.</b></div>
+		<!--<div class='avtt-settings-section avtt-settings-defaults'><h4 class="token-image-modal-footer-title">Default Settings</h4></div>-->
+		<div class='avtt-settings-section avtt-settings-ui'><h4 class="token-image-modal-footer-title">UI</h4><div class='global-setting'><h5 class="token-image-modal-footer-title">Global</h5></div><div class='campaign-setting'><h5 class="token-image-modal-footer-title">Campaign</h5></div></div>
+		<div class='avtt-settings-section avtt-settings-stream'><h4 class="token-image-modal-footer-title">Streaming/P2P</h4></div>
+		<div class='avtt-settings-section avtt-settings-performance'><h4 class="token-image-modal-footer-title">Performance</h4><div class="sidebar-panel-header-explanation"><b>These settings can improve performance and are stored globally</b></div></div>
+		<div class='avtt-settings-section avtt-settings-debug'><h4 class="token-image-modal-footer-title">Debugging</h4><div class="sidebar-panel-header-explanation"><b>These settings can be used to debug issues or as last resorts when defaults aren't working</b></div></div>
+	`);
+	}
 	// const updateValue = function(name, newValue) {
 	// 	if (is_valid_token_option_value(name, newValue)) {
 	// 		setValues[name] = newValue;
@@ -1498,7 +1601,15 @@ function build_sidebar_token_options_flyout(availableOptions, setValues, updateV
 				console.warn("build_sidebar_token_options_flyout failed to handle token setting option with type", option.type);
 		}
 		if(inputWrapper){
-			container.append(inputWrapper)
+			if(setting.sortCategory){
+				container.find(`.avtt-settings-${option.class}${option.class == 'ui' ? 
+					option.global == 1 ? 
+						' .global-setting' : 
+						' .campaign-setting' : 
+					''}`).append(inputWrapper);
+			}else{
+				container.append(inputWrapper)
+			}
 		}
 	});
 	if(!genericFlyout){
@@ -1621,10 +1732,12 @@ function build_sidebar_token_options_flyout(availableOptions, setValues, updateV
 			// We're about to call updateValue a bunch of times and only need to update the UI (or do anything else really) one time
 
 			availableOptions.forEach(option => updateValue(option.name, undefined));
-			updateValue('vision', {});
-			updateValue('light1', {});
-			updateValue('light2', {});
-
+			updateValue('vision', null);
+			updateValue('devilsight', null);
+			updateValue('truesight', null);
+			updateValue('light1', null);
+			updateValue('light2', null);
+			updateValue('includeDDB', null);	
 			let defaultTokenOptions = default_options();
 
 			if(showExtraOptions == true){	
@@ -1694,23 +1807,7 @@ function update_token_base_visibility(container) {
 	}
 }
 
-function enable_dice_streaming_feature(enabled){
-	if(enabled)
-	{
-		window.JOINTHEDICESTREAM = true;
-		add_dice_stream_gamelog_button();
-		update_dice_streaming_feature(window.JOINTHEDICESTREAM);
-	}
-	else{
-		$(".stream-dice-button").remove();
-		window.JOINTHEDICESTREAM = false;
-		$("[id^='streamer-']").remove();
-		for (let peer in window.STREAMPEERS) {
-			window.STREAMPEERS[peer].close();
-			delete window.STREAMPEERS[peer]
-		}
-	}
-}
+
 
 function update_dice_streaming_feature(enabled, sendToText=gamelog_send_to_text()) {
 
@@ -1841,7 +1938,6 @@ function recover_scenes(){
 				const oldId = document.getElementById('old-link').value;
 				//validate oldlink matches campaign id
 				if(oldId.startsWith(window.CAMPAIGN_INFO.id)) {
-					console.log("TODO: implement attemptRecovery", oldId);
 					attemptRecovery(oldId);
 				} else {
 					alert("Secret does not match current Campaign");
@@ -2315,7 +2411,6 @@ function import_process_datafile_text(fileText) {
 function attemptRecovery(campaignSecret) {
 	AboveApi.exportScenes(campaignSecret).then((scenes) => {
 		if(scenes && scenes.length > 0) {
-			//do we really want/need migrate here? or is there a better way?
 			build_import_loading_indicator('Preparing Import');
 			AboveApi.migrateScenes(window.gameId, scenes)
 				.then(() => {

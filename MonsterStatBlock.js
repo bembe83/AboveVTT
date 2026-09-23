@@ -70,18 +70,23 @@ function build_stat_block_for_copy(listItem, options, open5e = false){
 
 async function display_stat_block_in_container(statBlock, container, tokenId, customStatBlock = undefined) {
     const token = window.TOKEN_OBJECTS[tokenId];
-    let $html = (customStatBlock) ? $(`
-    <div class="container avtt-stat-block-container custom-stat-block">${customStatBlock}</div>`) : $(await build_monster_stat_block(statBlock, token));
+    let $html = (customStatBlock) ? $(`<div class="container avtt-stat-block-container custom-stat-block" data-stat-id="${window.TOKEN_OBJECTS[tokenId].options.statBlock}" data-token-id="${tokenId}">${customStatBlock}</div>`) : $(await build_monster_stat_block(statBlock, token));
     container.find("#noAccessToContent").remove(); // in case we're re-rendering with better data
     container.find(".avtt-stat-block-container").remove(); // in case we're re-rendering with better data
     container.append($html);
     if(customStatBlock || statBlock.data?.open5e == true){
+      $(container).find('.injected-input, .added-input-desc').remove();
+      $(container).find('.add-input:not(.avtt-custom-tracker)').replaceWith((i, innerHtml) => {
+        return innerHtml;
+      })
       await window.JOURNAL.translateHtmlAndBlocks($html);
       add_journal_roll_buttons($html, tokenId);
-      window.JOURNAL.add_journal_tooltip_targets($html);
+     
       $(container).find('.add-input').each(function(){window.JOURNAL.addTrackedInputs($(this), {token})});
     }
+    window.JOURNAL.add_journal_tooltip_targets($html);
     if(customStatBlock){
+      sync_pc_template(token, container);
       let imageUrl = parse_img(token.options.imgsrc);
 
       if(token.options.imgsrc.startsWith('above-bucket-not-a-url')){
@@ -92,9 +97,18 @@ async function display_stat_block_in_container(statBlock, container, tokenId, cu
             src="${imageUrl}"    
             class="monster-image"
             style="max-width: 100%;">
-            </div>`);
+            </div>`);    
+
+
+      const customStatId = token.options.statBlock;
+      window.JOURNAL.bindDndSheetTemplateEvents(customStatId, container.find('.avtt-stat-block-container').first(), container, {tokenId, showControls: false});
+      window.JOURNAL.add_input_event_listeners(container, customStatId, tokenId);
     }
-  
+    if($html.find('.dnd-sheet').length>0){
+      container.css('min-width', '615px');
+    }else{
+      container.css('min-width', '200px');
+    }
     add_aoe_statblock_click(container, tokenId);
 
     container.find("img.monster-image, .monster-image").each((i,block) => {
@@ -115,9 +129,8 @@ async function display_stat_block_in_container(statBlock, container, tokenId, cu
       scan_monster(container, statBlock, tokenId);
     else
       add_ability_tracker_inputs(container, tokenId)
-    // scan_creature_pane(container, statBlock.name, statBlock.image);
+
     add_stat_block_hover(container, tokenId);
-  
     //todo: new sendtogamelog menu for these too?
     container.find("p>em>strong, p>strong>em, div>strong>em, div>em>strong, p>span>em>strong, p>span>strong>em").off("contextmenu.sendToGamelog").on("contextmenu.sendToGamelog", function (e) {
       e.preventDefault();
@@ -146,8 +159,11 @@ async function display_stat_block_in_container(statBlock, container, tokenId, cu
       
     })
 
-    container.find("p>em>strong, p>strong>em, div>strong>em, div>em>strong, p>span>em>strong, p>span>strong>em").off("click.roll").on("click.roll", function (e) {
+    container.find("p>em>strong, p>strong>em, div>strong>em, div>em>strong, p>span>em>strong, p>span>strong>em").off("pointerdown.roll touchstart.roll").on("pointerdown.roll touchstart.roll", function (e) {
+      if (e.button === 2) return;
       e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
       if($(e.target).text().includes('Recharge'))
         return;
       let rollButtons = $(e.currentTarget).closest('em:has(strong), strong:has(em)').nextUntil(':has(.avtt-ability-roll-button)')
@@ -187,7 +203,8 @@ async function display_stat_block_in_container(statBlock, container, tokenId, cu
         
 
  
-          window.diceRoller.roll(diceRoll, true, undefined, get_avtt_setting_value('monsterCritType'), undefined, data.damageType);
+          const rollSettings = typeof get_token_roll_settings === 'function' ? get_token_roll_settings(tokenId) : {};
+          window.diceRoller.roll(diceRoll, true, rollSettings.critRange || 20, rollSettings.crit ?? get_avtt_setting_value('monsterCritType'), undefined, data.damageType);
 
         }
       }
@@ -200,7 +217,218 @@ async function display_stat_block_in_container(statBlock, container, tokenId, cu
       }
     }
     $("span.hideme").parent().parent().hide();
+    container.find('.lockStatButton, .download_button, .upload_button, .add-table-row, .table-row-drag-handle, .header-spacer').remove();
+    if(customStatBlock && container.find('.dnd-sheet').length>0){
+			const customStatId = window.TOKEN_OBJECTS[tokenId]?.options?.statBlock;
+			window.JOURNAL.bindDndSheetTemplateEvents(customStatId, $html, container, {tokenId, showControls: true, uploadId: tokenId, downloadToken: token});
+      window.JOURNAL.ensureEnclosingZWSP($html[0]);
+    }
+    inject_statblock_buff_dropdown(container, tokenId);
+	}
+
+/** Adds the roll buff dropdown to the top of a token's stat block and tags the block with its token
+ * id so roll buttons inside it can find the token's buffs. It lives inside the stat block container
+ * so popouts (which clone that container) get it too; `persistStatBlockContent` strips it back out
+ * before saving. */
+function inject_statblock_buff_dropdown(container, tokenId) {
+  if (tokenId == undefined || typeof build_buff_dropdown !== "function") return;
+  const statBlock = $(container).find(".avtt-stat-block-container").first();
+  if (statBlock.length === 0 || statBlock.find("#noAccessToContent").length > 0) return;
+
+  statBlock.attr("data-token-id", tokenId);
+  $(container).find(".avtt-statblock-buffs").remove();
+
+  const dropdown = build_buff_dropdown({ type: "token", tokenId }, true);
+  const rollSettings = typeof build_token_roll_settings === 'function' ? build_token_roll_settings(tokenId) : undefined;
+  if (!dropdown && !rollSettings) return;
+  statBlock.prepend($(`<div class="avtt-statblock-buffs"></div>`).append(dropdown, rollSettings));
 }
+
+function import_open_template(id){
+  $(`.import_pc_template[data-id='${id}']`).trigger("click");
+}
+function import_pc_template_html(files, parentEle, customStatId, tokenId) {
+	if (!files.length) return;
+	build_import_loading_indicator('Preparing Import');
+
+	let processed = 0;
+	let file = files[0]
+  const reader = new FileReader();
+  reader.onload = function () {
+    try {
+      const sanitizedHTML = basic_sanitize_html(reader.result);
+      parentEle.html(sanitizedHTML);
+      const token = window.TOKEN_OBJECTS[tokenId];
+      parentEle.find('.injected-input').each((i, ele)=>{
+        const value = ele.value;
+        const target = ele.getAttribute("data-tracker-key");
+        const targetTokenId = ele.getAttribute("data-token-id");
+        if(token && targetTokenId != undefined && targetTokenId != ''){
+          token.track_ability(target, value);
+        } else{
+          window.JOURNAL.track_ability(target, value, customStatId);
+        }
+      })
+      const containerInside = parentEle.find('.avtt-stat-block-container, .note-text').first();      
+      if(token){
+        setPcTemplateStats(parentEle, token.options);
+        token.place();
+      }
+      window.JOURNAL.notes[customStatId].text = sanitizedHTML.replaceAll(/\[(\/)?spell\]/gi, `[$1spell]`).replaceAll(/\[(\/)?magicitem\]/gi, `[$1magicItem]`).replaceAll(/\[(\/)?item\]/gi, `[$1item]`); 
+      window.JOURNAL.notes[customStatId].plain = '';
+      const currContainer = parentEle.closest('.resize_drag_window, .moveableWindow');
+      debounceRescanStatBlock(currContainer, customStatId, tokenId);
+      window.JOURNAL.setPersistTimeout();
+      debounceSendNote(customStatId, window.JOURNAL.notes[customStatId], tokenId, currContainer);
+      $('.import-loading-indicator').remove();
+    } catch (e) {
+      console.error('Failed to import file', file.name, e);
+      $('.import-loading-indicator').remove();
+    }
+    
+  };
+	reader.readAsText(file);
+}
+const debounceRescanStatBlock = mydebounce(async (container, noteId, tokenId, currScroll, force = false) => {
+  const token = window.TOKEN_OBJECTS[tokenId];
+  let targetRescan = $(container).find('.avtt-stat-block-container, .note-text').first();
+  targetRescan.find('[style=""]').removeAttr('style');
+  targetRescan.find('[class=""]').removeAttr('class');
+  if(!targetRescan.length){
+    container = $(container).closest('.avtt-stat-block-container, .note-text').parent();
+    targetRescan = $(container).find('.avtt-stat-block-container, .note-text').first();
+  }
+  if(!force && targetRescan.find('[contenteditable="true"]:is(:focus, :focus-within)').length>0){
+    return;
+  }
+  const liveScroll = targetRescan[0]?.scrollTop;
+  $(targetRescan).html(window.JOURNAL.notes[noteId].text);
+  $(container).find('.injected-input, .added-input-desc').remove();
+  $(container).find('.add-input:not(.avtt-custom-tracker)').replaceWith((i, innerHtml) => {
+    return innerHtml;
+  })
+  currScroll = liveScroll || 0;
+  await window.JOURNAL.translateHtmlAndBlocks(targetRescan);
+  add_journal_roll_buttons(targetRescan, tokenId);
+  window.JOURNAL.add_journal_tooltip_targets(targetRescan);
+  add_ability_tracker_inputs(targetRescan, tokenId);
+  $(container).find('.add-input').each(function(){window.JOURNAL.addTrackedInputs($(this), {token, noteId})});
+  add_stat_block_hover(targetRescan, tokenId);
+  add_aoe_statblock_click(targetRescan, tokenId);
+  targetRescan.find('a').attr('contenteditable', 'false');
+  if(tokenId){
+    sync_pc_template(window.all_token_objects[tokenId], container);
+    container.find("img.monster-image, .monster-image").each((i,block) => {
+      createSendPlayerButton(block, "login", true).insertAfter(block);
+    });
+
+    //todo: new sendtogamelog menu for these too?
+    container.find("p>em>strong, p>strong>em, div>strong>em, div>em>strong, p>span>em>strong, p>span>strong>em").off("contextmenu.sendToGamelog").on("contextmenu.sendToGamelog", function (e) {
+      e.preventDefault();
+      if(e.altKey || e.shiftKey || (!isMac() && e.ctrlKey) || e.metaKey)
+        return;
+      let outerP = e.target.closest('p, div').outerHTML;
+      const regExFeature = new RegExp(`${e.target.outerHTML.replace(/([\(\)])/g,"\\$1")}[\\s\\S]+?(?=(<\/p>|<\/div>|<strong><em|<em><strong))`, 'gi');
+      let match = outerP.match(regExFeature);
+
+
+      if(match){
+        let matched = `<p>${match[0]}</p>`;
+        
+
+        if($(e.target.closest('p, div')).find('em>strong, strong>em').length == 1){
+          let nextParagraphs = $(e.target.closest('p, div')).nextUntil('p:has(>em>strong), p:has(>strong>em), div:has(>strong>em), div:has(>em>strong)');
+          for(let i=0; i<nextParagraphs.length; i++){   
+            matched = `${matched}${nextParagraphs[i].outerHTML.trim()}`;
+          }
+        }
+        
+          
+          matched = `<div>${matched}</div>`;
+        send_html_to_gamelog(matched);
+      }
+      
+    })
+
+    container.find("p>em>strong, p>strong>em, div>strong>em, div>em>strong, p>span>em>strong, p>span>strong>em").off("pointerdown.roll touchstart.roll").on("pointerdown.roll touchstart.roll", function (e) {
+      if (e.button === 2) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      if($(e.target).text().includes('Recharge'))
+        return;
+      let rollButtons = $(e.currentTarget).closest('em:has(strong), strong:has(em)').nextUntil(':has(.avtt-ability-roll-button)')
+      rollButtons = rollButtons.add(rollButtons.find('.avtt-roll-button:not([data-rolltype="recharge"]), .avtt-roll-formula-button')).closest('.avtt-roll-button:not([data-rolltype="recharge"]), .avtt-roll-formula-button');
+      
+
+
+      const displayName = window.TOKEN_OBJECTS[tokenId] ? window.TOKEN_OBJECTS[tokenId].options?.revealname == true ? window.TOKEN_OBJECTS[tokenId].options.name : `` : target.find(".mon-stat-block__name-link").text(); // Wolf, Owl, etc
+      const creatureAvatar = window.TOKEN_OBJECTS[tokenId]?.options.imgsrc || statBlock?.data?.avatarUrl;
+      $(e.target.closest('p, div')).find('.avtt-aoe-button')?.click();
+      for(let i = 0; i<rollButtons.length; i++){      
+        let data = getRollData(rollButtons[i]);
+        let diceRoll;
+
+        if(data.expression != undefined){
+          if (/^1d20[+-]([0-9]+)/g.test(data.expression)) {
+              if(e.altKey){
+                if(e.shiftKey){
+                  diceRoll = new DiceRoll(`3d20kh1${data.modifier}`, data.rollTitle, data.rollType, displayName, creatureAvatar, "monster");
+                  }
+                  else if((!isMac() && e.ctrlKey) || e.metaKey){
+                  diceRoll = new DiceRoll(`3d20kl1${data.modifier}`, data.rollTitle, data.rollType, displayName, creatureAvatar, "monster");
+                  }
+              }
+              else if(e.shiftKey){
+              diceRoll = new DiceRoll(`2d20kh1${data.modifier}`, data.rollTitle, data.rollType, displayName, creatureAvatar, "monster");
+              }
+              else if((!isMac() && e.ctrlKey) || e.metaKey){
+              diceRoll = new DiceRoll(`2d20kl1${data.modifier}`, data.rollTitle, data.rollType, displayName, creatureAvatar, "monster");
+              }else{
+              diceRoll = new DiceRoll(data.expression, data.rollTitle, data.rollType, displayName, creatureAvatar, "monster")
+              }
+          }
+          else{
+            diceRoll = new DiceRoll(data.expression, data.rollTitle, data.rollType, displayName, creatureAvatar, "monster")
+          }
+        
+
+
+          const rollSettings = typeof get_token_roll_settings === 'function' ? get_token_roll_settings(tokenId) : {};
+          window.diceRoller.roll(diceRoll, true, rollSettings.critRange || 20, rollSettings.crit ?? get_avtt_setting_value('monsterCritType'), undefined, data.damageType);
+
+        }
+      }
+    })
+    let abilities= container.find("p>em>strong, p>strong>em, div>strong>em, div>em>strong, p>span>em>strong, p>span>strong>em");
+
+    for(let i = 0; i<abilities.length; i++){
+      if($(abilities[i]).closest('em:has(strong), strong:has(em)').nextUntil('em:has(strong), strong:has(em)').is('.avtt-roll-button, :has(.avtt-roll-button)')){
+        $(abilities[i]).toggleClass('avtt-ability-roll-button', true);
+      }
+    }
+    $("span.hideme").parent().parent().hide();
+    let imageUrl = parse_img(token.options.imgsrc);
+
+    if(token.options.imgsrc.startsWith('above-bucket-not-a-url')){
+      imageUrl = await getAvttStorageUrl(imageUrl);
+    }
+    container.find('.avtt-stat-block-container').append(`<div class="image" style="display: inline-block; position: relative;"><${(token.options.videoToken == true || ['.mp4', '.webm', '.m4v'].some(d => token.options.imgsrc.includes(d))) ? 'video disableremoteplayback muted' : 'img'}
+      src="${imageUrl}"    
+      class="monster-image"
+      style="max-width: 100%;">
+      </div>`);   
+    container.find("img.monster-image, .monster-image").each((i,block) => {
+      createSendPlayerButton(block, "login", true).insertAfter(block);
+    });
+  }
+  window.JOURNAL.bindDndSheetTemplateEvents(noteId, targetRescan, container, {tokenId, showControls: false});
+  window.JOURNAL.ensureEnclosingZWSP(targetRescan[0]);
+  inject_statblock_buff_dropdown(container, tokenId);
+  $(container).find('.avtt-stat-block-container, .note-text')[0].scrollTop = currScroll;
+}, 1000);
+
+
 
 async function build_monster_stat_block(statBlock, token) {
   if (!statBlock.userHasAccess) {
@@ -212,7 +440,7 @@ async function build_monster_stat_block(statBlock, token) {
     : token?.options?.imgsrc == statBlock.data.avatarUrl || token?.options?.imgsrc == undefined
       ? statBlock.data.largeAvatarUrl
       : token.options.imgsrc
-  if (get_avtt_setting_value('statBlockStyle') == 0 && statBlock.data.initiativeBonus != null || get_avtt_setting_value('statBlockStyle') == 2) {
+  if (get_avtt_setting_value('statBlockStyle') == 0 && (statBlock.data.initiativeBonus != null || statBlock.data['5.5e'] == true) || get_avtt_setting_value('statBlockStyle') == 2) {
     statblockData = `
     <div class="container avtt-stat-block-container ${(statBlock.data.slug) ? 'open5eMonster' : ''}">
       <div id="content" class="main content-container" style="padding:0!important">
@@ -1445,7 +1673,7 @@ class MonsterStatBlock {
     }
 
     initiativeButton(){
-      return this.rollButton(`1d20`, this.data.initiativeBonus != null ? this.initiativeModString : this.dexModString, 'Roll', 'Initiative', false)                   
+      return this.rollButton(`1d20`, this.data.initiativeBonus != null ? this.initiativeModString : this.dexModString, 'Check', 'Initiative', false)                   
     }
 
     statButton(value, stat, parenthesis = true) {
@@ -1480,12 +1708,11 @@ class MonsterStatBlock {
             const bonusMod = st.bonusModifier || 0;
             const statModInt = this.modInt(statValue) + this.proficiencyBonus + bonusMod;
             const statModString = statModInt >= 0 ? `+${statModInt}` : `${statModInt}`;
-            console.debug(`savingThrowsHtml`, statValue, bonusMod, statModString, statDefinition);
             return `${statDefinition.key} ${this.rollButton("1d20", statModString, "save", statDefinition.key)}`
         }).join(", ");
     }
-
     get skillsHtml() {
+
         if (typeof this.data.skillsHtml === "string" && this.data.skillsHtml.length > 0) {
             return this.data.skillsHtml; // data.skills isn't always correct. Or at least wasn't correct for Vecna
         }
@@ -1762,7 +1989,7 @@ function get_monster_senses(senses, vision = {darkvision: 0, devilsight: 0, true
         const ftPosition = senses[i].notes.indexOf('ft.')
         
         const range = parseInt(senses[i].notes.slice(0, ftPosition));
-        if(monsterSenseIds[senseKey] == undefined && range>darkvision){
+        if(monsterSenseIds[senseKey] == undefined && range>vision.darkvision){
           vision.darkvision = range;
         } else{
           if(monsterSenseIds[senseKey] == 'darkvision'){
@@ -1792,7 +2019,61 @@ const DAMAGE_ADJUSTMENT_TYPE_VULNERABILITIES = 3;
 
 const validRollTypes = ["to hit", "damage", "save", "check", "heal", undefined]; // undefined is in the list to allow clearing it
 
-const fetch_tooltip = mydebounce(async (dataTooltipHref, name, callback) => {
+function getNonLegacySpellId(options){
+    if(!window.SPELLS_CACHE){
+      return options.id ?? options.tooltipName;
+    }
+    let newSpell
+    if(options.tooltipName){
+      newSpell = window.SPELLS_CACHE.filter(d=> d.definition.name.toLowerCase() == options.tooltipName.toLowerCase() && (!d.definition.isLegacy || d.definition.isHomebrew)); 
+      return newSpell[0].definition.id;
+    } else if(options.id){
+        const spell = window.SPELLS_CACHE.filter(d=> d.definition.id == options.id);
+        if(!spell[0]){
+          return options.id;
+        }
+        const name = spell[0].definition.name.toLowerCase();
+        newSpell = window.SPELLS_CACHE.filter(d=> d.definition.name.toLowerCase() == name && (!d.definition.isLegacy || d.definition.isHomebrew));
+        options.tooltipName = name;
+    }
+    if(!newSpell[0]){
+        noisy_log('Legacy fallback', options)
+        newSpell = window.SPELLS_CACHE.filter(d=> d.definition.name.toLowerCase() == options.tooltipName.toLowerCase() && d.definition.isLegacy);
+    }
+    if(!newSpell[0]){
+      noisy_log('Spell does not exist');
+      return false;
+    }
+    return newSpell[0].definition.id;
+}
+function getNonLegacyItemId(options){
+    if(!window.ITEMS_CACHE){
+      return options.id ?? options.tooltipName;
+    }
+    let newItem 
+    if(options.tooltipName){
+      newItem = window.ITEMS_CACHE.filter(d=> d.name.toLowerCase() == options.tooltipName.toLowerCase() && (!d.isLegacy || d.isHomebrew) && (!options.id || d.id == options.id));
+    } 
+    if(!newItem?.[0] && options.id){
+        const item =  window.ITEMS_CACHE.filter(d=> d.id == options.id);
+        const name = item[0].name.toLowerCase();
+        newItem = window.ITEMS_CACHE.filter(d=> d.name.toLowerCase() == name && (!d.isLegacy || d.isHomebrew));
+        options.tooltipName = name;
+    }
+    if(!newItem[0]){
+        noisy_log('Legacy fallback', options)
+        newItem = window.ITEMS_CACHE.filter(d=> d.name.toLowerCase() == options.tooltipName.toLowerCase() && d.isLegacy);
+    }
+    if(!newItem[0]){
+      noisy_log('Item does not exist', options);
+      return false;
+    }
+    return newItem[0].id;
+}
+const fetch_tooltip = mydebounce(async (dataTooltipHref, name, callback, callbackTarget) => {
+  return await fetch_tooltip_immediate(dataTooltipHref, name, callback, callbackTarget);
+}, 200);
+const fetch_tooltip_immediate = async (dataTooltipHref, name, callback, callbackTarget) => {
     // dataTooltipHref will look something like this `//www.dndbeyond.com/spells/2329-tooltip?disable-webm=1&disable-webm=1`
     // we only want the `spells/2329` part of that
     try {
@@ -1805,8 +2086,8 @@ const fetch_tooltip = mydebounce(async (dataTooltipHref, name, callback) => {
           const typeAndId = `${type}/${id}`;
           const existingJson = window.tooltipCache[typeAndId];
           if (existingJson !== undefined) {
-              console.log("fetch_tooltip existingJson", existingJson);
-              callback(existingJson);
+              noisy_log("fetch_tooltip existingJson", existingJson);
+              callback(existingJson, callbackTarget);
               return;
           }
           window.tooltipCache[typeAndId] = {Tooltip: ``};
@@ -1824,7 +2105,7 @@ const fetch_tooltip = mydebounce(async (dataTooltipHref, name, callback) => {
 
               const toolTipJson = { Tooltip: '' }
               window.tooltipCache[typeAndId] = toolTipJson;
-              callback(toolTipJson); 
+              callback(toolTipJson, callbackTarget); 
               return;
             } 
               
@@ -1841,21 +2122,7 @@ const fetch_tooltip = mydebounce(async (dataTooltipHref, name, callback) => {
             tooltipBody.find('.detail-content>.line:first-of-type').remove();
           }
           let functionArray = [];
-          let importStyleText = ``;
-          $(moreInfo).find('link[rel="stylesheet"]').each(function(){
-            if(!this.href.includes('dndbeyond'))
-                return;
-            functionArray.push(async () => {
-              
-              let importStyle = await $.get(this.href);
-              let splitHref= this.href.split('/');
 
-              let parentDir = splitHref.slice(0,splitHref.length-2).join('/');
-              importStyleText = `${importStyle.replaceAll(/\.\.\/images/gi, `${parentDir}/images`)}${importStyleText}`
-            
-              return true;
-            }); 
-          });
           functionArray.reverse();
            for(let i =0; i<functionArray.length; i++){
             await functionArray[i]();
@@ -1874,9 +2141,8 @@ const fetch_tooltip = mydebounce(async (dataTooltipHref, name, callback) => {
                     </div>
               <div class="tooltip-body">
                 <div class='${bodyClass}'>
-                  <style>                         
+                  <style id='embededStyles'>                         
                       .tooltip-flyout .tooltip-body{
-                        ${importStyleText.replaceAll(/\:root/gi, '')}
                         .detail-content{
                           width: 100% !important;
                         }
@@ -1915,53 +2181,76 @@ const fetch_tooltip = mydebounce(async (dataTooltipHref, name, callback) => {
 
           const toolTipJson = {Tooltip: moreInfo}
           window.tooltipCache[typeAndId] = toolTipJson;
-          callback(toolTipJson); 
+          callback(toolTipJson, callbackTarget); 
         }
       }
+
       if (window.tooltipCache === undefined) {
           window.tooltipCache = {};
       }
 
 
-      console.log("fetch_tooltip starting for ", dataTooltipHref);
+      noisy_log("fetch_tooltip starting for ", dataTooltipHref);
 
       if(dataTooltipHref[0] != undefined){
+
         const parts = dataTooltipHref[0].split("/");
         const idIndex = parts.findIndex(p => p.includes("-tooltip"));
-        const id = parseInt(parts[idIndex]);
-        const type = parts[idIndex - 1];
-        const typeAndId = `${type}/${id}`;
+        let id = parseInt(parts[idIndex]);
+        const type = parts[idIndex - 1] == 'equipment' ? 'adventuring-gear' : parts[idIndex - 1];
+        if(get_avtt_setting_value('2024Tooltips')){
+          if(type == 'spells')
+            id= getNonLegacySpellId({id});
+          else if(type == 'magic-items' || type == 'adventuring-gear' || type == 'armor' || type == 'weapons'){ 
+            id = getNonLegacyItemId({id, tooltipName: name});
+          }
 
+        }
+        const typeAndId = `${type}/${id}`;
+       
+        const currSpell = type == 'spells' ? window.SPELLS_CACHE?.filter(d=> d.definition.id == id)[0]?.definition : false;
+        let isRitual, componentText;
+        if(currSpell){
+          isRitual = currSpell.ritual ?? false;
+          componentText = currSpell.componentsDescription ?? '';
+        }
+       
         const existingJson = window.tooltipCache[typeAndId];
         if (existingJson !== undefined) {
-          console.log("fetch_tooltip existingJson", existingJson);
-          callback(existingJson);
+          noisy_log("fetch_tooltip existingJson", existingJson);
+          callback(existingJson, callbackTarget);
           return;
         }
         
         window.ajaxQueue.addRequest({
-          url: `https://www.dndbeyond.com/${typeAndId}/tooltip-json`,
+          url: `https://www.dndbeyond.com/${typeAndId}/tooltip`,
           beforeSend: function() {
             // only make the call if we don't have it cached.
             // This prevents the scenario where a user triggers `mouseenter`, and `mouseleave` multiple times before the first network request finishes
             const alreadyFetched = window.tooltipCache[typeAndId];
             if (alreadyFetched) {
-                callback(alreadyFetched);
+                callback(alreadyFetched, callbackTarget);
                 return false;
             }
             return true;
           },
           success: async function (response) {
-            console.log("fetch_tooltip success", response);
+            noisy_log("fetch_tooltip success", response);
+            let responseJSON;
+            try{
+              responseJSON = JSON.parse(response.replace(/^[^{]*|[^}]*$/g, ""));
+            }
+            catch{
+              if(typeof response === 'string'){
 
-            if(typeof response === 'string'){
-
-              homebrewTooltip()
-              return;
+                homebrewTooltip()
+                return;
+              }
             }
 
-            window.tooltipCache[typeAndId] = response;
-            callback(response);
+
+            window.tooltipCache[typeAndId] = {...responseJSON, isRitual, componentText};
+            callback(window.tooltipCache[typeAndId], callbackTarget);
           },
           error: function (error) {
             console.warn("fetch_tooltip error - attmpting more info link for homebrew/sources", error);
@@ -1976,8 +2265,7 @@ const fetch_tooltip = mydebounce(async (dataTooltipHref, name, callback) => {
     } catch(error) {
         console.warn("Failed to find tooltip info in", dataTooltipHref, error);
     }
-}, 200);
-
+}
 
 function add_tooltip_aoe_buttons(html, tokenId){
   const icons = html.find(".aoe-size i:not('.above-vtt-visited')");
@@ -1990,13 +2278,14 @@ function add_tooltip_aoe_buttons(html, tokenId){
       const spellContainer = $(this).closest('.tooltip-spell');
       const name = spellContainer.find(".tooltip-header-title").first().text();
       let color = "default"
-      const feet = /([\d]+) ft/gi.exec(spellContainer.find('.aoe-size').text())[1];
+      let feet = /([\d]+) ft/gi.exec(spellContainer.find('.aoe-size').text())[1];
       const dmgType = spellContainer.find(`[class*='-damage'] i[class*='i-type']`)?.attr('class')?.split('-')[2];
       if (dmgType != undefined && dmgType != ''){
         color = dmgType.toLowerCase();
       }
       let shape = $(this).attr('class').split(' ').filter(c => c.startsWith('i-aoe-'))[0].split('-')[2];
       shape = window.sanitize_aoe_shape(shape)
+
       button.attr("title", "Place area of effect token")
       button.attr("data-shape", shape);
       button.attr("data-style", color);
@@ -2007,8 +2296,14 @@ function add_tooltip_aoe_buttons(html, tokenId){
       button.css("border-width","1px");
       button.click(function(e) {
         e.stopPropagation();
-
-        let options = window.build_aoe_token_options(color, shape, feet / window.top.CURRENT_SCENE_DATA.fpsq, name)
+        const circleIsSquare = get_avtt_setting_value('circleIsSquare');
+        let newShape = shape;
+        let newFeet = feet;
+        if(circleIsSquare && shape == 'circle'){
+          newShape = 'square';
+          newFeet *= 2;
+        }
+        let options = window.build_aoe_token_options(color, newShape, newFeet / window.top.CURRENT_SCENE_DATA.fpsq, name)
         if(name == 'Darkness' || name == 'Maddening Darkness' ){
           options = {
             ...options,
@@ -2029,88 +2324,50 @@ function add_tooltip_aoe_buttons(html, tokenId){
       
       return button;
     });
-    console.log(`${icons.length} aoe spells discovered`);
+    noisy_log(`${icons.length} aoe spells discovered`);
   }  
 }
 
-function display_tooltip(tooltipJson, container, clientY, tokenId=undefined) {
-    if (typeof tooltipJson?.Tooltip === "string") {
-        remove_tooltip(0, false);
-
-        console.log("container", container)
-        const tooltipHtmlString = tooltipJson.Tooltip.replaceAll(/<script>[\S\s]+<\/script>/gi, '');
-
-        build_and_display_sidebar_flyout(clientY, function (flyout) {
-            flyout.addClass("prevent-sidebar-modal-close"); // clicking inside the tooltip should not close the sidebar modal that opened it
-            flyout.addClass("tooltip-flyout")
-            const tooltipHtml = $(tooltipHtmlString);
-            add_journal_roll_buttons(tooltipHtml, tokenId);
-            add_aoe_statblock_click(tooltipHtml, tokenId);
-            add_tooltip_aoe_buttons(tooltipHtml, tokenId);
-            flyout.append(tooltipHtml);
-            let sendToGamelogButton = $(`<a class="ddbeb-button" href="#">Send To Gamelog</a>`);
-            sendToGamelogButton.css({ "float": "right" });
-            sendToGamelogButton.on("click", function(ce) {
-                ce.stopPropagation();
-                ce.preventDefault();
-                const tooltipWithoutButton = $(tooltipHtmlString);
-                tooltipWithoutButton.css({
-                    "width": "100%",
-                    "max-width": "100%",
-                    "min-width": "100%"
-                });
-                let outerHtml = $(tooltipWithoutButton[0].outerHTML);
-                outerHtml.find('style').remove();
-                send_html_to_gamelog(outerHtml[0].outerHTML);
-            });
-
-            const buttonFooter = $("<div></div>");
-            buttonFooter.css({
-                height: "40px",
-                width: "100%",
-                position: "relative",
-                background: "#fff"
-            });
-            flyout.append(buttonFooter);
-            buttonFooter.append(sendToGamelogButton);
-
-            const didResize = position_flyout_on_best_side_of(container, flyout);
-            if (didResize) {
-                // only mess with the html that DDB gave us if we absolutely have to
-                tooltipHtml.css({
-                    "width": "100%",
-                    "max-width": "100%",
-                    "min-width": "100%"
-                });
-            }
-
-            flyout.hover(function (hoverEvent) {
-                if (hoverEvent.type === "mouseenter") {
-                    clearTimeout(removeToolTipTimer);
-                    removeToolTipTimer = undefined;
-                } else {
-                    remove_tooltip(500);
-                }
-            });
-            flyout.css("background-color", "#fff");
-        });
+function get_tooltip_display_document(hoverEvent) {
+    const targetDocument = hoverEvent.currentTarget?.ownerDocument || document;
+    const targetWindow = targetDocument.defaultView;
+    try {
+        // A popout is its own top-level window, while an iframe should keep
+        // using the main AboveVTT window for its tooltip.
+        return targetWindow && targetWindow !== targetWindow.top ? targetWindow.top.document : targetDocument;
+    } catch (error) {
+        // Cross-origin frames cannot be inspected; retain the main document.
+        return document;
     }
 }
 
-var removeToolTipTimer = undefined;
-function remove_tooltip(delay = 0, removeHoverNote = true) {
+function display_tooltip(tooltipJson, container, hoverEvent, tokenId=undefined) {
+    if (typeof tooltipJson?.Tooltip === "string") {
+        // Cloned popout handlers execute in the opener, but the target belongs
+        // to the child document. Keep the flyout in that same document, unless
+        // the target is in an iframe, which displays its tooltip in the main UI.
+        const tooltipDocument = get_tooltip_display_document(hoverEvent);
+        remove_tooltip(0, false, tooltipDocument);
+
+        noisy_log("container", container)
+        const tooltipHtmlString = tooltipJson.Tooltip.replaceAll(/<script>[\S\s]+<\/script>/gi, '');
+
+
+        build_and_display_sidebar_flyout(hoverEvent.clientY, function (flyout) {
+            setup_tooltip_flyout(flyout, tooltipHtmlString, ['tooltip-flyout'], hoverEvent, {id: tokenId, container, isRitual: tooltipJson.isRitual, componentText: tooltipJson.componentText});
+            flyout.css("background-color", "#fff");
+        }, tooltipDocument);
+    }
+}
+
+function remove_tooltip(delay = 0, removeHoverNote = true, tooltipDocument = document) {
+    const tooltipWindow = tooltipDocument.defaultView || window;
+    clearTimeout(tooltipWindow.removeToolTipTimer);
     if (delay > 0) {
-      if($('.prevent-sidebar-modal-close:hover').length>0){
-        clearTimeout(removeToolTipTimer);
-        removeToolTipTimer = undefined;
-      }
-      else{
-        removeToolTipTimer = setTimeout(function(){remove_sidebar_flyout(removeHoverNote)}, delay);
-      } 
+      tooltipWindow.removeToolTipTimer = setTimeout(function(){remove_sidebar_flyout(removeHoverNote, tooltipDocument)}, delay);
     } else {
-        clearTimeout(removeToolTipTimer);
-        removeToolTipTimer = undefined;
-        remove_sidebar_flyout(removeHoverNote);
+      tooltipWindow.removeToolTipTimer = undefined;
+      remove_sidebar_flyout(removeHoverNote, tooltipDocument);
     }
 }
 
@@ -2118,20 +2375,18 @@ function add_stat_block_hover(statBlockContainer, tokenId) {
     const tooltip = $(statBlockContainer).find(".tooltip-hover");
     
     tooltip.hover(function (hoverEvent) {
-
+        if(hoverEvent.target.tagName == 'INPUT')
+          return;
         let currentTarget = $(hoverEvent.currentTarget);
+        const tooltipDocument = get_tooltip_display_document(hoverEvent);
+        const tooltipWindow = tooltipDocument.defaultView || window;
         let cursorOffset = {
-           left : 10,
-           top  : -10
+          left : 10,
+          top  : -10
         }
-        currentTarget.off('mousemove.cursor').on('mousemove.cursor', function(e){
-          currentTarget.css({
-            '--cursor-offsetX': `${(e.clientX + cursorOffset.left)}px`,
-            '--cursor-offsetY': `${(e.clientY + cursorOffset.top)}px`
-          })
-        })
         if (hoverEvent.type === "mouseenter") {
-          window.tooltipHoverTimeout = setTimeout(function(){
+          clearTimeout(tooltipWindow.tooltipHoverTimeout);
+          tooltipWindow.tooltipHoverTimeout = setTimeout(function(){
             currentTarget.css({
               '--cursor-offsetX': `${(hoverEvent.clientX + cursorOffset.left)}px`,
               '--cursor-offsetY': `${(hoverEvent.clientY + cursorOffset.top)}px`
@@ -2148,14 +2403,20 @@ function add_stat_block_hover(statBlockContainer, tokenId) {
                 if(container.find('.tooltip-header').length === 0){
                   container = currentTarget.closest("#resizeDragMon");
                 }
+                if(container.length === 0){
+                  container = currentTarget.closest(".moveableWindow");
+                }
                 if (container.length === 0) {
                     container = currentTarget.closest(".sidebar-modal");
                 }
                 if (container.length === 0) {
+                    container = currentTarget.closest(".avtt-stat-block-container");
+                }
+                if (container.length === 0) {
                     container = is_characters_page() ? $(".ct-sidebar__inner [class*='styles_content']") : $(".sidebar__pane-content");
                 }
-
-                display_tooltip(tooltipJson, container, hoverEvent.clientY, tokenId);   
+                hoverEvent.clientY += 20;
+                display_tooltip(tooltipJson, container, hoverEvent, tokenId);   
             };
             if(window.tooltipCache == undefined)
               window.tooltipCache = {};
@@ -2168,7 +2429,7 @@ function add_stat_block_hover(statBlockContainer, tokenId) {
 
               const existingJson = window.tooltipCache[typeAndId];
               if (existingJson !== undefined) {
-                console.log("fetch_tooltip existingJson", existingJson);
+                noisy_log("fetch_tooltip existingJson", existingJson);
                 callback(existingJson);
                 return;
               }
@@ -2181,7 +2442,7 @@ function add_stat_block_hover(statBlockContainer, tokenId) {
               const typeAndId = `${type}/${id}`;
               const existingJson = window.tooltipCache[typeAndId];
               if (existingJson !== undefined) {
-                console.log("fetch_tooltip existingJson", existingJson);
+                noisy_log("fetch_tooltip existingJson", existingJson);
                 callback(existingJson);
                 return;
               }
@@ -2189,9 +2450,15 @@ function add_stat_block_hover(statBlockContainer, tokenId) {
             currentTarget.toggleClass('loading-tooltip', true);   
             fetch_tooltip(dataTooltipHref, name, callback);   
           }, 200);
-        } else {
-            clearTimeout(window.tooltipHoverTimeout); 
-            remove_tooltip(500);
+        } else if (hoverEvent.type === "mousemove") {
+
+          currentTarget.css({
+            '--cursor-offsetX': `${(hoverEvent.clientX + cursorOffset.left)}px`,
+            '--cursor-offsetY': `${(hoverEvent.clientY + cursorOffset.top)}px`
+          })
+        } else if (hoverEvent.type === "mouseleave") {
+            clearTimeout(tooltipWindow.tooltipHoverTimeout);
+            remove_tooltip(500, true, tooltipDocument);
             currentTarget.toggleClass('loading-tooltip', false);
             currentTarget.off('mousemove.cursor');
         }
@@ -2200,7 +2467,7 @@ function add_stat_block_hover(statBlockContainer, tokenId) {
 }
 
 function send_html_to_gamelog(outerHtml, whisper) {
-    console.log("send_html_to_gamelog", outerHtml);
+    noisy_log("send_html_to_gamelog", outerHtml);
     outerHtml = outerHtml.replace('disableremoteplayback', 'disableremoteplayback autoplay loop');
     let html = window.MB.encode_message_text(outerHtml);
     const data = {
