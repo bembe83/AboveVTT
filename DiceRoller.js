@@ -744,7 +744,7 @@ class DiceRoller {
                                     let totals = $(listItems[i]).find(`[class*='TotalContainer-Flex']>div[class*='Total-']`);
                                     if (totals.length == msg.data.rolls.length) {
                                         for (let k = 0; k < totals.length; k++) {
-                                            if (parseInt($(totals[k]).find('span').text()) != msg.data.rolls[k].result.total)
+                                            if (parseInt($(totals[k]).find('span').text(),10) !== msg.data.rolls[k]?.result?.total)
                                                 break;
                                             target = $(listItems[i]);
                                         }
@@ -1097,6 +1097,7 @@ class DiceRoller {
 				critRange = Number(window.CHARACTER_AVTT_SETTINGS.critRange || 20);
 				logo = window.godice.godiceext.godicelogo;
 				roll = await window.godice.rollResult.rollDice(diceRoll.expression,forceCritType); 
+                diceRoll.expression = roll.notation;
 			}			
             let regExpression = new RegExp(`${diceRoll.expression.replace(/[+-]/g, '\\$&')}:\\s`);
             let rollType = (diceRoll.rollType) ? diceRoll.rollType : 'roll';
@@ -1261,6 +1262,9 @@ class DiceRoller {
                 }
                 setTimeout(function(){
                     window.MB.inject_chat(msgdata);
+                    setTimeout(function(){
+                        window.MB.reprocess_chat_message_history();
+                    }, 500);
                     self.#resetVariables();
                     self.nextRoll(undefined, critRange, critType)      
                 }, 50)

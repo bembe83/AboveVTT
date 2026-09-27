@@ -1757,7 +1757,7 @@ class DiceRollPrompt {
 			});
 			console.debug(newRolls);
 			
-			if (newRolls.lenght >0) {
+			if (newRolls.length >0) {
 				console.log("Manually rolled: [", newRolls. join(", "),"]");
 			}
 			else
@@ -2042,8 +2042,10 @@ function roll(diceString, diceRolls = null) {
 				useInTotal = true;
 				toUse--;
 			}
-			rolls.push({calculationValue: roll, initialValue:roll, modifierFlags: "", modifiers: keepPreference?[keepPreference]:[], type: "result", useInTotal: useInTotal, value: roll});
+			rolls.push({calculationValue: roll, initialValue:roll, modifierFlags: "", modifiers: new Set(keepPreference ? [keepPreference] : []), type: "result", useInTotal: useInTotal, value: roll});
 		}); 
+		
+		resultString = `[${rolls.map(die => `${die.value}${die.useInTotal ? "" : "d"}`).join(", ")}]`;
 		
 		result = { 
 			term: diceString, 
@@ -2124,10 +2126,10 @@ class RollResult {
 				if(match.groups.faces == 20){
 					if(advdis == 1) {
 						match.groups.numberOfDice = d20dice;
-						match.groups.modifier="kh";
+						match.groups.modifier="kh1";
 					} else if(advdis == -1){
 						match.groups.numberOfDice = d20dice;
-						match.groups.modifier="kl";
+						match.groups.modifier="kl1";
 					}
 				}else {
 					if(rollType == 1){
