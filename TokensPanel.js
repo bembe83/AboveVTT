@@ -325,7 +325,8 @@ function rebuild_token_items_list() {
                 playerCustomization.rootId = RootFolder.Players.id;
             let folderPath = playerCustomization?.folderPath();
             let parentId = playerCustomization?.parentId; 
-            return SidebarListItem.PC(pc.sheet, pc.name, pc.image, folderPath, parentId);
+            const name = playerCustomization?.name() ?? pc.name;
+            return SidebarListItem.PC(pc.sheet, name, pc.image, folderPath, parentId);
         });
     // Players Folders
     window.TOKEN_CUSTOMIZATIONS
@@ -3073,7 +3074,7 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
         });
     }
    
-    if (listItem.isTypeMyToken()) {
+    if (listItem.isTypeMyToken() || listItem.isTypePC()) {
 
         // MyToken name
         inputWrapper.append($(`<div class="token-image-modal-footer-title" style="width:100%;padding-left:0px">Token Name</div>`));
@@ -3425,6 +3426,20 @@ function display_aoe_token_configuration_modal(listItem, placedToken = undefined
                 </div></div>`;
 
     inputWrapper.append(lightInputs);
+
+    const visionAngleInput = build_token_vision_radius_input(targetOptions.visionAngle ?? 360, function (newDeg, persist = false) {
+        customization.setTokenOption("visionAngle", newDeg);
+        if (persist)
+            persist_token_customization(customization);
+    }, 'Token Vision Angle', 'visionAngle');
+    inputWrapper.find(".token-config-aura-wrapper.light .menu-vision-aura").first().before(visionAngleInput);
+
+    const lightAngleInput = build_token_vision_radius_input(targetOptions.lightAngle ?? 360, function (newDeg, persist = false) {
+        customization.setTokenOption("lightAngle", newDeg);
+        if (persist)
+            persist_token_customization(customization);
+    }, 'Token Light Angle', 'lightAngle');
+    inputWrapper.find(".token-config-aura-wrapper.light .menu-inner-aura").first().before(lightAngleInput);
 
 
 
