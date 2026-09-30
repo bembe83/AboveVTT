@@ -293,7 +293,6 @@ function setupMBIntervals(){
 	window.pingInterval = setInterval(function() {
 		window.MB.sendAbovePing();
 		checkForExportRemind();
-		forceDdbWsReconnect();
 	}, 480000);
 }
 

@@ -104,9 +104,41 @@ canvas.dice-rolling-panel__container,
     z-index: 160000 !important;
     visibility: visible;
 }
-.hide-button.active{
+#scenes-panel :is(.hide-button, .favorites-button).active{
     color: #fff;
     background-color: #c53131;
+}
+#scenes-panel .favorite:after {
+  content: "\e838";
+  font-family: 'Material Symbols Outlined';
+  position: absolute;
+  left: -2px;
+  font-size: 16px;
+  color: #ffd900;
+  top: -5px;
+  font-variation-settings: 'FILL' 1;
+  text-shadow: 0px 0px 1px #000, 0px 0px 1px #000, 0px 0px 1px #000, 0px 0px 1px #000;
+  pointer-events:none;
+}
+svg[src$='assets/folder.svg']>g>path:nth-of-type(2){
+    transform: scale(0.9, 2.1);
+    transform-origin: center 60px;
+}
+.folder > :is(.sidebar-list-item-row-item, .row-chapter) svg[src$='assets/folder.svg']>g>path:nth-of-type(odd){ 
+    filter: drop-shadow(0px -1px 0px #0000009c);
+}
+
+.folder:not(.collapsed) > :is(.sidebar-list-item-row-item, .row-chapter) svg[src$='assets/folder.svg']>g>path:nth-of-type(3){
+    transform: scale(1, 0.6);
+    transform-origin: center bottom;
+    filter: drop-shadow(0px -11px 5px #0000009c);
+}
+
+#scenes-panel .favorite:has(#note):after {
+  top: 13px;
+}
+#scenes-panel *{
+    user-select: none;
 }
 #hidden-scenes-message,
 .abovevttTempMessage{
@@ -3442,7 +3474,8 @@ button.roll-button-mod.adv {
     position: relative;
 }
 .moveableWindow.resize_drag_window:has(>.note){
-    overflow:clip;
+    overflow: clip;
+    overflow-clip-margin: 4px;
 }
 .body-rpgcharacter-sheet .moveableWindow .note > .note-text {
     height: calc(100% - 25px);
@@ -7769,15 +7802,30 @@ div#tokenOptionsContainer .remove-from-ct>button{
     right: -7px;
     bottom: -10px;
 }
-.resize_drag_window .ui-resizable-e,
-.resize_drag_window .ui-resizable-w,
-#resizeDragMon .ui-resizable-e,
-#resizeDragMon .ui-resizable-w,
-#sheet .ui-resizable-e,
-#sheet .ui-resizable-w   {
-    height: calc(100% + 4px);  
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-e,
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-w   {
+    height: calc(100% + 4px) !important;  
+    width: 4px !important;
+    top:-2px;
 }
-
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-n,
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-s {
+    width: calc(100% + 4px) !important;  
+    height: 4px !important;
+    left: -2px;
+}
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-e{
+    right:-4px;
+}
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-w {
+    left:-4px;
+}
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-n{
+    top:-4px;
+}
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-s{
+    bottom:-4px;
+}
 /*Resizable Handle Test code */
 /*[class*="ui-resizable"]{
     border:  1px dotted #ddd;
@@ -13991,8 +14039,8 @@ p.monster-header+p {
 }
 #resizeDragMon,
 .moveableWindow:has(.dnd-sheet){
-    contain: strict;
-
+    contain: layout;
+    
     .avtt-token-roll-settings {
         display: inline-block;
         position: relative;
@@ -14525,7 +14573,6 @@ ul.avttBuffItems select,
   position: relative !important;
   top: auto !important;
   left: 0 !important;
-  width: auto !important;
 }
 
 .moveableWindow:has(.note .dnd-sheet) .avtt-note-roll-controls .dropdown-check-list .clickHandle,
@@ -14539,7 +14586,6 @@ ul.avttBuffItems select,
 .moveableWindow:has(.note .dnd-sheet) .avtt-note-roll-controls .dropdown-check-list ul.avttBuffItems,
 .note .avtt-note-roll-controls .dropdown-check-list ul.avttBuffItems {
   box-sizing: border-box !important;
-  margin: 0 !important;
   padding: 2px !important;
   padding-inline-start: 2px !important;
   color: var(--theme-contrast, #242528) !important;
