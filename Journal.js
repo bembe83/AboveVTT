@@ -264,12 +264,23 @@ class JournalManager{
 		});
 
 		Promise.all([loadJournalPromise, loadChaptersPromise, loadStatBlocksPromise]).then(() => {
+			
+			// The following through this.persist is to update issues between 1.60 and 1.61 where note text was causing syntax errors
+			const notes = this.notes;
+			for(let noteId in notes){
+				const text = notes[noteId].text;
+				if(!text)
+					continue;
+				notes[noteId].text = basic_sanitize_html(text);
+			}
+			this.persist();
+
 			if(is_abovevtt_page()){
 				this.build_journal();
 			}
 			if(window.DM && !is_gamelog_popout() && is_abovevtt_page()){
 				// also sync the journal
-				window.JOURNAL?.sync();
+				this.sync();
 			}
 		});
 	}
@@ -979,7 +990,13 @@ class JournalManager{
 						self.build_journal(searchText);
 					}
 				});
-				let folderIcon = $(`<div class="sidebar-list-item-row-img"><img src="${window.EXTENSION_PATH}assets/folder.svg" class="token-image"></div>`)
+				let folderIcon = $(`<div class="sidebar-list-item-row-img"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" x="0px" y="0px" viewBox="0 0 309.267 309.267" style="enable-background:new 0 0 309.267 309.267;" src="${window.EXTENSION_PATH}assets/folder.svg" xml:space="preserve">
+						<g>
+						<path style="fill:#F4B459;" d="M260.944,43.491H125.64c0,0-18.324-28.994-28.994-28.994H48.323c-10.67,0-19.329,8.65-19.329,19.329   v222.286c0,10.67,8.659,19.329,19.329,19.329h212.621c10.67,0,19.329-8.659,19.329-19.329V62.82   C280.273,52.15,271.614,43.491,260.944,43.491z"/>
+						<path style="fill:#E4E7E7;" d="M28.994,72.484h251.279v77.317H28.994V72.484z"/>
+						<path style="fill:#F4B459;" d="M19.329,91.814h270.609c10.67,0,19.329,8.65,19.329,19.329l-19.329,164.298   c0,10.67-8.659,19.329-19.329,19.329H38.658c-10.67,0-19.329-8.659-19.329-19.329L0,111.143C0,100.463,8.659,91.814,19.329,91.814z   "/>
+						</g>
+					</svg></div>`)
 					
 				let row_chapter_title=$("<div class='row-chapter'></div>");
 				
@@ -1954,7 +1971,7 @@ class JournalManager{
 		const avttImages = closestNote.find('img[data-src*="above-bucket-not-a-url"]');
 		avttImages.attr('src', '');
 		avttImages.attr('href', '');
-		closestNote.find('a:empty, button:empty, .add-table-row, .table-row-drag-handle, .header-spacer, .dnd-sheet-block-copy-button, .dnd-sheet-block-delete-button, .dnd-sheet-block-drag-handle, .injected-input, .added-input-desc, .avtt-statblock-buffs, .avtt-note-roll-buff-pins, .spell-tooltip>svg.ritual-icon-svg').remove();
+		closestNote.find('a:empty, button:empty, .add-table-row, .table-row-drag-handle, .header-spacer, .avtt-equipment-weight-total, .dnd-sheet-block-copy-button, .dnd-sheet-block-delete-button, .dnd-sheet-block-drag-handle, .injected-input, .added-input-desc, .avtt-statblock-buffs, .avtt-note-roll-buff-pins, .spell-tooltip>svg.ritual-icon-svg').remove();
 		closestNote.find('.avtt-dnd-sheet-block').removeClass('avtt-dnd-sheet-block');
 		closestNote.find('[data-avtt-block-positioned]').each(function(){
 			this.style.removeProperty('position');
@@ -2030,7 +2047,7 @@ class JournalManager{
 		if(token){
 			sync_pc_template(token, html);
 		}
-		html.find('.injected-input, .added-input-desc').remove();
+		html.find('.injected-input, .added-input-desc, .avtt-equipment-weight-total').remove();
 		html.find('.add-input:not(.avtt-custom-tracker)').replaceWith((i, innerHtml) => {
 			return innerHtml;
 		})
@@ -2299,6 +2316,32 @@ class JournalManager{
 					setupDraggableTableRows(table);	
 				});
 
+				function updateEquipmentWeightTotals(){
+					document.querySelectorAll('.equipment-field table').forEach((table) => {
+						const headers = Array.from(table.querySelectorAll('thead th')).filter((th) => !th.classList.contains('header-spacer'));
+						const weightIndex = headers.findIndex((th) => th.textContent.trim().toLowerCase().startsWith('weight'));
+						if (weightIndex === -1) return;
+						let total = 0;
+						table.querySelectorAll('tbody tr').forEach((row) => {
+							const cells = Array.from(row.children).filter((cell) => cell.tagName === 'TD' && !cell.classList.contains('table-row-drag-handle'));
+							const weight = parseFloat((cells[weightIndex]?.textContent || '').replace(/[^0-9.\-]/g, ''));
+							if (!isNaN(weight)) total += weight;
+						});
+						const header = headers[weightIndex];
+						header.querySelector('.avtt-equipment-weight-total')?.remove();
+						const totalSpan = document.createElement('span');
+						totalSpan.className = 'avtt-equipment-weight-total';
+						totalSpan.contentEditable = 'false';
+						totalSpan.textContent = ' ' + (Math.round(total * 100) / 100) + ' lb';
+						header.append(totalSpan);
+					});
+				}
+				updateEquipmentWeightTotals();
+				document.addEventListener('input', (e) => {
+					if (!e.target?.closest?.('.equipment-field')) return;
+					updateEquipmentWeightTotals();
+				});
+
 				document.addEventListener('click', (e) => {
 					if (e.target && e.target.nodeName === 'INPUT' && e.target.closest('a')){
 						e.preventDefault();
@@ -2552,6 +2595,59 @@ class JournalManager{
 		const path = item.type == 'Spell' ? 'spells' : rawItem.magic ? 'magic-items' : filterType == 'armor' ? 'armor' : filterType == 'weapon' ? 'weapons' : 'equipment';
 		const href = `https://www.dndbeyond.com/${path}/${itemId}`;
 		return `<a class="tooltip-hover no-border ignore-abovevtt-formating ${item.type == 'Spell' ? 'spell' : rawItem.magic  ? 'magic-item' : 'item'}-tooltip" href="${href}">${text}</a>`;
+	}
+	populateDndSheetSuggestionDetails(cell, suggestion){
+		const rawItem = suggestion.raw || suggestion;
+		const row = $(cell).closest('tr');
+		if(row.length === 0)
+			return;
+
+		const isSpell = suggestion.type == 'Spell';
+		const isEquipment = $(cell).closest('.equipment-block').length > 0;
+		const isAttack = $(cell).closest('.attacks-field').length > 0;
+		const isEmpty = targetCell => targetCell.text().replace(/[\u200B-\u200D\uFEFF]/g, '').trim() == '';
+		if(isEquipment && !isSpell){
+			const weightCell = $(cell).next('td');
+			const quantityCell = weightCell.next('td');
+			const costCell = quantityCell.next('td');
+			const noteCell = costCell.next('td');
+			if(isEmpty(weightCell) && rawItem.weight != undefined)
+				weightCell.text(`${rawItem.weight} lb`);
+			if(isEmpty(quantityCell) && rawItem.bundleSize != undefined)
+				quantityCell.text(`${rawItem.bundleSize}`);
+			if(isEmpty(costCell) && rawItem.cost != undefined)
+				costCell.text(`${rawItem.cost}`);
+			this.populateDndSheetItemNotes(noteCell, rawItem);
+		} else if(isAttack){
+			this.populateDndSheetItemNotes(row.find('td:last-of-type'), rawItem, isSpell);
+		}
+	}
+	populateDndSheetItemNotes(noteCell, rawItem, isSpell = false){
+		const noteText = noteCell.text().replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+		if(noteCell.length === 0 || noteText != '')
+			return;
+		const rawProperties = rawItem.properties ?? rawItem.weaponProperties ?? rawItem.definition?.properties;
+		if(!isSpell && rawProperties != undefined){
+			const properties = Array.isArray(rawProperties) ? rawProperties : `${rawProperties}`.split(',').map(name => ({name: name.trim()}));
+			const propertyNames = properties.map(property => {
+				const propertyName = typeof property === 'string' ? property : property.name ?? property.definition?.name;
+				if(!propertyName)
+					return '';
+				const propertyUrl = propertyName.replace(/\s/g, '-');
+				const propertyLink = `<a class="tooltip-hover wprop-tooltip" href="https://www.dndbeyond.com/weapon-properties/${propertyUrl}" aria-haspopup="true" target="_blank">${propertyName}</a>`;
+				return `${propertyLink}${propertyName.toLowerCase() == 'thrown' || propertyName.toLowerCase() == 'range' ? ` (${rawItem.range}${rawItem.longRange ? `/${rawItem.longRange}` : ''})` : ''}`;
+			}).filter(Boolean).join(', ');
+			if(propertyNames)
+				noteCell.html(propertyNames);
+		} else if(isSpell && (rawItem.range ?? rawItem.rangeDescription) != undefined){
+			const range = rawItem.range ?? rawItem.rangeDescription;
+			if(typeof range === 'string'){
+				noteCell.text(`Range ${range}`);
+				return;
+			}
+			const aoeText = range.aoeValue && range.aoeType ? `${range.aoeValue}-foot${range.aoeType == 'Sphere' ? '-radius' : ''} ${range.aoeType}` : '';
+			noteCell.text(`Range ${range.rangeValue > 0 ? `${range.rangeValue} ft.` : `${range.origin}`}${aoeText != '' ? `, ${aoeText}` : ''}`);
+		}
 	}
 	removeDndSheetCellSuggestions(ownerDocument = document){
 		$('.dnd-sheet-cell-suggestions', ownerDocument).remove();
@@ -2857,6 +2953,7 @@ class JournalManager{
 				} else{
 					target.html(this.buildTooltipLinkHtml(suggestion));
 				} 
+				this.populateDndSheetSuggestionDetails(cell, suggestion);
 				this.removeDndSheetCellSuggestions(hostDocument);
 				onSelect?.();
 				cell.focus();
@@ -3112,6 +3209,9 @@ class JournalManager{
 			body.find('table').each(function(){
 				const table = this;
 				const $table = $(table);
+				if(!$table.parent().is('.table-overflow-wrapper')){
+					$table.wrap('<div class="table-overflow-wrapper"></div>');
+				}
 				let button = $table.next('.avtt-tinymce-add-row');
 				if(button.length === 0){
 					button = $(`<div class="avtt-tinymce-add-row" contenteditable="false" data-mce-bogus="all">+</div>`);
@@ -3122,6 +3222,7 @@ class JournalManager{
 					observeTableResize(table, button[0]);
 					$table.data('avttRowButtonObserved', true);
 				}
+
 			});
 		};
 		editor.on('init SetContent NodeChange Undo Redo', syncAddRowButtons);
@@ -3172,6 +3273,29 @@ class JournalManager{
 			script.onload = resolve;
 			script.onerror = reject;
 			ownerDocument.head.appendChild(script);
+		});
+	}
+	/** Sums the Weight column of every equipment table and shows the running total in that column's header. */
+	updateEquipmentWeightTotals(target){
+		$(target).find('.equipment-field table').each(function(){
+			const table = $(this);
+			const headers = table.find('thead th').not('.header-spacer');
+			let weightIndex = -1;
+			headers.each(function(index){
+				if(weightIndex === -1 && $(this).text().trim().toLowerCase().startsWith('weight'))
+					weightIndex = index;
+			});
+			if(weightIndex === -1)
+				return;
+			let total = 0;
+			table.find('tbody tr').each(function(){
+				const weight = parseFloat($(this).children('td').not('.table-row-drag-handle').eq(weightIndex).text().replace(/[^0-9.\-]/g, ''));
+				if(!isNaN(weight))
+					total += weight;
+			});
+			const header = headers.eq(weightIndex);
+			header.find('.avtt-equipment-weight-total').remove();
+			header.append(`<span class="avtt-equipment-weight-total" contenteditable="false"> ${Math.round(total * 100) / 100} lb</span>`);
 		});
 	}
 	setupDndSheetTableSortable(table, ownerDocument, persistCurrentNoteText, equipmentSortGroup){
@@ -3246,11 +3370,16 @@ class JournalManager{
 	}
 	/** Adds copy controls and connected column sorting to PC-template blocks. */
 	setupDndSheetBlockSorting(noteText, ownerDocument, persistCurrentNoteText, sortGroup){
+		const ownerWindow = ownerDocument.defaultView || window;
 		const initializeSortable = (sortableJquery) => {
 			const columns = sortableJquery(noteText).find('.dnd-sheet .avtt-dnd-sheet-block').parent();
 			columns.attr('data-avtt-block-sort-group', sortGroup);
 			columns.each(function(){
 				const column = sortableJquery(this);
+				let scrollPopoutViewport = false;
+				let viewportScrollStyle;
+				let previousOverflowAnchor;
+				let previousOverflowAnchorPriority;
 				if(column.data('ui-sortable'))
 					column.sortable('destroy');
 				column.sortable({
@@ -3262,7 +3391,46 @@ class JournalManager{
 					forcePlaceholderSize: true,
 					tolerance: 'pointer',
 					start: function(event, ui){
+						const sortable = column.sortable('instance');
+						const scrollParent = sortable.scrollParent[0];
+						scrollPopoutViewport = ownerDocument !== document &&
+							(scrollParent === ownerDocument || scrollParent === ownerDocument.documentElement ||
+								(scrollParent === ownerDocument.body &&
+									ownerWindow.getComputedStyle(ownerDocument.documentElement).overflow === 'visible'));
+						column.sortable('option', 'scroll', !scrollPopoutViewport);
+						if(scrollPopoutViewport){
+							viewportScrollStyle = (ownerDocument.scrollingElement || ownerDocument.documentElement).style;
+							previousOverflowAnchor = viewportScrollStyle.getPropertyValue('overflow-anchor');
+							previousOverflowAnchorPriority = viewportScrollStyle.getPropertyPriority('overflow-anchor');
+							// Moving the placeholder must not make the browser anchor-scroll the page.
+							viewportScrollStyle.setProperty('overflow-anchor', 'none');
+						}
 						ui.placeholder.height(ui.item.outerHeight());
+					},
+					sort: function(event){
+						if(!scrollPopoutViewport)
+							return;
+						// about:blank popouts can report content dimensions as jQuery's window size.
+						const sensitivity = column.sortable('option', 'scrollSensitivity');
+						const speed = column.sortable('option', 'scrollSpeed');
+						const deltaY = event.clientY < sensitivity ? -speed :
+							ownerWindow.innerHeight - event.clientY < sensitivity ? speed : 0;
+						const deltaX = event.clientX < sensitivity ? -speed :
+							ownerWindow.innerWidth - event.clientX < sensitivity ? speed : 0;
+						const previousX = ownerWindow.scrollX;
+						const previousY = ownerWindow.scrollY;
+						if(deltaX || deltaY){
+							ownerWindow.scrollBy(deltaX, deltaY);
+							if(ownerWindow.scrollX !== previousX || ownerWindow.scrollY !== previousY)
+								column.sortable('refreshPositions');
+						}
+					},
+					stop: function(){
+						if(viewportScrollStyle){
+							viewportScrollStyle.setProperty('overflow-anchor', previousOverflowAnchor, previousOverflowAnchorPriority);
+							viewportScrollStyle = undefined;
+						}
+						scrollPopoutViewport = false;
 					},
 					update: function(){
 						persistCurrentNoteText({forceSave: true, rescanStatBlock: false});
@@ -3291,7 +3459,7 @@ class JournalManager{
 			$(ownerDocument).off('keydown.pcTemplateTabKey').on('keydown.pcTemplateTabKey', pcTemplateTabKey);
 		}
 		const tokenId = options.tokenId;
-		const downloadToken = options.downloadToken;
+		const downloadToken = options.downloadToken ?? (ownerDocument !== document ? (window.TOKEN_OBJECTS[tokenId] || window.all_token_objects?.[tokenId]) : undefined);
 		const uploadId = options.uploadId ?? (tokenId ?? id);
 		const getCurrentNoteText = () => self.getDisplayedNoteText(container, initialNoteText);
 		const persistCurrentNoteText = (persistOptions) => {
@@ -3358,6 +3526,7 @@ class JournalManager{
 			block.after(copy);
 			setupBlockControls();
 			setupEquipmentTableSorting();
+			self.updateEquipmentWeightTotals(getCurrentNoteText());
 			persistCurrentNoteText({forceSave: true, rescanStatBlock: false});
 		});
 		container.off('pointerdown.dndSheetBlockDelete, touchstart.dndSheetBlockDelete').on('pointerdown.dndSheetBlockDelete, touchstart.dndSheetBlockDelete', '.dnd-sheet-block-delete-button', (e) => {
@@ -3537,13 +3706,30 @@ class JournalManager{
 			persistCurrentNoteText({forceSave: false, rescanStatBlock: false});
 		});
 		setLockState();
+		self.updateEquipmentWeightTotals(getCurrentNoteText());
+		container.off('input.equipmentWeightTotal').on('input.equipmentWeightTotal', '.dnd-sheet .equipment-field', function(){
+			self.updateEquipmentWeightTotals(getCurrentNoteText());
+		});
 
-		if(options.showControls !== true)
+		const popoutControls = ownerDocument !== document;
+		if(options.showControls !== true && !popoutControls)
 			return;
 		const titleBar = container.find('.title_bar').first();
-		const controlContainer = options.controlContainer ? $(options.controlContainer) : (titleBar.length > 0 ? titleBar : container);
+		let controlContainer = options.controlContainer ? $(options.controlContainer) : (titleBar.length > 0 ? titleBar : container);
+		if(popoutControls){
+			const currentNoteText = getCurrentNoteText();
+			let toolbar = currentNoteText.children('.avtt-statblock-buffs').first();
+			if(toolbar.length === 0){
+				toolbar = $('<div class="avtt-statblock-buffs"></div>');
+				currentNoteText.prepend(toolbar);
+			}
+			toolbar.addClass('avtt-popout-stat-toolbar');
+			toolbar.find('.avtt-popout-stat-controls').remove();
+			controlContainer = $('<div class="avtt-popout-stat-controls" contenteditable="false"></div>');
+			toolbar.append(controlContainer);
+		}
 		controlContainer.find('.lockStatButton, .download_button, .upload_button').remove();
-		const absoluteControls = titleBar.length === 0;
+		const absoluteControls = titleBar.length === 0 && !popoutControls;
 		const controlStyle = absoluteControls ? "cursor: pointer; position: absolute; top: 3px; width: 20px; height: 20px; color: #ddd;" : "cursor: pointer; position: relative; display:inline-block; color: #ddd;";
 		const spanStyle = absoluteControls ? "font-size:20px;" : "font-size: 20px; position: relative; top: 4px;";
 		const lockStatButton = $(`<div class='lockStatButton' style="${controlStyle}${absoluteControls ? 'left: 2px;' : ''}">
@@ -3578,7 +3764,7 @@ class JournalManager{
 		uploadStat.find('input[type="file"]').change(function(e) {
 			import_pc_template_html(e.target.files, getCurrentNoteText(), id, tokenId);
 		});
-		if(titleBar.length > 0){
+		if(titleBar.length > 0 && !popoutControls){
 			container.find('.title_bar_text').css('display', 'inline-block');
 			titleBar.prepend(lockStatButton, downloadStat, uploadStat);
 			titleBar.css({
@@ -3982,18 +4168,21 @@ class JournalManager{
 	injectDisplayedNoteRollControls(id, note_text, note_container){
 		const titleBar = $(note_container).find('.title_bar').first();
 		const noteText = $(note_text);
+		const popoutStatControls = noteText.find('.avtt-popout-stat-controls').detach();
 		titleBar.find('.avtt-note-roll-controls').remove();
-		noteText.children('.avtt-note-roll-controls').remove();
+		noteText.children('.avtt-note-roll-controls, .avtt-popout-stat-toolbar').remove();
 		noteText.children('.avtt-note-roll-buff-pins').remove();
 		if(noteText.find('.dnd-sheet').length === 0 || typeof build_buff_dropdown !== 'function')
 			return;
 
 		const dropdown = build_buff_dropdown({type: 'note', noteId: id}, true);
 		const rollSettings = typeof build_note_roll_settings === 'function' ? build_note_roll_settings(id) : undefined;
-		if(!dropdown && !rollSettings)
+		if(!dropdown && !rollSettings && popoutStatControls.length === 0)
 			return;
 
-		const controls = $(`<div class="avtt-note-roll-controls${titleBar.length === 0 ? ' avtt-statblock-buffs' : ''}"></div>`).append(dropdown, rollSettings);
+		const controls = $(`<div class="avtt-note-roll-controls${titleBar.length === 0 ? ' avtt-statblock-buffs' : ''}"></div>`)
+			.toggleClass('avtt-popout-stat-toolbar', popoutStatControls.length > 0)
+			.append(dropdown, rollSettings, popoutStatControls);
 		const uploadButton = titleBar.find('.upload_button').first();
 		if(uploadButton.length > 0)
 			uploadButton.after(controls);
@@ -4002,12 +4191,12 @@ class JournalManager{
 		else
 			noteText.prepend(controls);
 
-		const pinDisplay = $('<div class="avtt-note-roll-buff-pins"></div>').append(dropdown.find('.avttBuffSheetPins').detach());
+		const pinDisplay = $('<div class="avtt-note-roll-buff-pins"></div>').append($(dropdown).find('.avttBuffSheetPins').detach());
 		if(titleBar.length > 0)
 			noteText.prepend(pinDisplay);
 		else
 			controls.after(pinDisplay);
-		const dropdownEntry = window.avttBuffDropdowns?.find(entry => entry.id === dropdown.attr('id'));
+		const dropdownEntry = window.avttBuffDropdowns?.find(entry => entry.id === $(dropdown).attr('id'));
 		if(dropdownEntry)
 			dropdownEntry.pinContainer = pinDisplay;
 	}
@@ -4082,7 +4271,7 @@ class JournalManager{
 				window.JOURNAL.addTokenDragToMonsterLink(self);
 			}
 			if($self.attr('href')?.match(/\/spells\/[0-9]|\/magic-items\/[0-9]|\/monsters\/[0-9]|\/sources\//gi)){
-				$self.attr('data-moreinfo', `${$self.attr('href')}`);
+				$self.attr('data-moreinfo', `${$self.attr('href').replace(/[']/gi, "")}`);
 			}
 			if(!$self.hasClass('monster-tooltip')){
 				window.JOURNAL.getDataTooltip($self.attr('href'), function(url, typeClass, isRitual){
@@ -4096,7 +4285,7 @@ class JournalManager{
 						const newUrl = `${newHref.replace(/(\d+-)?([^/]*)(-tooltip)?(\?.*)?$/i, `${tooltipId}-$2`)}`;
 						$self.attr('href', newUrl);
 						if($self.attr('href')?.match(/\/spells\/[0-9]|\/magic-items\/[0-9]|\/monsters\/[0-9]|\/sources\//gi)){
-							$self.attr('data-moreinfo', `${newUrl}`);
+							$self.attr('data-moreinfo', `${newUrl.replace(/[']/gi, "")}`);
 						}
 					}
 					$self.attr('data-tooltip-href', url);
@@ -4121,7 +4310,7 @@ class JournalManager{
 		const monsterId = $target.attr('data-monsterid');
 		if (monsterId) {
 			const defaultSize = window.CURRENT_SCENE_DATA.hpps / 1 / window.ZOOM;
-			const tokenIcon = $(`<span class="material-symbols-outlined" style="user-select: none;display: inline-block;cursor: pointer;font-size: 91%;margin-left: 1px;padding-bottom: 3px;vertical-align: middle;">person_add</span>`)
+			const tokenIcon = $(`<span class="material-symbols-outlined add-monster" style="user-select: none;display: inline-block;cursor: pointer;font-size: 91%;margin-left: 1px;padding-bottom: 3px;vertical-align: middle;">person_add</span>`)
 			$target.after(tokenIcon);
 			let tokenImgSrc;
 			tokenIcon.off('pointerup.droptoken').on('pointerup.droptoken',function(event){
@@ -4556,34 +4745,13 @@ class JournalManager{
 					
 					const itemId = `${item[0].id}-${text.replace(/[\s\/\\]/g, '-')}`;
 					const isMagic = item[0].magic;
-					const {cost, weight, bundleSize, properties, range, longRange, filterType } = item[0];
+					const {filterType } = item[0];
 					
 					const dataTooltipHref = `www.dndbeyond.com/${isMagic ? 'magic-items' : filterType.toLowerCase() == 'armor' ? 'armor' : filterType.toLowerCase() == 'weapon' ? 'weapons' : 'adventuring-gear'}/${itemId}-tooltip?disable-webm=1`;
 					const href = `/${isMagic ? 'magic-items' : 'equipment'}/${itemId}`;
 					const link = `<a class="tooltip-hover ${isMagic ? 'magic-item-tooltip' : 'item-tooltip adventuring-gear-tooltip'}" href="${href}" data-tooltip-href="${dataTooltipHref}">${text}</a>`;
 					cell.html(link);
-					const weightCell = cell.next('td');
-					const quantityCell = weightCell.next('td');
-					const costCell = quantityCell.next('td');
-					const noteCell = costCell.next('td');
-					if(weightCell.text().trim() == '' && weight != undefined){
-						weightCell.text(`${weight} lb`);
-					}
-					if(quantityCell.text().trim() == '' && bundleSize != undefined){
-						quantityCell.text(`${bundleSize}`);
-					}
-					if(costCell.text().trim() == '' && cost != undefined){
-						costCell.text(`${cost}`);
-					}
-					if(noteCell.text().trim() == '' && properties != undefined){
-						const propertyNames = properties.map(p => {
-							if(ddbConfigJson.weaponProperties.filter(d => d.id == p.id).length > 0){
-								return `[wprop]${p.name}[/wprop]${p.name.toLowerCase() == 'thrown' || p.name.toLowerCase() == 'range' ? ` (${range}${longRange ? `/${longRange}` : ''})` : ''}`;
-							}
-							return p.name; s
-						}).join(', ');
-						noteCell.text(`${propertyNames}`);
-					}
+					this.populateDndSheetSuggestionDetails(cell, {type: isMagic ? 'Magic Item' : filterType || 'Item', raw: item[0]});
 						
 
 					
@@ -4592,7 +4760,7 @@ class JournalManager{
 			}
 			
 			const attacksBlock = target.find('.dnd-sheet .attacks-field');
-			if(attacksBlock.length > 0 && window.SPELLS_CACHE != undefined){
+			if(attacksBlock.length > 0){
 				const firstCells = attacksBlock.find('table tbody tr td:is(:first-child:not(.table-row-drag-handle), .table-row-drag-handle+td)');
 				for(let i=0; i<firstCells.length; i++){
 
@@ -4608,9 +4776,9 @@ class JournalManager{
 						item = window.ITEMS_CACHE.filter(d => d.name.toLowerCase() == text.toLowerCase())
 					}
 					if(!item.length){
-						item = window.SPELLS_CACHE.filter(d => d.definition.name.toLowerCase() == text.toLowerCase() && (isLegacy || d.definition.isLegacy == isLegacy))
+						item = window.SPELLS_CACHE?.filter(d => d.definition.name.toLowerCase() == text.toLowerCase() && (isLegacy || d.definition.isLegacy == isLegacy)) || []
 						if(!item.length){
-							item = window.SPELLS_CACHE.filter(d => d.definition.name.toLowerCase() == text.toLowerCase())
+							item = window.SPELLS_CACHE?.filter(d => d.definition.name.toLowerCase() == text.toLowerCase()) || []
 						}
 						if(!item.length){
 							noisy_log(3, `item/spell not found`, text);
@@ -4620,31 +4788,15 @@ class JournalManager{
 					}
 					
 					const itemId = `${type == 'spell' ? item[0].definition.id : item[0].id}-${text.replace(/[\s\/\\]/g, '-')}`;
-					const isMagic = item[0].magic;
-					const { properties, range, longRange, filterType } = item[0];
+					const rawItem = type == 'spell' ? item[0].definition : item[0];
+					const isMagic = type != 'spell' && rawItem.magic;
+					const { filterType } = rawItem;
 					
-					const dataTooltipHref = `www.dndbeyond.com/${type == 'spell' ? 'spells' : isMagic ? 'magic-items' : filterType.toLowerCase() == 'armor' ? 'armor' : 'adventuring-gear'}/${itemId}-tooltip?disable-webm=1`;
+					const dataTooltipHref = `www.dndbeyond.com/${type == 'spell' ? 'spells' : isMagic ? 'magic-items' : filterType?.toLowerCase() == 'armor' ? 'armor' : filterType?.toLowerCase() == 'weapon' ? 'weapons' : 'adventuring-gear'}/${itemId}-tooltip?disable-webm=1`;
 					const href = `/${type == 'spell' ? 'spells' : isMagic ? 'magic-items' : 'equipment'}/${itemId}`;
 					const link = `<a class="tooltip-hover ${type == 'spell' ? 'spell-tooltip' : isMagic ? 'magic-item-tooltip' : 'item-tooltip adventuring-gear-tooltip'}" href="${href}" data-tooltip-href="${dataTooltipHref}">${text}</a>`;
 					cell.html(link);
-					const noteCell = cell.siblings('td:last-of-type');
-					if(noteCell.text().trim() == '' && properties != undefined){
-						let propertyNames = properties.map(p => {
-							if(ddbConfigJson.weaponProperties.filter(d => d.id == p.id).length > 0){
-								return `[wprop]${p.name}[/wprop]${p.name.toLowerCase() == 'thrown' || p.name.toLowerCase() == 'range' ? ` (${range}${longRange ? `/${longRange}` : ''})` : ''}`;
-							}
-							return p.name; 
-						}).join(', ');
-						
-						noteCell.text(`${propertyNames}`);
-					} else if(type == 'spell' && range != undefined && noteCell.text().trim() == ''){
-						const aoeValue = range.aoeValue;
-						const aoeType = range.aoeType;
-						const aoeText = aoeValue && aoeType ? `${aoeValue}-foot${aoeType == 'Sphere' ? '-radius' : ''} ${aoeType}` : '';
-							
-						noteCell.text(`Range ${range.rangeValue > 0 ? `${range.rangeValue} ft.` : `${range.origin}`}${aoeText != '' ? `, ${aoeText}` : ''}`);
-						
-					}
+					this.populateDndSheetSuggestionDetails(cell, {type: type == 'spell' ? 'Spell' : isMagic ? 'Magic Item' : filterType || 'Item', raw: rawItem});
 				}
 			}
 		}
@@ -5256,9 +5408,10 @@ class JournalManager{
     }
 	getCustomCR(statBlock){
 		if(statBlock == undefined) return 0;
-       
+		
 		statBlock.find('style').remove();
-		statBlock=statBlock[0].innerHTML;
+		statBlock = statBlock[0].innerHTML;
+		statBlock = `<div>${statBlock}</div>`;
 		let crText = $(statBlock).find('.custom-challenge-rating.custom-stat').text();
 		if(crText == '' || crText == undefined){
 			let searchText = statBlock.replaceAll('mon-stat-block-2024', '').replaceAll(/\&nbsp\;/g,' ')
@@ -6260,6 +6413,12 @@ class JournalManager{
 				}
 				.table-row-drag-handle:active {
 					cursor: grabbing;
+				}
+				.avtt-equipment-weight-total {
+					text-transform: none;
+					white-space: nowrap;
+					font-weight: bold;
+					font-size: 10px;
 				}
 				svg.ritual-icon-svg {
 					width: 10px;
@@ -9830,7 +9989,6 @@ function render_source_chapter_in_iframe(url) {
 	let iframe = $(`#${iframeId}`);
 	if (iframe.length > 0) {
 
-		// TODO: any clean up tasks before redirecting?
 
 		if (chapterHash) {
 			iframe.attr("data-chapter-hash", chapterHash);
@@ -9885,6 +10043,8 @@ function render_source_chapter_in_iframe(url) {
 			// because we want everything that matches tagName and above
 			// for example, if tagName is H3, we want our boundaryTags to include H3, H2, and H1
 			switch (tagName) {
+				case "H6": boundaryTags.push("H6");
+				case "H5": boundaryTags.push("H5");
 				case "H4": boundaryTags.push("H4");
 				case "H3": boundaryTags.push("H3");
 				case "H2": boundaryTags.push("H2");
@@ -9903,8 +10063,6 @@ function render_source_chapter_in_iframe(url) {
 		}
 
 		setTimeout(()=>{
-
-			
 			if(this.src.includes('dndbeyond.com/sources')){
 				const iframeContentContainer = iframeContents.find('#content.main.content-container>section.primary-content');
 				if(iframeContentContainer.length > 0){
@@ -9912,7 +10070,42 @@ function render_source_chapter_in_iframe(url) {
 					window.JOURNAL.add_journal_tooltip_targets(iframeContentContainer);
 					add_stat_block_hover(iframeContentContainer);
 				}
-					
+				const urlSrc = this.src;
+				const headers = iframeContents.find(':is(h1, h2, h3, h4, h5, h6)[id]');
+				for(let header of headers){
+					const curr = $(header);
+					const addNote = $('<span class="material-symbols-outlined add-token-note" style="z-index: 1000; position: relative; cursor: pointer;">add_notes</span>');
+					const title = curr.text().trim();
+					const tokenId = uuid();
+					const options = {id: tokenId, name:title};
+					const anchorTag = curr.attr('id');
+					addNote.off('pointerup.droptoken').on('pointerup.droptoken',function(event){
+						let number = null;
+						const startMatch = title.match(/^(?:\p{L}+)?(\d{1,2})\b/u);
+						if (startMatch) {
+							number = startMatch[1];
+						} else{
+							const endMatch = title.match(/(?:\p{L}+)?(\d{1,2})[^\p{L}]*$/u);
+							if (endMatch) {
+								number = endMatch[1];
+							}
+						}
+						
+						const findId = number 
+							? `_AboveVTT_Tokens_Numbers_${number.length>1 ? number : `0${number}`}` 
+							: "_AboveVTT_Tokens_Letters_____Exclamation_Mark";
+						const listItem = window.tokenListItems.find(d=> d.id == findId);
+						window.JOURNAL.notes[tokenId] = {
+							title: title,
+							text: `<p><span class="journal-ddb-section-embed">${urlSrc.split('?')[0]}#${anchorTag}</span></p>`,
+							plain: '',
+							player: true
+						}
+						window.JOURNAL.persist();
+						create_and_place_token(listItem, event.shiftKey, undefined, undefined, undefined, undefined, title, undefined, options);
+					})
+					curr.append(addNote);
+				}
 				iframeContents.find('#content.main.content-container>section.secondary-content .sidebar-menu~.sidebar-menu').remove();
 				window.JOURNAL.block_send_to_buttons(iframeContentContainer);
 				$('.lightbox, .lightboxOverlay').remove(); //if added to main window remove

@@ -254,7 +254,7 @@ function token_context_menu_expanded(tokenIds, e, crossScenePortalData) {
 						alwaysshowname: window.TOKEN_SETTINGS.alwaysshowname != undefined ? window.TOKEN_SETTINGS.alwaysshowname : false
 					};
 
-					window.ScenesHandler.create_update_token(options)
+					create_update_token(options)
 					tokens = [window.TOKEN_OBJECTS[options.id]]
 				}
 				if(!isTeleporter){
@@ -464,34 +464,38 @@ function token_context_menu_expanded(tokenIds, e, crossScenePortalData) {
 									(doors[0][10] != undefined ? doors[0][10] : ""),
 									(doors[0][11] != undefined ? doors[0][11] : "")
 							]
-							window.DRAWINGS.push(data);
-							pushWallUndo({
-								undo: [[...data]],
-							})
+							const wallExists = window.DRAWINGS.find(d => d[1] == 'wall' && d[3] == data[3] && d[4] == data[4] && d[5] == data[5] && d[6] == data[6]);
+			
+							if(!wallExists){
+								window.DRAWINGS.push(data);
+								pushWallUndo({
+									undo: [[...data]],
+								})
+							}
 							let clonePortalId = `${mouseX-5}${mouseY}${mouseX+5}${mouseY}${window.CURRENT_SCENE_DATA.id}`.replaceAll('.','') 
 				
-							if(window.TOKEN_OBJECTS[clonePortalId] == undefined){
-								let options = {
-									...default_options(),
-									left: `${mouseX-25}px`,
-									top: `${mouseY-25}px`,
-									id: clonePortalId,
-									vision:{
-										feet: 0,
-										color: `rgba(0, 0, 0, 0)`
-									},
-									imgsrc: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=`,
-									type: 'door',
-									size: 50,
-									scaleCreated: window.CURRENT_SCENE_DATA.scale_factor,
-									teleporterCoords: {
-										'left': originX,
-										'top': originY,
-										'scale': window.CURRENT_SCENE_DATA.scale_factor != undefined ? window.CURRENT_SCENE_DATA.scale_factor : 1
-									}
-								};
-								window.ScenesHandler.create_update_token(options)
-							}
+							
+							let options = {
+								...default_options(),
+								left: `${mouseX-25}px`,
+								top: `${mouseY-25}px`,
+								id: clonePortalId,
+								vision:{
+									feet: 0,
+									color: `rgba(0, 0, 0, 0)`
+								},
+								imgsrc: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=`,
+								type: 'door',
+								size: 50,
+								scaleCreated: window.CURRENT_SCENE_DATA.scale_factor,
+								teleporterCoords: {
+									'left': originX,
+									'top': originY,
+									'scale': window.CURRENT_SCENE_DATA.scale_factor != undefined ? window.CURRENT_SCENE_DATA.scale_factor : 1
+								}
+							};
+							create_update_token(options)
+							
 							redraw_light_walls();
 							sync_drawings();
 							window.TOKEN_OBJECTS[tokenIds].options.teleporterCoords = {'left': mouseX, 'top': mouseY, 'scale': window.CURRENT_SCENE_DATA.scale_factor != undefined ? window.CURRENT_SCENE_DATA.scale_factor : 1}
@@ -4421,9 +4425,76 @@ function build_adjustments_flyout_menu(tokenIds) {
 		$(".ageMenuInput").on('focus', function(event){
 			event.target.select();
 		});
+		if (tokens.length === 1) {
+			const listItem = list_item_from_token(tokens[0]);
+			const rootId = listItem && RootFolder.allValues().find(d => listItem.folderPath.includes(d.path) && d.name != '')?.id;
+			if (listItem && rootId) {
+				let syncToListItem = $(`<button class='token-image-modal-remove-all-button' style="width:100%;min-height:24px;padding:4px;margin:5px 0px;display:flex;align-items:center;justify-content:center;">Sync Token Settings to List Item</button>`);
+				syncToListItem.on("click", function () {
+					const customization = find_or_create_token_customization(listItem.type, listItem.id, listItem.parentId, rootId);
+					const tokenOptions = tokens[0].options;
+						if (!listItem.isTypeBuiltinToken() && !listItem.isTypeDDBToken()) {
+							const defaultImage = tokenOptions.imgsrc && !tokenOptions.imgsrc.startsWith('data:')
+								? parse_img(tokenOptions.imgsrc)
+								: undefined;
+							if (defaultImage) {
+								customization.tokenOptions.defaultImage = defaultImage;
+							}
+							if (Array.isArray(tokenOptions.alternativeImages)) {
+								customization.tokenOptions.alternativeImages = $.extend(true, [], tokenOptions.alternativeImages);
+							}
+					}
+					const modalOptionNames = [
+						'name', 'tokenSize', 'imageSize', 'offset', 'imageZoom', 'tokenFlip', 'imageOpacity', 'imageHeading',
+						'color', 'playerThemeBorder', 'auraislight', 'vision', 'devilsight', 'truesight', 'light1', 'light2',
+						'visionAngle', 'lightAngle', 'share_vision', 'auraVisible', 'aura1', 'aura2', 'includeDDB', 'videoToken'
+					];
+					const syncableOptionNames = new Set([
+						...token_setting_options()
+							.filter(setting => !setting.globalSettingOnly || setting.name === 'auraislight')
+							.filter(setting => !allTokensAreAoe || availableToAoe.includes(setting.name))
+							.map(setting => setting.name),
+						...modalOptionNames
+					]);
+					if (listItem.type === ItemType.PC) {
+						syncableOptionNames.delete('player_owned');
+					}
+					syncableOptionNames.forEach(optionName => {
+						let optionValue = tokenOptions[optionName];
+						if (optionName === 'name' && typeof optionValue === 'string' && typeof listItem.name === 'string') {
+							const personalitySuffix = ` ${listItem.name}`;
+							if (tokenOptions.placeType === 'personality' && optionValue.endsWith(personalitySuffix)) {
+								optionValue = listItem.name;
+							} else if (tokenOptions.placeType !== 'none' && optionValue.startsWith(`${listItem.name} `)) {
+								const generatedSuffix = optionValue.slice(listItem.name.length + 1);
+								if (/^\d+$/.test(generatedSuffix)) {
+									optionValue = listItem.name;
+								}
+							}
+						}
+						if (optionValue === undefined) {
+							delete customization.tokenOptions[optionName];
+						} else {
+							customization.tokenOptions[optionName] = typeof optionValue === 'object'
+								? $.extend(true, {}, { value: optionValue }).value
+								: optionValue;
+						}
+					});
+					syncToListItem.prop("disabled", true);
+					persist_token_customization(customization, function (success) {
+						syncToListItem.prop("disabled", false);
+						if (success && window.DM) {
+							did_change_mytokens_items();
+						}
+						showTempMessage(success ? 'Token options synced to list item' : 'Failed to sync token options');
+					});
+				});
+				body.append(syncToListItem);
+			}
+		}
 	}
 
-
+	
 
 	return body;
 }
@@ -5587,7 +5658,10 @@ function add_to_quick_roll_menu(token, autoRollAfterAoe = false) {
 	
 	if(token.isPlayer()){
 		hp_input.prop("disabled", true);
-		hp_input.css('color', 'gray')
+		hp_input.css({
+			'color': '#000000',
+			'opacity': '0.75'
+		})
 	}
 	hp_input.val(token.hp);
 
@@ -5605,7 +5679,10 @@ function add_to_quick_roll_menu(token, autoRollAfterAoe = false) {
 
 	if(token.isPlayer()){
 		maxhp_input.prop("disabled", true);
-		maxhp_input.css('color', 'gray')
+		maxhp_input.css({
+			'color': '#000000',
+			'opacity': '0.75'
+		})
 	}
 	maxhp_input.val(token.maxHp);
 
@@ -5725,42 +5802,26 @@ function add_to_quick_roll_menu(token, autoRollAfterAoe = false) {
 		}
 	);
 	qrm_entry_buttons.append(remove_from_list);
-	
+	let stat_block = $('<button title="Open Stat Block" class="qrm_buttons_bar" style="display:inline-flex;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
 	if(token.options.statBlock){
-		stat_block=$('<button title="Open Monster Stat Block" class="qrm_buttons_bar" style="display:inline-flex;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
-		
 		stat_block.click(function(){
 			window.JOURNAL.display_note(token.options.statBlock);
 		});
-		if(!token.isMonster()){
-			stat_block.css("visibility", "hidden");
-		}
-	}
-	else if(token.isMonster() == true){
-		stat_block=$('<button title="Open Monster Stat Block" class="qrm_buttons_bar" style="display:inline-flex;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
-		
+	} else if(token.isMonster() == true){
+		stat_block.attr('title', 'Open Monster Stat Block');
 		stat_block.click(function(){
 			load_monster_stat(token.options.monster, token.options.id);
 		});
-		if(!token.isMonster()){
-				stat_block.css("visibility", "hidden");
-		}
-	}	
-	else if (token.isPlayer() == true) {
-		stat_block=$('<button title="Open Player Stat Block" class="qrm_buttons_bar" style="display:inline-flex;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
+	} else if (token.isPlayer() == true) {
+		stat_block.attr('title', 'Open Player Stat Block');	
 		stat_block.click(function(){
 			open_player_sheet(token.options.id, undefined, token.options.name);
 		});
-	}
-	else{
-		stat_block=$('<button title="No Stat Block for custom tokens" disabled="true" class="qrm_buttons_bar" style="display:inline-flex;"><svg class="statSVG" xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24px" viewBox="0 0 24 24" width="24px" fill="#000000"><g><rect fill="none" height="24" width="24"/><g><path d="M19,5v14H5V5H19 M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3L19,3z"/></g><path d="M14,17H7v-2h7V17z M17,13H7v-2h10V13z M17,9H7V7h10V9z"/></g></svg></button>');
-		//can add the below if people don't like the disabled button
-		//stat_block.click(function(){
-		//	alert('Sorry, this appears to be a custom token, there was no stat block to fetch.');
-		//});
+	} else{
+		stat_block.css("visibility", "hidden");
 	}
 	qrm_entry_buttons.append(stat_block)
-	//stat_block.tooltip({show: { duration: 1000 }})
+
 
 	qrm_entry_name.append(name_line);
 	

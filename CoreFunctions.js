@@ -512,7 +512,7 @@ Other Commands:
         <input class="roll-input-mod" type='number' value='0' step='1'></input>
         <button class="roll-button-mod plus">+</button>
         <button class="roll-button-mod adv roll_mods_button icon-advantage markers-icon"></button>
-        <select id='contextSelect' class="roll-button" style="width:20px; left:unset; right:0px; border-radius:0px 10px 10px 0px; background-color:buttonface;"></select>
+        <button id='contextSelect' type="button" aria-label="Roll options" class="roll-button" style="width:20px; left:unset; right:0px; border-radius:0px 10px 10px 0px; background-color:buttonface;"></button>
       </div>`)
     modInput.append(rollButton);
 
@@ -868,14 +868,14 @@ function get_available_styles(){
       }
       return styles;
 }
-function add_aoe_to_statblock(html){
+function add_aoe_to_statblock(html, followingText = ''){
 
   html = html.replaceAll(/&shy;|­/gi, '')
     .replace(/(?:[^\S\r\n]*\r?\n){2,}[^\S\r\n]*/g, ' ') // heals the blank line runs left behind by previously injected buttons
 
   const aoeRegEx = /(([\d]+)-foot(?:(?:-long(?:,)? ([\d]+)-foot-wide)|(?:-radius(?:, ([\d]+)-foot-high)?))?\s+([a-zA-Z]+))((?:(?!\d+-foot)(?![^<]*>)[^<])*)/gi;
 
-  return html.replaceAll(aoeRegEx, function(m, m1, m2, m3, m4, m5, m6, m7) {
+  return html.replaceAll(aoeRegEx, function(m, m1, m2, m3, m4, m5, m6, offset, source) {
     const shape = m5.toLowerCase();
 
     // Guard clause for unsupported shapes
@@ -887,17 +887,30 @@ function add_aoe_to_statblock(html){
       return `${m}`;
     }
 
-    let sentencePart = 'default';
-
+    let aoeType = 'default';
+    const availableStyles = get_available_styles().map(s => s.toLowerCase().trim());
     if (m6 !== undefined) {
-
       const words = m6.toLowerCase().trim().split(/[^\d\w]+/gi).filter(Boolean);
-      const availableStyles = get_available_styles().map(s => s.toLowerCase().trim());
-
+      
       for (let i = 0; i < words.length; i++) {
         const candidate = words.slice(0, words.length -i).join('-');
         if (availableStyles.includes(candidate)) {
-          sentencePart = candidate;
+          aoeType = candidate;
+          break;
+        }
+      }
+    }
+    if (aoeType === 'default') {
+      const followingHtml = source.slice(offset + m1.length);
+      const sameParagraph = followingHtml.split(/<\/p\s*>/i)[0];
+      const template = document.createElement('template');
+      template.innerHTML = sameParagraph;
+
+      const damageText = (template.content.textContent + followingText).split(/\b\d+-foot\b/i)[0];
+      for (const damageType of damageText.matchAll(/\b([a-zA-Z]+)\s+damage\b/gi)) {
+        const candidate = damageType[1].toLowerCase();
+        if (availableStyles.includes(candidate)) {
+          aoeType = candidate;
           break;
         }
       }
@@ -906,7 +919,7 @@ function add_aoe_to_statblock(html){
       ? ` data-line-width=${m3 !== undefined ? `'${m3}'`: '5'}` 
       : '';
 
-    return `<button class='avtt-aoe-button' border-width='1px' title='Place area of effect token' data-shape='${shape}' data-style='${sentencePart}' data-size='${m2}' data-name='${m5} AoE'${lineWidthAttr}>${m1}</button>${m6 !== undefined ? m6 : ''}`;
+    return `<button class='avtt-aoe-button' border-width='1px' title='Place area of effect token' data-shape='${shape}' data-style='${aoeType}' data-size='${m2}' data-name='${m5} AoE'${lineWidthAttr}>${m1}</button>${m6 !== undefined ? m6 : ''}`;
   });
 }
 async function embedDDBSection(target){
@@ -976,34 +989,8 @@ function add_aoe_statblock_click(target, tokenId = undefined){
     }
   })
 }
-function create_update_token(options, save = true) {
-  noisy_log("create_update_token");
-  let self = this;
-  let id = options.id;
-  options.scaleCreated = window.CURRENT_SCENE_DATA.scale_factor;
 
-  if (!(id in window.TOKEN_OBJECTS)) {
-    window.TOKEN_OBJECTS[id] = new Token(options);
-  }
 
-  if(options.repositionAoe != undefined){
-    window.TOKEN_OBJECTS[id].place(0);
-    let origin, dx, dy;   
-    origin = getOrigin(window.TOKEN_OBJECTS[id]);
-    dx = origin.x - options.repositionAoe.x;
-    dy = origin.y - options.repositionAoe.y;        
-    options.left = `${parseFloat(options.left) - dx}px`;
-    options.top = `${parseFloat(options.top) - dy}px`;
-    delete options.repositionAoe;
-  }
-  
-  window.TOKEN_OBJECTS[id].place(0);
-  window.TOKEN_OBJECTS[id].sync();
-  if(window.all_token_objects[id] == undefined){
-    window.all_token_objects[id] = window.TOKEN_OBJECTS[id]	
-  }
-
-}
 /** Logs that are super noisy should be sent through here.
  * This allows us to enable these logs on the fly when we need to debug things that would otherwise flood the console 
  * @param message the args of the console log 
@@ -1028,7 +1015,7 @@ function noisy_log(...message) {
 
 
 /** Runs the dice notation/aoe replacements over an html string. */
-function apply_avtt_roll_button_markup(html){
+function apply_avtt_roll_button_markup(html, followingText = ''){
   const dashToMinus = /([\s>])−(\d)/gi
 
   // apply most specific regex first matching all possible ways to write a dice notation
@@ -1046,7 +1033,6 @@ function apply_avtt_roll_button_markup(html){
   const damageRollRegex = new RegExp(`\\s*([:\\s>]|^)(${rollFormula})([\\.\\):\\s<,]|\$)`, 'gi');
   const hitRollRegexBracket = /\s*(?<![0-9]+d[0-9]+)(\()([+-]\s?[0-9]+)(\))/gi
   const hitRollRegex = /\s*(?<!(?:[0-9]+d)?[0-9]+)([:\s>]|^)([+-]\s?[0-9]+)([:\s<,]|$)/gi
-  const dRollRegex = /\s*([\s>]|^)(\s?d[0-9]+)([^+-])/gi
   const rechargeRegEx = /\s*(Recharge [0-6]?\s?[—–-]?\s?[0-6])/gi
   const actionType = "roll"
 
@@ -1060,10 +1046,9 @@ function apply_avtt_roll_button_markup(html){
     .replaceAll(damageRollRegex, ` $1<button data-exp='$2' data-mod='' data-rolltype='damage' data-actiontype='${actionType}' class='avtt-roll-button' title='${actionType}'>$2</button>$3`)
     .replaceAll(hitRollRegexBracket, ` <button data-exp='1d20' data-mod='$2' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'>$1$2$3</button>`)
     .replaceAll(hitRollRegex, ` $1<button data-exp='1d20' data-mod='$2' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'>$2</button>$3`)
-    .replaceAll(dRollRegex, `$1<button data-exp='1$2' data-mod='' data-rolltype='to hit' data-actiontype=${actionType} class='avtt-roll-button' title='${actionType}'>$2</button>$3`)
     .replaceAll(rechargeRegEx, `<button data-exp='1d6' data-mod='' data-rolltype='recharge' data-actiontype='Recharge' class='avtt-roll-button' title='${actionType}'>$1</button>`)
 
-  return add_aoe_to_statblock(updated);
+  return add_aoe_to_statblock(updated, followingText);
 }
 
 
@@ -1123,7 +1108,15 @@ function add_roll_buttons_to_text(sheetElement){
     if (!should_roll_scan_text(textNode)) continue;
 
     const escaped = textNode.nodeValue.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-    const updated = apply_avtt_roll_button_markup(escaped);
+    let followingText = '';
+    const paragraph = textNode.parentElement.closest('p');
+    if (paragraph && sheetElement.contains(paragraph)) {
+      const range = ownerDocument.createRange();
+      range.setStartAfter(textNode);
+      range.setEnd(paragraph, paragraph.childNodes.length);
+      followingText = range.cloneContents().textContent;
+    }
+    const updated = apply_avtt_roll_button_markup(escaped, followingText);
     if (updated === escaped) continue;
 
     const parsed = ownerDocument.createElement('template');
@@ -1445,8 +1438,6 @@ function init_my_dice_details(){
 function general_statblock_formating(input){
   input = input.replace(/&nbsp;/g,' ')
 
-  input = input.replace(/^((\s+?)?<(strong|em)>(<(strong|em)>)?([a-z0-9\s\.\(\)]+)(<\/(strong|em)>)?<\/(strong|em)>)/gi, '$6');
-
   //bold top of statblock info
   input = input.replace(/^(Senses|Gear|Skills|Damage Resistances|Resistances|Immunities|Damage Immunities|Damage Vulnerabilities|Condition Immunities|Languages|Proficiency Bonus|Saving Throws)/gi, `<strong>$1</strong>`)
   input = input.replace(/^(Speed|Hit Points|HP|AC|Armor Class|Challenge|CR)([\s<][\d\()<])/gi, `<strong>$1</strong>$2`)
@@ -1457,8 +1448,19 @@ function general_statblock_formating(input){
   input = input.replace(/'/g, '’');
   // e.g. Divine Touch. Melee Spell Attack:
   input = input.replace(
-      /^(<span.+?>)?(([a-z0-9]+[\s]?){1,7})(\([^\)]+\))?(\.)([\s]+)?((Melee|Ranged|Melee or Ranged) (Weapon Attack:|Spell Attack:|Attack Roll:))?/gi,
-        '$1<em><strong>$2$5</strong></em><em>$4$6$7</em>'
+      /^(\s*(?:<[a-z][\w:-]*\b[^>]*>\s*)*)(([a-z0-9]+[\s]?){1,7})(\([^\)]+\))?(\.)([\s]+)?((Melee|Ranged|Melee or Ranged) (Weapon Attack:|Spell Attack:|Attack Roll:))?/gi,
+      function(match, prefix, name, word, qualifier, period, spacing, attack) {
+        const hasBold = /<(?:strong|b)\b/i.test(prefix);
+        const hasItalic = /<(?:em|i)\b/i.test(prefix);
+        if (hasBold && hasItalic) return match;
+
+        let heading = `${name}${period}`;
+        if (!hasBold) heading = `<strong>${heading}</strong>`;
+        if (!hasItalic) heading = `<em>${heading}</em>`;
+        let detail = `${qualifier || ''}${spacing || ''}${attack || ''}`;
+        if (detail.replace(/[\u200B-\u200D\uFEFF]/g, '').trim() && !hasItalic) detail = `<em>${detail}</em>`;
+        return `${prefix}${heading}${detail}`;
+      }
   ).replace(/[\s]+\./gi, '.').replace(/<em><\/em>/gi, '');
 
   // Find actions requiring saving throws
@@ -1485,6 +1487,8 @@ function general_statblock_formating(input){
 }
 
 function process_monitored_logs() {
+  console.concerningLogs ??= [];
+  console.otherLogs ??= [];
   const logs = [...console.concerningLogs, ...console.otherLogs].sort((a, b) => a.timeStamp < b.timeStamp ? 1 : -1);
   let processedLogs = [];
   logs.forEach(log => {
@@ -1661,8 +1665,8 @@ async function add_new_dice(){
     canvas2.style.width = `${width}px`;
     canvas2.style.height = `${height}px`;
 
-    document.documentElement.style.setProperty('--sidebar-width', `${visibleSidebarWidth}px`);
-
+    canvas.style.setProperty('--sidebar-width', `${visibleSidebarWidth}px`);
+    canvas2.style.setProperty('--sidebar-width', `${visibleSidebarWidth}px`);
     
     physicsWorker.postMessage({
         "type": "resize",
@@ -2581,7 +2585,7 @@ async function harvest_game_id() {
     const characterId = window.location.pathname.split("/").pop();
     window.characterData = await DDBApi.fetchCharacter(characterId);
     if (!window.characterData?.campaign){
-      return false;
+      throw new Error('Unable to find campaign linked to character. Character may be disabled in the campaign. Otherwise there may be a temporary outage.')
     }
     return window.characterData?.campaign?.id?.toString();
   }
@@ -3491,9 +3495,18 @@ function createDialogMenu(rootId, options) {
   return dialog[0]; //note: return native element, NOT jquery
 }
 function basic_sanitize_html(html){
-  let sanitized = DOMPurify.sanitize(html,{ALLOWED_TAGS: ['video','img','div','p', 'b', 'i', 'button', 'span', 'path', 'polygon', 'rect', 'svg', 'circle', 'a', 'hr', 'ul', 'li', 'ol', 'h3', 'h2', 'h4', 'h1', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'br', 'input', 'strong', 'em'], ADD_ATTR: ['target', 'contenteditable']}); //This array needs to include all HTML elements the extension sends via chat.
+  let sanitized = DOMPurify.sanitize(html,{ALLOWED_TAGS: ['video','img','div','p', 'b', 'i', 'button', 'span', 'path', 'polygon', 'rect', 'svg', 'circle', 'a', 'hr', 'ul', 'li', 'ol', 'h3', 'h2', 'h4', 'h1', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'br', 'input', 'strong', 'em', 'aside'], ADD_ATTR: ['target', 'contenteditable']}); //This array needs to include all HTML elements the extension sends via chat.
   sanitized = sanitized.replace(/(?=([^\S\n]*(?:\n[^\S\n]*){2,}))\1(<)|(>)(?=([^\S\n]*(?:\n[^\S\n]*){2,}))\4/gi, '$2$3').replaceAll(/[\u200B-\u200D\uFEFF]|&(ZeroWidthSpace|#8203|#x200B);/gi, '');
-  return sanitized;
+  const template = document.createElement('template');
+  template.innerHTML = sanitized;
+  Array.from(template.content.childNodes).forEach(node => {
+    if (node.nodeType === Node.TEXT_NODE && node.textContent.replace(/[\u200B-\u200D\uFEFF]/g, '').trim()) {
+      const paragraph = document.createElement('p');
+      node.replaceWith(paragraph);
+      paragraph.appendChild(node);
+    }
+  });
+  return template.innerHTML;
 }
 
 //turn an element into a menu trigger
@@ -4950,8 +4963,14 @@ function register_buff_row_context_menu() {
 window.avttBuffDropdowns = window.avttBuffDropdowns || [];
 
 function rebuild_all_buff_dropdowns(){
-  window.avttBuffDropdowns = window.avttBuffDropdowns.filter(entry => entry.element.closest("html").length > 0);
-  window.avttBuffDropdowns.forEach(entry => build_buff_dropdown(entry.scope, false));
+  const openPopouts = Object.values(window.childWindows || {}).filter(popout => popout && !popout.closed);
+  window.avttBuffDropdowns = window.avttBuffDropdowns.filter(entry => {
+    const copies = new Set(openPopouts.flatMap(popout => [...popout.document.querySelectorAll(`[id="${entry.id}"]`)]));
+    if(entry.element.closest("html").length > 0)
+      copies.add(entry.element[0]);
+    copies.forEach(element => build_buff_dropdown(entry.scope, false, $(element)));
+    return copies.size > 0;
+  });
 }
 
 const TOKEN_ROLL_SETTING_DEFAULTS = Object.freeze({
@@ -5089,6 +5108,7 @@ function buff_dropdown_element_id(scope){
 /** Storage and condition plumbing, which differs between character, token, and note stat blocks. */
 function buff_scope_accessor(scope){
   const elementId = buff_dropdown_element_id(scope);
+  const listKey = listType => listType === 'favorite' ? 'rollbufffavorites' : 'rollbuffpins';
   if(scope?.type === 'token'){
     const tokenId = scope.tokenId;
     return {
@@ -5106,27 +5126,14 @@ function buff_scope_accessor(scope){
         token.options.rollbuffs = buffs;
         token.place_sync_persist();
       },
-      setPins: function(pins){
+      getList: function(listType){
+        return [...(get_token_by_id(tokenId)?.options?.[listKey(listType)] || [])];
+      },
+      setList: function(listType, list){
         const token = get_token_by_id(tokenId);
         if(token == undefined) return;
-        token.options.rollbuffpins = pins;
+        token.options[listKey(listType)] = list;
         token.place_sync_persist();
-      },
-      setFavorites: function(favorites){
-        const token = window.TOKEN_OBJECTS?.[tokenId];
-        if(token == undefined) return;
-        token.options.rollbufffavorites = favorites;
-        token.place_sync_persist();
-      },
-      getPins: function(){
-        const token = get_token_by_id(tokenId);
-        if(token == undefined) return [];
-        return token.options.rollbuffpins || [];
-      },
-      getFavorites: function(){
-        const token = get_token_by_id(tokenId);
-        if(token == undefined) return [];
-        return token.options.rollbufffavorites || [];
       },
       setCondition: function(condition, value){
         const token = get_token_by_id(tokenId);
@@ -5153,26 +5160,22 @@ function buff_scope_accessor(scope){
         note.rollbuffs = buffs;
         saveNote();
       },
-      setPins: function(pins){
+      getList: function(listType){ return [...(getNote()?.[listKey(listType)] || [])]; },
+      setList: function(listType, list){
         const note = getNote();
         if(!note) return;
-        note.rollbuffpins = pins;
+        note[listKey(listType)] = list;
         saveNote();
       },
-      setFavorites: function(favorites){
-        const note = getNote();
-        if(!note) return;
-        note.rollbufffavorites = favorites;
-        saveNote();
-      },
-      getPins: function(){ return getNote()?.rollbuffpins || []; },
-      getFavorites: function(){ return getNote()?.rollbufffavorites || []; },
       setCondition: function(){}
     };
   }
+  const storageKey = listType => (listType === 'favorite' ? 'rollFavoriteBuffs' : 'rollBuffPins') + window.PLAYER_ID;
   return {
     elementId,
     canEdit: function(){ return true; },
+    getList: function(listType){ return JSON.parse(localStorage.getItem(storageKey(listType))) || []; },
+    setList: function(listType, list){ localStorage.setItem(storageKey(listType), JSON.stringify(list)); },
     read: function(){
       return JSON.parse(localStorage.getItem('rollBuffs' + window.PLAYER_ID)) || [];
     },
@@ -5215,7 +5218,7 @@ function rebuild_buffs(fullBuild = false){
 }
 
 /** @param scope {{type: 'character'}|{type: 'token', tokenId: string}|{type: 'note', noteId: string}} whose buffs this dropdown edits */
-function build_buff_dropdown(scope = { type: 'character' }, fullBuild = false){
+function build_buff_dropdown(scope = { type: 'character' }, fullBuild = false, targetElement = undefined){
   const accessor = buff_scope_accessor(scope);
   const isCharacterScope = scope?.type === 'character' || scope == undefined;
   const elementId = accessor.elementId;
@@ -5234,14 +5237,10 @@ function build_buff_dropdown(scope = { type: 'character' }, fullBuild = false){
     
   }
     
-  if(isCharacterScope){
+  if(isCharacterScope)
     window.rollBuffs = selectedBuffs;
-    rollBuffFavorites = JSON.parse(localStorage.getItem('rollFavoriteBuffs' + window.PLAYER_ID)) || [];
-    rollBuffPins = JSON.parse(localStorage.getItem('rollBuffPins' + window.PLAYER_ID)) || [];
-  }else{
-    rollBuffFavorites = accessor.getFavorites();
-    rollBuffPins = accessor.getPins();
-  }
+  rollBuffFavorites = accessor.getList('favorite');
+  rollBuffPins = accessor.getList('pin');
   
   let avttBuffSelect;
   const innerBuffHtml = `
@@ -5277,10 +5276,10 @@ function build_buff_dropdown(scope = { type: 'character' }, fullBuild = false){
   }
   else{
     // the registry keeps a handle on dropdowns living in popout documents, which $('#id') can't reach
-    avttBuffSelect = registeredDropdown?.element?.closest('html').length > 0 ? registeredDropdown.element : $(`#${elementId}`);
+    avttBuffSelect = targetElement ?? (registeredDropdown?.element?.closest('html').length > 0 ? registeredDropdown.element : $(`#${elementId}`));
     if(avttBuffSelect.length === 0) return undefined;
     avttBuffSelect.toggleClass('readonly', !editable);
-    avttBuffSelect.find('.avttBuffItems').html(innerBuffHtml)
+    avttBuffSelect[0].querySelector('.avttBuffItems').innerHTML = innerBuffHtml;
   }
   const toggleBuffMenuVisiblity = function(){
     avttBuffSelect.toggleClass('visible')
@@ -5296,10 +5295,21 @@ function build_buff_dropdown(scope = { type: 'character' }, fullBuild = false){
       }, 250)
     }
   }
-  const avttBuffItems = avttBuffSelect.find('.avttBuffItems')
+
+  const avttBuffItems = $(avttBuffSelect[0].querySelector('.avttBuffItems'));
+  const findInItems = selector => $(avttBuffItems[0].querySelectorAll(selector));
   avttBuffSelect.off('click.clickHandle').on('click.clickHandle', '.clickHandle', function(){
     toggleBuffMenuVisiblity();
   })
+
+  
+ 
+  const toggleListEntry = function(listType, buffName){
+    const list = accessor.getList(listType);
+    accessor.setList(listType, list.includes(buffName) ? list.filter(d => d != buffName) : [...list, buffName]);
+    rebuild_all_buff_dropdowns();
+  }
+
   avttBuffSelect.off('click.headers').on('click.headers', 'ul>ul', function(e){
     e.stopPropagation();
     if($(e.target).is('li:first-of-type'))
@@ -5323,12 +5333,13 @@ function build_buff_dropdown(scope = { type: 'character' }, fullBuild = false){
     }, 
     {}
   );
+  const ownerDocument = avttBuffSelect[0].ownerDocument;
   const pinWrapper = $(`<div id='${idPrefix}avttBuffSheetPins' class='avttBuffSheetPins'></div>`);
-  avttBuffSelect.find(`#${idPrefix}avttBuffSheetPins`).remove()
+  $(ownerDocument.querySelectorAll(`[id="${idPrefix}avttBuffSheetPins"]`)).remove()
  
   for(let i in sortedBuffs){
     const groupName = buffsDebuffs[i].type == 'class' ? buffsDebuffs[i].class : buffsDebuffs[i].type == 'species' ? buffsDebuffs[i].species : buffsDebuffs[i].type;
-    const headerRow = avttBuffItems.find(`ul[data-group='${groupName}']`);
+    const headerRow = findInItems(`ul[data-group='${groupName}']`);
     const replacedName = i.replace("'", '');
     const addToFavorite = rollBuffFavorites.includes(replacedName);
     const addToPins = rollBuffPins.includes(replacedName);
@@ -5369,35 +5380,15 @@ function build_buff_dropdown(scope = { type: 'character' }, fullBuild = false){
       row.find('span.favorite').off('click.favorite').on('click.favorite', function(e){
         e.preventDefault();
         e.stopPropagation();
-        if(rollBuffFavorites.includes(replacedName)){
-          rollBuffFavorites = rollBuffFavorites.filter(d=> d != replacedName)
-        }
-        else{
-          rollBuffFavorites.push(replacedName)
-        }
-        if(!isCharacterScope)
-           accessor.setFavorites(rollBuffFavorites);
-        else
-          localStorage.setItem('rollFavoriteBuffs' + window.PLAYER_ID, JSON.stringify(rollBuffFavorites));
-        rebuild_all_buff_dropdowns();
+        toggleListEntry('favorite', replacedName);
       })
       row.find('span.pinToSheet').off('click.pinToSheet').on('click.pinToSheet', function(e){
         e.preventDefault();
         e.stopPropagation();
-        if(rollBuffPins.includes(replacedName)){
-          rollBuffPins = rollBuffPins.filter(d=> d != replacedName)
-        }
-        else{
-          rollBuffPins.push(replacedName)
-        }
-        if(!isCharacterScope)
-          accessor.setPins(rollBuffPins);
-        else
-          localStorage.setItem('rollBuffPins' + window.PLAYER_ID, JSON.stringify(rollBuffPins));
-        rebuild_all_buff_dropdowns();
+        toggleListEntry('pin', replacedName);
       })
       if(addToFavorite)
-        avttBuffItems.find(`ul[data-group='favorite']`).append(row);  
+        findInItems(`ul[data-group='favorite']`).append(row);  
       else    
         headerRow.append(row);
 
@@ -5442,37 +5433,15 @@ function build_buff_dropdown(scope = { type: 'character' }, fullBuild = false){
       row.find('span.favorite').off('click.favorite').on('click.favorite', function(e){
         e.preventDefault();
         e.stopPropagation();
-        if(rollBuffFavorites.includes(replacedName)){
-          rollBuffFavorites = rollBuffFavorites.filter(d=> d != replacedName)
-        }
-        else{
-          rollBuffFavorites.push(replacedName)
-        }
-        if(!isCharacterScope)
-          accessor.setFavorites(rollBuffFavorites);
-        else
-          localStorage.setItem('rollFavoriteBuffs' + window.PLAYER_ID, JSON.stringify(rollBuffFavorites));
-        rebuild_all_buff_dropdowns();
+        toggleListEntry('favorite', replacedName);
       })
       row.find('span.pinToSheet').off('click.pinToSheet').on('click.pinToSheet', function(e){
         e.preventDefault();
         e.stopPropagation();
-        if(rollBuffPins.includes(replacedName)){
-          rollBuffPins = rollBuffPins.filter(d=> d != replacedName)
-        }
-        else{
-          rollBuffPins.push(replacedName)
-        }
-        if(!isCharacterScope){
-          accessor.setPins(rollBuffPins);
-        } else{
-          localStorage.setItem('rollBuffPins' + window.PLAYER_ID, JSON.stringify(rollBuffPins));
-        }
-        
-        rebuild_all_buff_dropdowns();
+        toggleListEntry('pin', replacedName);
       })
       if(addToFavorite)
-        avttBuffItems.find(`ul[data-group='favorite']`).append(row);
+        findInItems(`ul[data-group='favorite']`).append(row);
       else   
         headerRow.append(row);
 
@@ -5491,8 +5460,8 @@ function build_buff_dropdown(scope = { type: 'character' }, fullBuild = false){
     }
 
   }
-  avttBuffItems.find(`ul>ul`).each(function(){
-    if($(this).find('li').length < 2)
+  findInItems(':scope ul > ul').each(function(){
+    if(this.querySelectorAll('li').length < 2)
       $(this).hide();
   })
 
@@ -5503,11 +5472,14 @@ function build_buff_dropdown(scope = { type: 'character' }, fullBuild = false){
     window.avttBuffDropdowns.push({ id: elementId, scope, element: avttBuffSelect });
   }
 
+  const notePinContainer = targetElement && targetElement[0] !== registeredDropdown?.element?.[0]
+    ? $(targetElement[0].closest('.resize_drag_window, body')?.querySelector('.avtt-note-roll-buff-pins') ?? [])
+    : registeredDropdown?.pinContainer;
   if(isCharacterScope){
-    const tabContent = $(`#${elementId}~[class*='styles_tabFilter']>[class*='styles_content'], #${elementId}~.ct-tablet-box__content [class*='styles_tabFilter']>[class*='styles_content']`);
+    const tabContent = $(ownerDocument.querySelectorAll(`[id="${elementId}"]~[class*='styles_tabFilter']>[class*='styles_content'], [id="${elementId}"]~.ct-tablet-box__content [class*='styles_tabFilter']>[class*='styles_content']`));
     tabContent.prepend(pinWrapper);
-  } else if(scope?.type === 'note' && registeredDropdown?.pinContainer?.closest('html').length > 0) {
-    registeredDropdown.pinContainer.empty().append(pinWrapper);
+  } else if(scope?.type === 'note' && notePinContainer?.closest('html').length > 0) {
+    notePinContainer.empty().append(pinWrapper);
   } else {
     avttBuffSelect.append(pinWrapper);
   }

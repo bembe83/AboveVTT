@@ -104,9 +104,41 @@ canvas.dice-rolling-panel__container,
     z-index: 160000 !important;
     visibility: visible;
 }
-.hide-button.active{
+#scenes-panel :is(.hide-button, .favorites-button).active{
     color: #fff;
     background-color: #c53131;
+}
+#scenes-panel .favorite:after {
+  content: "\e838";
+  font-family: 'Material Symbols Outlined';
+  position: absolute;
+  left: -2px;
+  font-size: 16px;
+  color: #ffd900;
+  top: -5px;
+  font-variation-settings: 'FILL' 1;
+  text-shadow: 0px 0px 1px #000, 0px 0px 1px #000, 0px 0px 1px #000, 0px 0px 1px #000;
+  pointer-events:none;
+}
+svg[src$='assets/folder.svg']>g>path:nth-of-type(2){
+    transform: scale(0.9, 2.1);
+    transform-origin: center 60px;
+}
+.folder > :is(.sidebar-list-item-row-item, .row-chapter) svg[src$='assets/folder.svg']>g>path:nth-of-type(odd){ 
+    filter: drop-shadow(0px -1px 0px #0000009c);
+}
+
+.folder:not(.collapsed) > :is(.sidebar-list-item-row-item, .row-chapter) svg[src$='assets/folder.svg']>g>path:nth-of-type(3){
+    transform: scale(1, 0.6);
+    transform-origin: center bottom;
+    filter: drop-shadow(0px -11px 5px #0000009c);
+}
+
+#scenes-panel .favorite:has(#note):after {
+  top: 13px;
+}
+#scenes-panel *{
+    user-select: none;
 }
 #hidden-scenes-message,
 .abovevttTempMessage{
@@ -1000,6 +1032,8 @@ select#doorTypeSelectUVTT{
   pointer-events: none;
   z-index: 20;
 }
+
+
 #rotDragbox{
     z-index: 45;
 }
@@ -2696,6 +2730,33 @@ padding-top:10px;
     pointer-events: auto;
 }
 
+.token-drag-handle {
+    display: none;
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    width: 20px;
+    height: 20px;
+    background: #000d;
+    color: #ddd;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    transform: scale(calc(1 / var(--window-zoom, 1))) translate(-50%, 0);
+    transform-origin: top left;
+    pointer-events: auto;
+}
+
+.token.tokenselected.token-small-drag-target:not(.ui-draggable-disabled) > .token-drag-handle {
+    display: flex;
+}
+
+.token-drag-handle .material-symbols-outlined {
+    font-size: 18px;
+    pointer-events: none;
+}
+
+
+
 .tokenselected::before {
     content: "";
     position: absolute;
@@ -3178,15 +3239,27 @@ body .gamelogcontainer .sidebar__pane-content {
     border-right: 1px solid;
     border-image: linear-gradient(to top, transparent 0% 25%, #aaa 25% 75%, transparent 75% 100%) 1;
 }
-select#contextSelect {
+button#contextSelect {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
-    background-color: buttonface !important;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8"><path fill="%23333" d="M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z"/></svg>') !important;
-    background-repeat: no-repeat !important;
-    background-position: center center !important;
-    background-size: 50% 50% !important;
+    background-color: buttonface;
+    background-image: none !important;
+    border-right: none;
+    border-image: none;
+}
+button#contextSelect::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--roll-arrow-width, 10px);
+    height: var(--roll-arrow-height, 7px);
+    transform: translate(-50%, -50%);
+    background-color: var(--roll-arrow-color, currentColor);
+    -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 8"><path d="M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z"/></svg>') center / contain no-repeat;
+    mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 8"><path d="M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z"/></svg>') center / contain no-repeat;
+    pointer-events: none;
 }
 input.roll-input-mod::-webkit-inner-spin-button,
 input.roll-input-mod::-webkit-outer-spin-button {
@@ -3442,7 +3515,8 @@ button.roll-button-mod.adv {
     position: relative;
 }
 .moveableWindow.resize_drag_window:has(>.note){
-    overflow:clip;
+    overflow: clip;
+    overflow-clip-margin: 4px;
 }
 .body-rpgcharacter-sheet .moveableWindow .note > .note-text {
     height: calc(100% - 25px);
@@ -4514,6 +4588,7 @@ body.color-blind-avtt {
 }
 .lineAoe{
     pointer-events:none;
+    overflow:clip;
 }
 .lineAoe *{
     pointer-events:auto;
@@ -6652,6 +6727,7 @@ span.exhaustion-pip.last{
 #edit_scene_form .sidebar-hovertext:hover:before{
     max-width: 300px;
     width: max-content;
+    pointer-events:none;
 }
 .ct-sidebar{
     inset: 0px 0px 0px auto !important;
@@ -7769,15 +7845,30 @@ div#tokenOptionsContainer .remove-from-ct>button{
     right: -7px;
     bottom: -10px;
 }
-.resize_drag_window .ui-resizable-e,
-.resize_drag_window .ui-resizable-w,
-#resizeDragMon .ui-resizable-e,
-#resizeDragMon .ui-resizable-w,
-#sheet .ui-resizable-e,
-#sheet .ui-resizable-w   {
-    height: calc(100% + 4px);  
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-e,
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-w   {
+    height: calc(100% + 4px) !important;  
+    width: 4px !important;
+    top:-2px;
 }
-
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-n,
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-s {
+    width: calc(100% + 4px) !important;  
+    height: 4px !important;
+    left: -2px;
+}
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-e{
+    right:-4px;
+}
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-w {
+    left:-4px;
+}
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-n{
+    top:-4px;
+}
+:is(.resize_drag_window, #resizeDragMon, #sheet) .ui-resizable-s{
+    bottom:-4px;
+}
 /*Resizable Handle Test code */
 /*[class*="ui-resizable"]{
     border:  1px dotted #ddd;
@@ -7920,13 +8011,13 @@ div#tokenOptionsContainer .remove-from-ct>button{
     vertical-align: bottom;
 }
 
-:is(#combat_area, #combat_area_carousel) tr td{
-    vertical-align: middle
-}
+
 :is(#combat_area, #combat_area_carousel) tr td{
     vertical-align: bottom
 }
-
+:is(#combat_area, #combat_area_carousel) tr td:first-of-type{
+    vertical-align: middle
+}
 #round_number_label button{
     margin-left: 6px;
 }
@@ -7958,7 +8049,8 @@ div#tokenOptionsContainer .remove-from-ct>button{
     content:'';
     width:35px;
     height:35px;
-    top:2px;
+    top:50%;
+    transform: translateY(-50%);
     left:2px;
     border:2px solid #0000;
     position:absolute;
@@ -8190,7 +8282,7 @@ div#file-listing-section .sidebar-panel-loading-indicator {
 /*minimize windows*/
 
 #darkness_layer.smooth-transition{
-    transition: filter 350ms linear;
+    transition: background-color 350ms linear;
 }
 
 .minimized > *:not(#ct_text_title, .player_title, .monster_title, #text_controller_title, .title_bar_text),
@@ -10042,8 +10134,7 @@ body.preventSelectDefinitelyNot .token.declutterToken[style*='opacity: 0.5']{
 }
 #darkness_layer{
     z-index: 7;
-    background: #fff;
-    filter: brightness(var(--darkness-filter));
+    background: var(--darkness-color, #fff);
 
 }
 #light_container{
@@ -10067,11 +10158,9 @@ body.preventSelectDefinitelyNot .token.declutterToken[style*='opacity: 0.5']{
     transition: opacity 1.5s linear 0s;
     opacity:1;
     background:#000;
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
     scale: var(--scene-scale);
-    translate: 0 0 0;
     transform-origin: top left;
+    isolation: isolate;
     contain: strict;
 }
 #scene_map_container.map-loading{
@@ -13407,6 +13496,12 @@ p.monster-header+p {
     b{
         font-weight: 600;
     }
+    .avtt-equipment-weight-total {
+        text-transform: none;
+        white-space: nowrap;
+        font-weight: bold;
+        font-size: 10px;
+    }
     .dnd-page {
         border: 2px solid #222;
         padding: 15px;
@@ -13991,8 +14086,8 @@ p.monster-header+p {
 }
 #resizeDragMon,
 .moveableWindow:has(.dnd-sheet){
-    contain: strict;
-
+    contain: layout;
+    
     .avtt-token-roll-settings {
         display: inline-block;
         position: relative;
@@ -14117,6 +14212,25 @@ p.monster-header+p {
     }
 
     
+}
+
+.avtt-popout-stat-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 28px;
+}
+
+.avtt-popout-stat-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.avtt-popout-stat-controls .material-symbols-outlined {
+    color: var(--font-color, var(--theme-contrast, #333));
 }
 
 .dropdown-check-list ul.avttBuffItems > ul > li:first-of-type:after,
@@ -14431,7 +14545,9 @@ ul.avttBuffItems select,
   margin: 0;
   left:0;
 }
-
+.avtt-stat-block-container > .avtt-statblock-buffs > .avtt-token-roll-settings {
+  top:0px;
+}
 .avtt-statblock-buffs > .avtt-token-roll-settings .avtt-token-roll-settings-fields {
   top: 22px;
   right: auto;
@@ -14525,7 +14641,6 @@ ul.avttBuffItems select,
   position: relative !important;
   top: auto !important;
   left: 0 !important;
-  width: auto !important;
 }
 
 .moveableWindow:has(.note .dnd-sheet) .avtt-note-roll-controls .dropdown-check-list .clickHandle,
@@ -14539,7 +14654,6 @@ ul.avttBuffItems select,
 .moveableWindow:has(.note .dnd-sheet) .avtt-note-roll-controls .dropdown-check-list ul.avttBuffItems,
 .note .avtt-note-roll-controls .dropdown-check-list ul.avttBuffItems {
   box-sizing: border-box !important;
-  margin: 0 !important;
   padding: 2px !important;
   padding-inline-start: 2px !important;
   color: var(--theme-contrast, #242528) !important;
@@ -14794,7 +14908,9 @@ ul.avttBuffItems select,
     white-space: initial;
     overflow: initial
 }
-
+.tooltip-header{
+    overflow:clip;
+}
 .tooltip-header-title{
     text-transform: capitalize;
 }

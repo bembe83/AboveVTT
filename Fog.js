@@ -1064,7 +1064,7 @@ function check_single_token_visibility(id){
 
 	
 	let inTruesight = false;
-	if(window.TOKEN_OBJECTS[id].conditions.includes('Invisible') && $(`.aura-element-container-clip.truesight`).length>0 ){
+	if(window.TOKEN_OBJECTS[id].options.hidden !== true && window.TOKEN_OBJECTS[id].conditions.includes('Invisible') && $(`.aura-element-container-clip.truesight`).length>0 ){
 		const truesightContext = window.truesightCanvas.getContext('2d');
 		const truesightData = truesightContext.getImageData(0, 0, window.truesightCanvas.width, window.truesightCanvas.height);
 		inTruesight = is_token_under_truesight_aura(id, truesightData);
@@ -1191,7 +1191,7 @@ function do_check_token_visibility() {
 
 		document.querySelectorAll('.token').forEach(el => el.classList.remove('notVisible'));
 		document.querySelectorAll('.door-button').forEach(el => el.classList.remove('notVisible'));
-		if(noSelectedTokensWithVision && window.CURRENTLY_SELECTED_TOKENS.length>0 && !isAoeTokenSelected){
+		if(window.SelectedTokenVision == true && noSelectedTokensWithVision && window.CURRENTLY_SELECTED_TOKENS.length>0 && !isAoeTokenSelected){
 			document.querySelectorAll('.vision>.aura-element').forEach(el => el.classList.add('notVisible'));
 			document.querySelectorAll('.aura-element.islight').forEach(el => el.classList.remove('notVisible'));
 		} else{
@@ -1298,7 +1298,7 @@ function do_check_token_visibility() {
 
 
 		let inTruesight = false;
-		if(window.TOKEN_OBJECTS[id].conditions.includes('Invisible') && truesightAuraExists){
+		if(window.TOKEN_OBJECTS[id].options.hidden !== true && window.TOKEN_OBJECTS[id].conditions.includes('Invisible') && truesightAuraExists){
 			inTruesight = is_token_under_truesight_aura(id, truesightData);
 		}
 
@@ -1777,6 +1777,12 @@ function ctxScale(canvasid,  w, h, doNotScale=false){
 	return canvas;
 }
 
+
+function set_darkness_background(brightnessPercent) {
+	const channel = Math.max(0, Math.min(100, brightnessPercent));
+	$('#VTT').css('--darkness-color', `rgb(${channel}%, ${channel}%, ${channel}%)`);
+}
+
 function reset_canvas(apply_zoom=true) {
 	const sceneMapWidth = $("#scene_map").width();
 	const sceneMapHeight = $("#scene_map").height();
@@ -1889,7 +1895,7 @@ function check_darkness_value(){
 
 		if ((window.SelectedTokenVision === true && tokenHasSharedVision && window.CURRENT_SCENE_DATA.disableSceneVision != 1)){
 			if(window.CURRENT_SCENE_DATA.darkness_filter > 0){
-				$('#VTT').css('--darkness-filter', `${100 - window.CURRENT_SCENE_DATA.darkness_filter}%`)
+				set_darkness_background(100 - window.CURRENT_SCENE_DATA.darkness_filter);
 			}
 			if(selectedTokensWithLight == 0){
 				rayCanvas.css('opacity', '0');
@@ -1917,7 +1923,7 @@ function check_darkness_value(){
 			else if (window.CURRENT_SCENE_DATA.disableSceneVision == 1) {
 				rayCanvas.css('opacity', '0');
 			}
-  			$('#VTT').css('--darkness-filter', darknessPercent + "%");
+			set_darkness_background(darknessPercent);
   		   	if(window.DM){
   		   		$("#light_container [id^='light_']").css('visibility', "visible");
 				$(`.token`).toggleClass('notVisible', false);
@@ -1962,7 +1968,7 @@ function check_darkness_value(){
 				'opacity': ''
 			});
 		}
-		$('#VTT').css('--darkness-filter', darknessPercent + "%");
+		set_darkness_background(darknessPercent);
 		if(!parseInt(window.CURRENT_SCENE_DATA.darkness_filter) && window.walls?.length>4){
 			lightContainer.css({'opacity': '0.3'});
 		}
@@ -2661,10 +2667,13 @@ function open_portal_config(){
 						'', 
 						''
 			]
-			window.DRAWINGS.push(data);
-			pushWallUndo({
-				undo: [[...data]],
-			})
+			const wallExists = window.DRAWINGS.find(d => d[1] == 'wall' && d[3] == data[3] && d[4] == data[4] && d[5] == data[5] && d[6] == data[6]);
+			if(!wallExists){
+				window.DRAWINGS.push(data);
+				pushWallUndo({
+					undo: [[...data]],
+				})
+			}
 			let newPortalId = `${mouseX-5}${mouseY}${mouseX+5}${mouseY}${window.CURRENT_SCENE_DATA.id}`.replaceAll('.','') 
 
 			
@@ -2692,13 +2701,9 @@ function open_portal_config(){
 				auraislight: false,
 				alwaysshowname: window.TOKEN_SETTINGS.alwaysshowname != undefined ? window.TOKEN_SETTINGS.alwaysshowname : false
 			};
-			if(window.TOKEN_OBJECTS[newPortalId] == undefined){
-				window.ScenesHandler.create_update_token(options);
-			}else {
-				window.TOKEN_OBJECTS[newPortalId] = options;
-			}
-			window.TOKEN_OBJECTS[newPortalId].place(0);
-			window.TOKEN_OBJECTS[newPortalId].sync();
+			
+			create_update_token(options);
+			
 			redraw_light_walls();
 			sync_drawings();
 			open_portal_config();
@@ -2743,7 +2748,7 @@ function open_portal_config(){
 					auraislight: false,
 					alwaysshowname: window.TOKEN_SETTINGS.alwaysshowname != undefined ? window.TOKEN_SETTINGS.alwaysshowname : false
 				};
-				window.ScenesHandler.create_update_token(options);
+				create_update_token(options);
 			}
 			if(window.all_token_objects[portalId] == undefined){
 				window.all_token_objects[portalId] = window.TOKEN_OBJECTS[portalId]	
@@ -2891,10 +2896,14 @@ function open_portal_config(){
 						(wall[10] != undefined ? wall[10] : ""),
 						(wall[11] != undefined ? wall[11] : "")
 			]
-			window.DRAWINGS.push(data);
-			pushWallUndo({
-				undo: [[...data]],
-			})
+			const wallExists = window.DRAWINGS.find(d => d[1] == 'wall' && d[3] == data[3] && d[4] == data[4] && d[5] == data[5] && d[6] == data[6]);
+			if(!wallExists){
+				window.DRAWINGS.push(data);
+				pushWallUndo({
+					undo: [[...data]],
+				})
+			}
+			
 			let clonePortalId = `${mouseX-5}${mouseY}${mouseX+5}${mouseY}${window.CURRENT_SCENE_DATA.id}`.replaceAll('.','') 
 			let teleporterCoords;
 			if(window.CURRENT_SCENE_DATA.id != portal.sceneId){
@@ -2944,13 +2953,9 @@ function open_portal_config(){
 				alwaysshowname: window.TOKEN_SETTINGS.alwaysshowname != undefined ? window.TOKEN_SETTINGS.alwaysshowname : false,
 				teleporterCoords
 			};
-			if(window.TOKEN_OBJECTS[clonePortalId] == undefined){
-				window.ScenesHandler.create_update_token(options);
-			}else {
-				window.TOKEN_OBJECTS[clonePortalId] = options;
-			}
-			window.TOKEN_OBJECTS[clonePortalId].place(0);
-			window.TOKEN_OBJECTS[clonePortalId].sync();
+			
+			create_update_token(options);
+			
 			redraw_light_walls();
 			sync_drawings();
 			open_portal_config();
@@ -3253,6 +3258,7 @@ function redraw_light_walls(options = {clearCanvas: true, editingWallPoints: fal
 								
 							if(tokenObject?.options?.teleporterCoords?.linkedPortalId != undefined && tokenObject.options.teleporterCoords.sceneId != window.CURRENT_SCENE_DATA.id){
 								copy_selected_tokens(tokenObject.options.teleporterCoords.linkedPortalId);
+								
 								forSelTokens((token,id) => {
 									token.selected = true;
 									token.options.deleteableByPlayers = true;
@@ -3262,35 +3268,85 @@ function redraw_light_walls(options = {clearCanvas: true, editingWallPoints: fal
 								window.MB.sendMessage('custom/myVTT/highlight', {
 									id: tokenObject.options.id
 								});
-								if(!window.DM){
-									async function teleportScene(tokenObject){
-										let currentScene = await AboveApi.getCurrentScene(true);
-										let sceneIds = {}
-										let playerId = window.PLAYER_ID;
-										if(currentScene.playerscene && currentScene.playerscene.players){
-											sceneIds = {
-												...currentScene.playerscene,         
-											};
-											sceneIds[playerId] = tokenObject.options.teleporterCoords.sceneId
+								
+								async function teleportScene(tokenObject){
+
+									let currentScene = await AboveApi.getCurrentScene(true);
+									
+									let playersOnCurrentScene = [];
+									
+									if(currentScene.playerscene && currentScene.playerscene.players){
+										const playersNotOnScene =[];
+										for(let i in currentScene.playerscene){
+											if(currentScene.playerscene[i] != window.CURRENT_SCENE_DATA.id){
+												playersNotOnScene.push(i);
+											}
+											else if(currentScene.playerscene[i] == window.CURRENT_SCENE_DATA.id){
+												for(let pc of window.pcs){
+													if(i == 'players' && playersNotOnScene.includes(pc.characterId))
+														continue;
+													playersOnCurrentScene.push({id: pc.characterId, user: pc.userId});
+												}
+											}
+											
 										}
-										else if(typeof currentScene.playerscene == 'string'){
-											sceneIds = {
-												players: currentScene.playerscene,
-											};
-											sceneIds[playerId] = tokenObject.options.teleporterCoords.sceneId
+										
+									}
+									else if(typeof currentScene.playerscene == 'string' && currentScene.playerscene == window.CURRENT_SCENE_DATA.id){
+										for(let pc of window.pcs){
+											playersOnCurrentScene.push({id: pc.characterId, user: pc.userId});
 										}
-										window.splitPlayerScenes = sceneIds;
-										window.MB.sendMessage("custom/myVTT/switch_scene", { sceneId: sceneIds});
+									}
+									playersOnCurrentScene = [...new Set(playersOnCurrentScene)];
+									let movedPlayerIds = [];
+									if(shiftHeld && window.TELEPORTER_PASTE_BUFFER.tokens){
+										for(let token of Object.values(window.TELEPORTER_PASTE_BUFFER.tokens)){
+											for(let player of playersOnCurrentScene){
+												if(token.options.sheet != undefined){
+													const splitId = token.options.id.split('/');
+													const playerId = splitId[splitId.length - 1].split('?')[0];
+													if(playerId == player.id)
+														movedPlayerIds.push(player.id)
+												}
+												if(token.options.shared_vision == true || token.options.shared_vision == player.user){
+													movedPlayerIds.push(player.id)
+												}
+											}
+										};
+									}
+									if(!window.DM){
+										movedPlayerIds.push(window.PLAYER_ID);
+									}
+									movedPlayerIds = [...new Set(movedPlayerIds)]
+									
+									if(currentScene.playerscene && currentScene.playerscene.players){
+										sceneIds = {
+											...currentScene.playerscene,         
+										};
+										for(let playerID of movedPlayerIds){
+											sceneIds[playerID] = tokenObject.options.teleporterCoords.sceneId;
+										}
+										
+									}
+									else if(typeof currentScene.playerscene == 'string'){
+										sceneIds = {
+											players: currentScene.playerscene,
+										};
+										for(let playerID of movedPlayerIds){
+											sceneIds[playerID] = tokenObject.options.teleporterCoords.sceneId;
+										}
+									}
+									window.splitPlayerScenes = sceneIds;
+									window.MB.sendMessage("custom/myVTT/switch_scene", { sceneId: sceneIds});
+									if(window.DM){
+										window.MB.sendMessage("custom/myVTT/switch_scene", { sceneId: tokenObject.options.teleporterCoords.sceneId, switch_dm: true });
+										$("#scenes-panel .dm_scenes_button.selected-scene").removeClass("selected-scene");
+										$(`#scenes-panel [data-scene-id="${tokenObject.options.teleporterCoords.sceneId}"] .dm_scenes_button`).addClass("selected-scene");
+									} else{
 										window.MB.sendMessage("custom/myVTT/update_dm_player_scenes", {splitPlayerScenes: window.splitPlayerScenes});
 									}
-									teleportScene(tokenObject);
-									
 								}
-								else{
-									window.MB.sendMessage("custom/myVTT/switch_scene", { sceneId: tokenObject.options.teleporterCoords.sceneId, switch_dm: true });
-									$("#scenes-panel .dm_scenes_button.selected-scene").removeClass("selected-scene");
-									$(`#scenes-panel [data-scene-id="${tokenObject.options.teleporterCoords.sceneId}"] .dm_scenes_button`).addClass("selected-scene");
-								}
+								teleportScene(tokenObject);
 							}
 							else if(tokenObject?.options?.teleporterCoords != undefined){
 								let coords = tokenObject.options.teleporterCoords;
@@ -5490,7 +5546,7 @@ function drawing_mouseup(e) {
 						top: `${parseFloat(midY) - 25}px`,
 						id: newId
 					};
-					window.ScenesHandler.create_update_token(options, noScale=true)
+					create_update_token(options, noScale=true)
 					window.TOKEN_OBJECTS[tokenId].delete();
 					window.selectedWalls[i].tokenId = newId;
 				}

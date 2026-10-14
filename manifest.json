@@ -2,7 +2,7 @@
 	"manifest_version": 3,
 	"name": "AboveVTT",
 	"description": "Integrated VTT for D&DBeyond",
-	"version": "1.60.1",
+	"version": "1.61.1",
 	"content_scripts": [
 		{
 			"matches": [
@@ -33,6 +33,10 @@
 	"host_permissions": [
 		"*://*.dndbeyond.com/*"
 	],
+	"background": {
+		"service_worker": "background.js",
+		"scripts": ["background.js"]
+	},
 	"icons": {
 		"128": "icon.png"
 	},

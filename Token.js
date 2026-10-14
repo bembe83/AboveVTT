@@ -558,7 +558,7 @@ class Token {
 			return {};
 		}
 		const customStatBlock = window.JOURNAL.notes[this.options.statBlock]?.text;
-		const pcURL = customStatBlock != undefined ? $(customStatBlock).find('.custom-pc-sheet.custom-stat').text() : undefined;
+		const pcURL = customStatBlock != undefined ? $(`<div>${customStatBlock}</div>`).find('.custom-pc-sheet.custom-stat').text() : undefined;
 		return {customStatBlock, pcURL};
 	}
 	size(newSize, linewidth=false) {
@@ -1089,7 +1089,7 @@ class Token {
 				const underdarknessDeadCross = underdarknessToken.find('.dead')
 				underdarknessDeadCross.attr("style", `transform:scale(${this.get_token_scale()});--size: ${parseInt(this.options.size) / window.CURRENT_SCENE_DATA.scale_factor / 10}px;`)
 				// check token death
-				if (this.hp > 0) {
+				if (this.baseHp > 0) {
 					underdarknessDeadCross.hide()
 				} else {
 					underdarknessDeadCross.show()
@@ -1098,7 +1098,7 @@ class Token {
 			else{
 				deadCross.attr("style", `transform:scale(${this.get_token_scale()});--size: ${parseInt(this.options.size) / 10}px;`)
 				// check token death
-				if (this.hp > 0) {
+				if (this.baseHp > 0) {
 					deadCross.hide()
 				} else {
 					deadCross.show()
@@ -3232,6 +3232,13 @@ class Token {
 
 
 				setTokenBase(tok, this.options);
+				if (!this.options.id.includes('exampleToken')) {
+					const dragHandle = $('<div class="token-drag-handle" title="Drag to move token" aria-label="Drag to move token"><span class="material-symbols-outlined" aria-hidden="true">open_with</span></div>');
+					dragHandle.on('click dblclick', function(event) {
+						event.stopPropagation();
+					});
+					tok.append(dragHandle);
+				}
 				let click = {
 					x: 0,
 					y: 0
@@ -3324,9 +3331,7 @@ class Token {
 							//$("#VTT").css('--grid-overlay-on-tmp', '1'); commented out as it's not consistent and is confusing can reasses if we enable other options for grid over
 							window.disable_window_mouse_handlers();
 							pauseCursorEventListener = true; // we're going to send events from drag, so we don't need the eventListener sending events, too
-							if (get_avtt_setting_value("allowTokenMeasurement")) {
-								$("#capture_mouse").css("z-index", "50");
-							}
+
 							window.DRAWFUNCTION = "select"
 							window.DRAGGING = true;
 							clearTimeout(contextMenuLongPressTimer);
@@ -3601,7 +3606,7 @@ class Token {
 
 				let classToClick = null;
 				if(this.isLineAoe()){
-					tok.draggable( "option", "handle", "[data-img]" );
+					tok.draggable( "option", "handle", "[data-img], .token-drag-handle" );
 					classToClick = "[data-img]"
 				}
 				
@@ -3849,6 +3854,8 @@ class Token {
  * @param token jquery selected div with the class token
  */
 function toggle_player_selectable(tokenInstance, token){
+	if(!tokenInstance)
+		return;
 	const tokenImage = token?.find("img, [data-img]")
 	if (tokenInstance.options.locked && !window.DM){
 		tokenImage?.css("cursor","default");
@@ -3972,6 +3979,36 @@ function convert_point_from_map_to_view(mapX, mapY) {
 	let pageX = mapX / (1 / window.ZOOM) + window.VTTMargin;
 	let pageY = mapY / (1 / window.ZOOM) + window.VTTMargin;
 	return { x: pageX, y: pageY };
+}
+function create_update_token(options, save = true) {
+  noisy_log("create_update_token");
+  let self = this;
+  let id = options.id;
+  options.scaleCreated = window.CURRENT_SCENE_DATA.scale_factor;
+
+  if (!(id in window.TOKEN_OBJECTS)) {
+    window.TOKEN_OBJECTS[id] = new Token(options);
+  } else {
+    window.TOKEN_OBJECTS[id].options = options;
+  }
+
+  if(options.repositionAoe != undefined){
+    window.TOKEN_OBJECTS[id].place(0);
+    let origin, dx, dy;   
+    origin = getOrigin(window.TOKEN_OBJECTS[id]);
+    dx = origin.x - options.repositionAoe.x;
+    dy = origin.y - options.repositionAoe.y;        
+    options.left = `${parseFloat(options.left) - dx}px`;
+    options.top = `${parseFloat(options.top) - dy}px`;
+    delete options.repositionAoe;
+  }
+  
+  window.TOKEN_OBJECTS[id].place(0);
+  window.TOKEN_OBJECTS[id].sync();
+  if(window.all_token_objects[id] == undefined){
+    window.all_token_objects[id] = window.TOKEN_OBJECTS[id]	
+  }
+
 }
 
 function place_token_in_center_of_view(tokenObject) {
@@ -4269,7 +4306,7 @@ function select_all_tokens() {
 
 function deselect_all_tokens(ignoreVisionUpdate = false) {
 	forSelTokens((token) => (token.selected = false));
-	$(`.token`).toggleClass('tokenselected', false);
+	$(`.token`).toggleClass(['tokenselected', 'token-small-drag-target'], false);
 	$(`:is(#combat_area, #combat_area_carousel) tr`).toggleClass('selected-token', false);
 	remove_selected_token_bounding_box();
 	window.CURRENTLY_SELECTED_TOKENS = [];
@@ -4992,6 +5029,8 @@ const debounceDrawSelectedToken = mydebounce(() => {
 		do_draw_selected_token_bounding_box();
 	}, 100);
 
+
+
 function draw_selected_token_bounding_box(){
 	debounceDrawSelectedToken();
 }
@@ -5142,16 +5181,22 @@ async function do_draw_selected_token_bounding_box() {
 			let left = undefined;
 
 			forSelTokens((token, id) => {
+				const sceneToken = $(`div.token[data-id='${id}']`);
+				if ((!window.DM || token.options.lockRestrictDrop == "declutter") && sceneToken.css('display') == 'none') return;
 
-				if ((!window.DM || token.options.lockRestrictDrop == "declutter") && $(`div.token[data-id='${id}']`).css('display') == 'none') return;
+			
+				sceneToken.toggleClass('token-small-drag-target', token.options.size * window.ZOOM < 6);
+				
 
-				let tokenImageClientPosition = $(`div.token[data-id='${id}']>.token-image`)[0].getBoundingClientRect();
-				let tokenImagePosition = $(`div.token[data-id='${id}']>.token-image`).position();
+				const tokenPosition = sceneToken.position();
+				const tokenImage = $(`div.token[data-id='${id}']>.token-image`);
+				let tokenImageClientPosition = tokenImage[0].getBoundingClientRect();
+				let tokenImagePosition = tokenImage.position();
 				let tokenImageWidth = (tokenImageClientPosition.width) / (window.ZOOM);
 				let tokenImageHeight = (tokenImageClientPosition.height) / (window.ZOOM);
-				let tokenTop = ($(`div.token[data-id='${id}']`).position().top + tokenImagePosition.top) / (window.ZOOM);
+				let tokenTop = (tokenPosition.top + tokenImagePosition.top) / (window.ZOOM);
 				let tokenBottom = tokenTop + tokenImageHeight;
-				let tokenLeft = ($(`div.token[data-id='${id}']`).position().left  + tokenImagePosition.left) / (window.ZOOM);
+				let tokenLeft = (tokenPosition.left  + tokenImagePosition.left) / (window.ZOOM);
 				let tokenRight = tokenLeft + tokenImageWidth;
 				if (top == undefined) {
 					top = tokenTop;
@@ -5431,7 +5476,7 @@ function paste_selected_walls(x, y) {
 				top: `${parseFloat(midY) - 25}px`,
 				id: doorTokenId
 			};
-			window.ScenesHandler.create_update_token(options, noScale=true)
+			create_update_token(options, noScale=true)
 		}
 		window.selectedWalls.push({pt1: pt1, pt2: pt2, wall: wall, tokenId: doorTokenId, drawIndex: drawIndex})
 	}
@@ -5529,7 +5574,7 @@ function paste_selected_tokens(x, y, teleporter = undefined) {
 
 			options.top = `${mapView.y + top*window.CURRENT_SCENE_DATA.vpps}px`;
 			options.left = `${mapView.x + left*window.CURRENT_SCENE_DATA.hpps}px`;
-			window.ScenesHandler.create_update_token(options);
+			create_update_token(options);
 			// deselect the old and select the new so the user can easily move the new tokens around after pasting them
 			if(typeof window.TOKEN_OBJECTS[id] !== "undefined"){
 				window.TOKEN_OBJECTS[id].selected = false;
@@ -5613,7 +5658,7 @@ function undo_delete_tokens() {
 	if (!window.DM) return;
 	for (let id in window.TOKEN_OBJECTS_RECENTLY_DELETED) {
 		let options = window.TOKEN_OBJECTS_RECENTLY_DELETED[id];
-		window.ScenesHandler.create_update_token(options);
+		create_update_token(options);
 	}
 	window.TOKEN_OBJECTS_RECENTLY_DELETED = {};
 }

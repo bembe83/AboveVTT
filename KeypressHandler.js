@@ -561,6 +561,98 @@ Mousetrap.bind('shift+p', function(e) {
         return;
     open_portal_config();
 });
+Mousetrap.bind('shift+mod+v', async function(e) {
+    if(!window.DM)
+        return;
+    if($('#temp_overlay:hover, #capture_mouse:hover').length==0)
+        return;
+    const tokenId = uuid();
+    const items = await navigator.clipboard.read();
+    const parts = await Promise.all(items.map(async item => {
+        const type = item.types.includes('text/html')
+            ? 'text/html'
+            : item.types.includes('text/plain') ? 'text/plain' : null;
+
+        if (!type) return '';
+
+        const content = await (await item.getType(type)).text();
+        if (type === 'text/html') return content;
+
+        return content
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replace(/\r?\n/g, '<br>');
+    }));
+
+    const template = document.createElement('template');
+    template.innerHTML = basic_sanitize_html(parts.join('<br>'));
+    template.content.querySelectorAll('.block-send-to-game-log, .add-monster, .add-token-note').forEach(element => element.remove());
+    template.content.querySelectorAll('[style]').forEach(element => {
+        element.style.removeProperty('color');
+        element.style.removeProperty('-webkit-text-fill-color');
+        Array.from(element.style).forEach(property => {
+            if (property === 'background' || property.startsWith('background-')) {
+                element.style.removeProperty(property);
+            }
+        });
+        if (!element.matches('img, video, svg, svg *, input')) {
+            ['width', 'min-width', 'max-width', 'inline-size', 'min-inline-size', 'max-inline-size'].forEach(property => {
+                const value = element.style.getPropertyValue(property).trim();
+                if (value && !/^(?:\d*\.?\d+%|auto|none|min-content|max-content|fit-content|inherit|initial|unset|revert|revert-layer)$/i.test(value)) {
+                    element.style.removeProperty(property);
+                }
+            });
+        }
+        if (!element.style.cssText) element.removeAttribute('style');
+    });
+    const preservedEmptyElements = 'area, base, br, col, embed, hr, img, input, link, meta, param, source, track, wbr, video, path, polygon, rect, circle';
+    Array.from(template.content.querySelectorAll('*')).reverse().forEach(element => {
+        if (element.matches(preservedEmptyElements)) return;
+        if (element.children.length === 0 && !element.textContent.replace(/[\u200B-\u200D\uFEFF]/g, '').trim()) {
+            element.remove();
+        }
+    });
+
+    const text = template.innerHTML;
+    const plainContent = template.content.cloneNode(true);
+    plainContent.querySelectorAll('br').forEach(element => element.replaceWith('\n'));
+    plainContent.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6, li, tr, aside').forEach(element => {
+        element.prepend('\n');
+        element.append('\n');
+    });
+
+
+    const firstLine = plainContent.textContent.replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .split(/\r?\n/).map(line => line.trim()).find(Boolean) || '';
+
+    let number = null;
+    const startMatch = firstLine.match(/^(?:\p{L}+)?(\d{1,2})\b/u);
+    if (startMatch) {
+        number = startMatch[1];
+    } else{
+        const endMatch = firstLine.match(/(?:\p{L}+)?(\d{1,2})[^\p{L}]*$/u);
+        if (endMatch) {
+            number = endMatch[1];
+        }
+    }
+    const findId = number 
+        ? `_AboveVTT_Tokens_Numbers_${number.length>1 ? number : `0${number}`}` 
+        : "_AboveVTT_Tokens_Letters_____Exclamation_Mark";
+    
+    const listItem = window.tokenListItems.find(d=> d.id == findId);
+    
+    const options = {id: tokenId, name: firstLine};
+
+    window.JOURNAL.notes[tokenId] = {
+        title: firstLine,
+        text: `<p>${text}</p>`,
+        plain: '',
+        player: true
+    }
+    window.JOURNAL.persist();
+    create_and_place_token(listItem, true, undefined, window.cursor_x, window.cursor_y, undefined, undefined, undefined, options);
+})
 
 Mousetrap.bind('mod+v', async function(e) {
     if (await avttHandleFilePickerPaste(e)) {
