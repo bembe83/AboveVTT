@@ -392,9 +392,7 @@ async function init_characters_pages(container = $(document)) {
   // it's ok to call both of these, because they will do any clean up they might need and then return early
   init_character_sheet_page();
   init_character_list_page_without_avtt();
-
- 
-  
+  window.diceRoller = new DiceRoller(); 
 }
 
 const debounceConvertToRPGRoller =  mydebounce(() => {convertToRPGRoller()}, 20)
@@ -529,6 +527,7 @@ async function init_character_sheet_page() {
       if(event.data.msgType == 'setupObserver'){   
         convertToRPGRoller();
         window.EXPERIMENTAL_SETTINGS['rpgRoller'] = event.data.rpgRoller;
+		window.EXPERIMENTAL_SETTINGS['godiceRoller'] = event.data.godiceRoller;
         if(window.sendToTab != false || event.data.tab == undefined){
           window.sendToTab = (window.self != window.top) ? event.data.iframeTab : event.data.tab;     
         }
@@ -538,6 +537,7 @@ async function init_character_sheet_page() {
       }
       if(event.data.msgType =='removeObserver'){
         delete window.EXPERIMENTAL_SETTINGS['rpgRoller'];
+		delete window.EXPERIMENTAL_SETTINGS['godiceRoller'] ;
         window.sendToTabRPGRoller = undefined;
         window.sendToTab = undefined;
         setTimeout(function(){

@@ -155,7 +155,6 @@ $(function() {
         $('body').toggleClass('mobileAVTTUI', (window.EXPERIMENTAL_SETTINGS['iconUi'] != false));
         $('body').toggleClass('color-blind-avtt', (window.EXPERIMENTAL_SETTINGS['colorBlindText'] == true));
 
-
         tabCommunicationChannel.addEventListener ('message', (event) => {
           if((event.data.msgType == 'addCondition' || event.data.msgType == 'removeCondition') && event.data.sendTo == window.PLAYER_ID){ // Sets a player token's condition on and off
             const tokenId = Object.keys(window.all_token_objects).find(key => key.includes(event.data.characterId));
@@ -171,7 +170,7 @@ $(function() {
           if(event.data.msgType == 'CharacterData' && !find_pc_by_player_id(event.data.characterId, false))
             return;
           if(event.data.msgType == 'roll'){
-            if ((window.EXPERIMENTAL_SETTINGS['rpgRoller'] == true || event.data.msg.disableDDBDice) && event.data.msg.sendTo == window.PLAYER_ID){
+            if ((window.EXPERIMENTAL_SETTINGS['rpgRoller'] == true || window.EXPERIMENTAL_SETTINGS['godiceRoller'] || event.data.msg.disableDDBDice) && event.data.msg.sendTo == window.PLAYER_ID){
                window.MB.inject_chat(event.data.msg);
             }
             else{
@@ -207,9 +206,10 @@ $(function() {
             tabCommunicationChannel.postMessage({
               msgType: 'setupObserver',
               tab: (window.EXPERIMENTAL_SETTINGS['disableSendToTab'] ==  true) ? undefined : window.PLAYER_ID,
-              rpgTab: (window.EXPERIMENTAL_SETTINGS['rpgRoller'] ==  true) ? window.PLAYER_ID : undefined,
+              rpgTab: (window.EXPERIMENTAL_SETTINGS['rpgRoller'] ==  true || window.EXPERIMENTAL_SETTINGS['godiceRoller'] == true) ? window.PLAYER_ID : undefined,
               iframeTab: window.PLAYER_ID,
-              rpgRoller: window.EXPERIMENTAL_SETTINGS['rpgRoller']
+              rpgRoller: window.EXPERIMENTAL_SETTINGS['rpgRoller'], 
+			  godiceRoller: window.EXPERIMENTAL_SETTINGS['godiceRoller']
             })
             return;
           }
@@ -339,7 +339,8 @@ $(function() {
           msgType: 'setupObserver',
           tab: (window.EXPERIMENTAL_SETTINGS['disableSendToTab'] ==  true) ? undefined : window.PLAYER_ID,
           iframeTab: window.PLAYER_ID,
-          rpgRoller: window.EXPERIMENTAL_SETTINGS['rpgRoller']
+          rpgRoller: window.EXPERIMENTAL_SETTINGS['rpgRoller'],
+		  godiceRoller: window.EXPERIMENTAL_SETTINGS['godiceRoller']
         })
         sendBeyond20Event('register-generic-tab', {action:'register-generic-tab'});
         if (is_encounters_page()) {

@@ -56,6 +56,8 @@
         "spectrum-2.0.8.min.js",
         "purify.min.js",
         "rpg-dice-roller.bundle.min.js",
+        //GoDiceLibrary
+        "godice-roller.bundle.js",
         "color-picker.js",
         "mousetrap.1.6.5.min.js",
         "peerjs.min.js",
@@ -118,6 +120,8 @@
         "DiceContextMenu/DiceContextMenu.js",
         "MessageBroker.js",
         "rpg-dice-roller.bundle.min.js",
+	//GoDiceLibrary
+	"godice-roller.bundle.js",
         // AboveVTT files that execute when loaded        
         "CharactersPage.js" // Make sure CharactersPage executes last
     ];
