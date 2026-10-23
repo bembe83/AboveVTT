@@ -1110,6 +1110,10 @@ class Utils {
 	
 	static rollFieldUpdate(diceRollsPrompt, dieField){
 		console.debug(dieField);
+		const value = Number(dieField.value);
+		const maxValue = Number(dieField.max);
+		if (!(value > 0 && value <= maxValue)) return;
+
 		let remainRolls = parseInt(diceRollsPrompt[0].getAttribute("data-counter"));
 		
 		Utils.rollFieldFullfilled(dieField);
@@ -1122,7 +1126,9 @@ class Utils {
 	}
 	
 	static rollFieldFullfilled(dieField){
-		if(dieField.value && dieField.value != ""){
+		const value = Number(dieField.value);
+		const maxValue = Number(dieField.max);
+		if(value > 0 && value <= maxValue){
 			dieField.setAttribute('readonly', true);
 			dieField.parentElement.classList.add("fulfilled");
 			dieField.setAttribute("data-manual-roll", true);
