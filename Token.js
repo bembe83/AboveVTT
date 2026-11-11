@@ -720,7 +720,7 @@ class Token {
 		return (Math.round(parseFloat(this.options.gridSquares)*2)/2 < 1) || this.isAoe();
 	}
 	isPlayerLocked() {
-		return !window.DM && ((this.options.restrictPlayerMove && this.options.share_vision != window.myUser && this.options.share_vision != true) || this.options.locked) && !this.isCurrentPlayer();
+		return !window.DM && ((this.options.restrictPlayerMove && this.options.share_vision != window.myUser && this.options.share_vision != true) || this.options.locked) && !this.isCurrentPlayer() || $("#VTT").hasClass('paused');
 	}
 	isDMLocked() {
 		return window.DM && this.options.locked && !$('#select_locked .ddbc-tab-options__header-heading').hasClass('ddbc-tab-options__header-heading--is-active');
@@ -4468,8 +4468,8 @@ function setTokenAuras (token, options) {
 	if (!options.aura1 || options.id.includes('exampleToken')) return;
 	const tokenId = options.id.replaceAll("/", "").replaceAll('.', '');
 	let existingAura = token.parent().parent().find("#aura_" + tokenId);
-	const innerAuraSize = options.aura1.feet.length > 0 ? (options.aura1.feet / parseFloat(window.CURRENT_SCENE_DATA.fpsq)) * window.CURRENT_SCENE_DATA.hpps/window.CURRENT_SCENE_DATA.scale_factor  : 0;
-	const outerAuraSize = options.aura2.feet.length > 0 ? (options.aura2.feet / parseFloat(window.CURRENT_SCENE_DATA.fpsq)) * window.CURRENT_SCENE_DATA.hpps/window.CURRENT_SCENE_DATA.scale_factor  : 0;
+	const innerAuraSize = !isNaN(parseFloat(options.aura1.feet)) ? (parseFloat(options.aura1.feet) / parseFloat(window.CURRENT_SCENE_DATA.fpsq)) * window.CURRENT_SCENE_DATA.hpps/window.CURRENT_SCENE_DATA.scale_factor  : 0;
+	const outerAuraSize = !isNaN(parseFloat(options.aura2.feet)) ? (parseFloat(options.aura2.feet) / parseFloat(window.CURRENT_SCENE_DATA.fpsq)) * window.CURRENT_SCENE_DATA.hpps/window.CURRENT_SCENE_DATA.scale_factor  : 0;
 	if ((innerAuraSize > 0 || outerAuraSize > 0) && options.auraVisible) {
 		// use sizeWidth and sizeHeight???
 		

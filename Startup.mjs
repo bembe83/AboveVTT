@@ -95,7 +95,7 @@ $(function() {
             ]),
             new Promise((resolve) => {
               inventoryTimeout = setTimeout(() => {
-                showError(new Error("Timed out fetching party inventory/items/spells after 30 seconds"));
+                console.warn("Timed out fetching party inventory/items/spells after 60 seconds. May be down or slow to load.");
                 resolve();
               }, 60000);
             })
@@ -143,6 +143,7 @@ $(function() {
         addExtensionPathStyles();
         $('body').append(`<script type="text/javascript" src="https://www.dropbox.com/static/api/2/dropins.js" id="dropboxjs" data-app-key="h3iaoazdu0wqrfd"></script>`)
       }).then(() => {     
+        restore_popout_stat_blocks();
         const lastSendToDefault = localStorage.getItem(`${gameId}-sendToDefault`, gamelog_send_to_text()); 
 
         if(lastSendToDefault != null){

@@ -361,19 +361,15 @@ class MessageBroker {
 
 		this.abovews.onopen = function() {
 			self.loadingAboveWS = false;
-			let recovered = false;
-			if (self.callbackAboveQueue.length > 1) {
-				recovered = true;
-			}
 			let cb;
 			noisy_log('Empting callback queue list');
 			while (cb = self.callbackAboveQueue.shift()) {
 				cb();
 			};
-			if (recovered && (!window.DM)) {
-				noisy_log('asking the DM for recovery!');
+			if (!window.DM) {
 				debounceSyncMeUp();
-	 		}
+			}
+			
 			setupMBIntervals();
 		};
 
@@ -774,7 +770,6 @@ class MessageBroker {
 					window.splitPlayerScenes = msg.data.splitPlayerScenes;
 					did_update_scenes();
 				}
-				
 			} else if (msg.eventType == "custom/myVTT/scene") {
 				self.handleScene(msg);
 			} else if (msg.eventType == "custom/myVTT/syncmeup") {
@@ -1448,8 +1443,7 @@ class MessageBroker {
 						$('.import-loading-indicator .percentageLoaded').css('width', `10%`);	
 						window.CURRENT_SCENE_DATA.width = mapWidth;
 						window.CURRENT_SCENE_DATA.height = mapHeight;
-						if(window.CURRENT_SCENE_DATA.gridType == 2 || window.CURRENT_SCENE_DATA.gridType == 3){
-						}else{
+						if(window.CURRENT_SCENE_DATA.gridType != 2 && window.CURRENT_SCENE_DATA.gridType != 3){
 							delete window.CURRENT_SCENE_DATA.scaleAdjustment;
 						}
 
@@ -1510,14 +1504,23 @@ class MessageBroker {
 						if (window.TELEPORTER_PASTE_BUFFER != undefined) {
 							try {
 								const teleporterTokenId = window.TELEPORTER_PASTE_BUFFER.targetToken
+								if(!teleporterTokenId){
+									window.TELEPORTER_PASTE_BUFFER = undefined;
+									console.warn("Teleporter target not assigned.");
+								}
 								const targetPortal = window.TOKEN_OBJECTS[teleporterTokenId];
+								if(!targetPortal){
+									window.TELEPORTER_PASTE_BUFFER = undefined;
+									console.warn("Teleporter target not found.");
+								}
 								const top = (parseInt(targetPortal.options.top) + 25) * (window.CURRENT_SCENE_DATA.scale_factor / targetPortal.options.scaleCreated);
 								const left = (parseInt(targetPortal.options.left) + 25) * (window.CURRENT_SCENE_DATA.scale_factor / targetPortal.options.scaleCreated);
 								const isTeleporter = true;
 								await paste_selected_tokens(left, top, isTeleporter);
 								window.TOKEN_OBJECTS[teleporterTokenId].highlight();
 							}
-							catch {
+							catch(error) {
+								console.warn("Failed to paste teleporter tokens.", error);
 								window.TELEPORTER_PASTE_BUFFER = undefined;
 							}
 						}
@@ -1559,6 +1562,10 @@ class MessageBroker {
 						if($('#portal_config_window').length>0)
 							open_portal_config();
 						$('#loadingStyles').remove();
+						//we have these stored in window.TOKEN_OBJECTS, window.REVEALED, and window.DRAWINGS for the current scene. Clear from memory.
+						window.CURRENT_SCENE_DATA.tokens = {};
+						window.CURRENT_SCENE_DATA.reveals = [];
+						window.CURRENT_SCENE_DATA.drawings = [];
 
 						console.groupEnd()	
 						window.MB.loadNextScene();	
@@ -1784,7 +1791,7 @@ class MessageBroker {
 						data[property] = window.all_token_objects[data.id].options[property];
 					}
 					else if(property in data){
-					 window.all_token_objects[data.id].options[property] = data[property]; 
+					 	window.all_token_objects[data.id].options[property] = data[property]; 
 					}
 				}
 
@@ -1915,7 +1922,7 @@ class MessageBroker {
 
 	
 
-	handleSyncMeUp(msg) {
+	handleSyncMeUp = mydebounce((msg) =>{
 		if (DM) {
 			ct_persist(); // force refresh of combat tracker for late users
 			if (window.CURRENT_SOUNDPAD) {
@@ -1952,7 +1959,7 @@ class MessageBroker {
 				paused: $('#pause_players').hasClass('paused')
 			});
 		}
-	}
+	}, 2000);
 
 	handleAudioPlayingSync(msg){
 		if(window.DM){

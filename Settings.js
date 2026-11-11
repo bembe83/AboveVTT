@@ -241,6 +241,8 @@ function token_setting_options() {
 			options: [
 				{ value: "average", label: "Average", description: "Monster Max HP will be set to the average value." },
 				{ value: "roll", label: "Roll", description: "Monster Max HP will be individually rolled." },
+				{ value: "dis", label: "Disadvantage", description: "Monster Max HP will be rolled twice and set as the lower value." },
+				{ value: "adv", label: "Advantage", description: "Monster Max HP will be rolled twice and set as the higher value." },
 				{ value: "max", label: "Max", description: "Monster Max HP will be set to the maximum value." }
 			],
 			defaultValue: "average"
@@ -1954,9 +1956,13 @@ function export_current_scene(){
 		hpps: window.CURRENT_SCENE_DATA.hpps/(window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion),
 		vpps: window.CURRENT_SCENE_DATA.vpps/(window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion),
 		offsetx: window.CURRENT_SCENE_DATA.offsetx/(window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion),
-		offsety: window.CURRENT_SCENE_DATA.offsety/(window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion)
+		offsety: window.CURRENT_SCENE_DATA.offsety/(window.CURRENT_SCENE_DATA.scale_factor*window.CURRENT_SCENE_DATA.conversion),	
+		drawings: [...window.DRAWINGS],
+		reveals: [...window.REVEALED],
 	} 
 	
+
+
 	let DataFile = {
 		version: 2,
 		scenes: [currentSceneData],
@@ -1967,6 +1973,8 @@ function export_current_scene(){
 	};
 	delete DataFile.scenes[0].map;
 	for(tokenID in window.TOKEN_OBJECTS){
+		currentSceneData.tokens[tokenID] = window.TOKEN_OBJECTS[tokenID].options;
+
 		let statBlockID = window.TOKEN_OBJECTS[tokenID].options.statBlock
 		if(statBlockID != undefined && window.JOURNAL.notes[statBlockID] != undefined){
 			DataFile.notes[statBlockID] = window.JOURNAL.notes[statBlockID];
@@ -2095,10 +2103,10 @@ async function export_scenes_folder_context(folderId){
 async function export_main_scenes_folder_backup(){
 	build_import_loading_indicator('Preparing Export File');  
 
-	let folderId = "scenesFolder"
+
 	let ids = [];
-	const getIds = function(folderId){
-		let scenesInFolder = window.ScenesHandler.scenes.filter(d => d.parentId == folderId);
+	const getIds = function(folderId = "scenesFolder"){
+		let scenesInFolder = window.ScenesHandler.scenes.filter(d => d.parentId == folderId || (folderId == "scenesFolder" && !d.parentId));
 
 		for(let scene=0; scene<scenesInFolder.length; scene++){
 			ids.push(scenesInFolder[scene].id)
@@ -2108,7 +2116,7 @@ async function export_main_scenes_folder_backup(){
 		}
 	}
 
-	getIds(folderId);
+	getIds();
 	let scenes = []
 		
 	for(let id=0; id<ids.length; id++){

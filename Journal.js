@@ -277,7 +277,9 @@ class JournalManager{
 
 			if(is_abovevtt_page()){
 				this.build_journal();
+				this.restore_popout_notes();
 			}
+
 			if(window.DM && !is_gamelog_popout() && is_abovevtt_page()){
 				// also sync the journal
 				this.sync();
@@ -1468,6 +1470,7 @@ class JournalManager{
 			chapterImport.append($(`<option value='/magic-items'>Magic Items</option>`));
 			chapterImport.append($(`<option value='/feats'>Feats</option>`));
 			chapterImport.append($(`<option value='/spells'>Spells</option>`));
+			chapterImport.append($(`<option value='/search'>Search</option>`));
 			const sortedSources = window.ddbConfigJson.sources.sort((a, b) => a.description.localeCompare(b.description, 'en'));
 			for(let source=0; source<sortedSources.length; source++){
 				const currentSource = sortedSources[source]
@@ -1484,7 +1487,7 @@ class JournalManager{
 				let source = this.value;
 				journalPanel.display_sidebar_loading_indicator('Loading Chapters');
 				try{
-					if (source == '/magic-items' || source == '/feats' || source == '/spells'){
+					if (source == '/magic-items' || source == '/feats' || source == '/spells' || source == '/search'){
 						let new_noteid=uuid();
 						let new_note_title = source.replaceAll(/-/g, ' ')
 												.replaceAll(/\//g, '')
@@ -1950,6 +1953,11 @@ class JournalManager{
 					'mouseout': function(e){
 						clearTimeout(hoverNoteTimer)
 						remove_tooltip(500);
+					},
+					'dblclick': function(e){
+						if(window.JOURNAL.notes[noteId] != undefined){
+							window.JOURNAL.display_note(noteId);
+						}
 					}
 			
 			    });
@@ -3780,6 +3788,7 @@ class JournalManager{
 		note_container.find('.popout-button').off('click.popout').on('click.popout', function(event){
 			const windowName = self.getNotePopoutName(id);
 			popoutWindow(windowName, note_container.find(`div.note[data-id='${id}']`), note_container.width(), note_container.height());
+			self.store_popout_note(windowName, id);
 			const popoutBody = $(childWindows[windowName].document).find('body');
 			const popoutNote = popoutBody.find(`div.note[data-id='${id}']`);
 			const popoutNoteText = popoutNote.find('.note-text').first();
@@ -3787,7 +3796,46 @@ class JournalManager{
 			self.injectDisplayedNoteRollControls(id, popoutNoteText, popoutBody);
 			popoutBody.css('overflow', 'auto');
 			$(event.currentTarget).closest('.resize_drag_window').hide();
+
 		})
+	}
+	store_popout_note(windowName, noteId){
+		if(!windowName || !noteId)
+			return;
+		const currentPopouts = JSON.parse(localStorage.getItem('avtt_popout_notes')) || {};
+		currentPopouts[windowName] = noteId;
+		localStorage.setItem('avtt_popout_notes', JSON.stringify(currentPopouts));
+	}
+	restore_popout_notes(){
+		const currentPopouts = JSON.parse(localStorage.getItem('avtt_popout_notes')) || {};
+		for(const windowName in currentPopouts){
+			const noteId = currentPopouts[windowName];
+			if(!this.notes[noteId]){
+				this.clear_popout_note(windowName);
+				continue;
+			}
+			const popoutWindow = window.open('', windowName);
+			if(!popoutWindow || popoutWindow.closed){
+				this.clear_popout_note(windowName);
+				continue;
+			}
+			const popoutNote = $(popoutWindow.document).find(`div.note[data-id='${noteId}']`);
+			if(popoutWindow.document.title !== windowName && popoutNote.length === 0){
+				popoutWindow.close();
+				this.clear_popout_note(windowName);
+				continue;
+			}
+			window.childWindows[windowName] = popoutWindow;
+			popoutWindow.onbeforeunload = function(){
+				closePopout(windowName);
+			};
+			this.updateNotePopout(noteId);
+		}
+	}
+	clear_popout_note(windowName){
+		const currentPopouts = JSON.parse(localStorage.getItem('avtt_popout_notes')) || {};
+		delete currentPopouts[windowName];
+		localStorage.setItem('avtt_popout_notes', JSON.stringify(currentPopouts));
 	}
 	findNotePopoutWindow(id){
 		for(const name in childWindows){
@@ -9961,14 +10009,15 @@ function init_journal(gameid){
 	window.JOURNAL=new JournalManager(gameid);	
 	
 }
-
+ 
 function render_source_chapter_in_iframe(url) {
 	url = url.replace('https://dndbeyond', 'https://www.dndbeyond');
 	const sourceChapter = url.startsWith('https://www.dndbeyond.com/sources/') || url.startsWith('/sources/');
 	const compendiumChapter = url.startsWith('https://www.dndbeyond.com/compendium/') || url.startsWith('/compendium/');
 	const attachmentChapter = url.startsWith('https://www.dndbeyond.com/attachments/') || url.startsWith('/attachments/');
-	const rulesChapter = url.startsWith('https://www.dndbeyond.com/magic-items') || url.startsWith('https://www.dndbeyond.com/feats') || url.startsWith('https://www.dndbeyond.com/spells')
-	if (typeof url !== "string" ||  (!sourceChapter && !compendiumChapter && !attachmentChapter && !rulesChapter)) {
+	const rulesChapter = url.startsWith('https://www.dndbeyond.com/magic-items') || url.startsWith('https://www.dndbeyond.com/feats') || url.startsWith('https://www.dndbeyond.com/spells');
+	const searchChapter = url.match(/^https:\/\/www.dndbeyond.com(\/[^\/]+)?\/search/gi);
+	if (typeof url !== "string" || (!searchChapter && !sourceChapter && !compendiumChapter && !attachmentChapter && !rulesChapter)) {
 		console.error(`render_source_chapter_in_iframe was given an invalid url`, url);
 		showError(new Error(`Unable to render a DDB chapter. This url does not appear to be a valid DDB chapter ${url}`));
 	}
@@ -10026,11 +10075,20 @@ function render_source_chapter_in_iframe(url) {
 		$(event.target).contents().find("body[class*='marketplace']").replaceWith($("<div id='noAccessToContent' style='height: 100%;text-align: center;width: 100%;padding: 10px;font-weight: bold;color: #944;'>You do not have access to this content on DndBeyond.</div>"));
 		const iframeContents = $(event.target).contents();
 
-		iframeContents.find(".site-bar").hide();
+		iframeContents.find("head").append(`
+			<style id='ddbSourceStyles'>
+				#mega-menu-target, 
+				.ad-container, 
+				#site > footer, 
+				.site-bar,
+				[class*="layout_overflowContainer"]>:is(header, footer) {
+					display: none !important;
+				}
+				
+			</style>
+		`)
 
-		iframeContents.find("#mega-menu-target").hide();
-		iframeContents.find(".ad-container").hide();
-		iframeContents.find("#site > footer").hide();
+		
 
 		const hash = $(event.target).attr('data-chapter-hash');
 		if (hash) {
@@ -10063,13 +10121,14 @@ function render_source_chapter_in_iframe(url) {
 		}
 
 		setTimeout(()=>{
+			
+			const iframeContentContainer = iframeContents.find('#content.main.content-container>section.primary-content');
+			if(iframeContentContainer.length > 0){
+				add_journal_roll_buttons(iframeContentContainer);
+				window.JOURNAL.add_journal_tooltip_targets(iframeContentContainer);
+				add_stat_block_hover(iframeContentContainer);
+			}
 			if(this.src.includes('dndbeyond.com/sources')){
-				const iframeContentContainer = iframeContents.find('#content.main.content-container>section.primary-content');
-				if(iframeContentContainer.length > 0){
-					add_journal_roll_buttons(iframeContentContainer);
-					window.JOURNAL.add_journal_tooltip_targets(iframeContentContainer);
-					add_stat_block_hover(iframeContentContainer);
-				}
 				const urlSrc = this.src;
 				const headers = iframeContents.find(':is(h1, h2, h3, h4, h5, h6)[id]');
 				for(let header of headers){
@@ -10106,11 +10165,13 @@ function render_source_chapter_in_iframe(url) {
 					})
 					curr.append(addNote);
 				}
-				iframeContents.find('#content.main.content-container>section.secondary-content .sidebar-menu~.sidebar-menu').remove();
-				window.JOURNAL.block_send_to_buttons(iframeContentContainer);
-				$('.lightbox, .lightboxOverlay').remove(); //if added to main window remove
-				$('.p-article-content>.nav-select ~ .nav-select', iframeContents).remove(); 
 			}
+			iframeContents.find('#content.main.content-container>section.secondary-content .sidebar-menu~.sidebar-menu').remove();
+			$('.lightbox, .lightboxOverlay').remove(); //if added to main window remove
+			$('.lightbox ~ .lightbox, .lightboxOverlay ~ .lightboxOverlay', iframeContents).remove(); //if doubled up in iframe remove
+			$('.p-article-content>.nav-select ~ .nav-select', iframeContents).remove(); 
+			
+			window.JOURNAL.block_send_to_buttons(iframeContentContainer);
 		}, 2000)
 
 		iframeContents.find("head").append('<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons"></link>');

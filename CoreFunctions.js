@@ -683,7 +683,7 @@ function monitor_console_logs() {
         }
 
         if (get_avtt_setting_value("aggressiveErrorMessages") && !log.value?.some(v => typeof v == 'object' && v.doNotRelog == true)) {
-          showError(new Error(`${log.type} ${log.message}`), ...log.value);
+          showError(new Error(`${log.type} ${log.value?.[0]}`), ...log.value);
         }
       } else {
         console.otherLogs.unshift(log);
@@ -1308,8 +1308,11 @@ function add_journal_roll_buttons(target, tokenId=undefined, specificImage=undef
   currentElement = null;
 
   $currTarget.find(".avtt-roll-button").off('pointerdown.click touchstart.click').on('pointerdown.click touchstart.click', clickHandler);
-  $currTarget.find(".avtt-roll-button").on("contextmenu", rightClickHandler);
-
+  $currTarget.find(".avtt-roll-button").off('contextmenu').on('contextmenu', rightClickHandler);
+  $currTarget.find(".avtt-roll-button").off('click.prevent').on('click.prevent', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+  });
   $currTarget.find("button.avtt-roll-formula-button").off('pointerdown.avttRoll touchstart.avttRoll').on('pointerdown.avttRoll touchstart.avttRoll', function(clickEvent) {
     if (clickEvent.button === 2) return;
     clickEvent.preventDefault();
@@ -1955,8 +1958,10 @@ function showErrorMessage(error, ...extraInfo) {
       extraInfo.push('<br/><b>The scene you are trying to load does not exist. You may have deleted it - try setting the DM scene to an existing map.</b>')
     }
   }
-  const messageOnly = extraInfo.shift() == 'messageOnly';
-
+  const messageOnly = extraInfo[0] == 'messageOnly';
+  if(messageOnly){
+    extraInfo.shift();
+  }
   const extraStrings = extraInfo.map(ei => {
     if (typeof ei === "object") {
       return JSON.stringify(ei)
@@ -3495,7 +3500,7 @@ function createDialogMenu(rootId, options) {
   return dialog[0]; //note: return native element, NOT jquery
 }
 function basic_sanitize_html(html){
-  let sanitized = DOMPurify.sanitize(html,{ALLOWED_TAGS: ['video','img','div','p', 'b', 'i', 'button', 'span', 'path', 'polygon', 'rect', 'svg', 'circle', 'a', 'hr', 'ul', 'li', 'ol', 'h3', 'h2', 'h4', 'h1', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'br', 'input', 'strong', 'em', 'aside'], ADD_ATTR: ['target', 'contenteditable']}); //This array needs to include all HTML elements the extension sends via chat.
+  let sanitized = DOMPurify.sanitize(html,{ALLOWED_TAGS: ['iframe', 'video','img','div','p', 'b', 'i', 'button', 'span', 'path', 'polygon', 'rect', 'svg', 'circle', 'a', 'hr', 'ul', 'li', 'ol', 'h3', 'h2', 'h4', 'h1', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'br', 'input', 'strong', 'em', 'aside'], ADD_ATTR: ['target', 'contenteditable']}); //This array needs to include all HTML elements the extension sends via chat.
   sanitized = sanitized.replace(/(?=([^\S\n]*(?:\n[^\S\n]*){2,}))\1(<)|(>)(?=([^\S\n]*(?:\n[^\S\n]*){2,}))\4/gi, '$2$3').replaceAll(/[\u200B-\u200D\uFEFF]|&(ZeroWidthSpace|#8203|#x200B);/gi, '');
   const template = document.createElement('template');
   template.innerHTML = sanitized;
@@ -3852,7 +3857,9 @@ const TOKEN_BUFF_TARGETS = Object.freeze({
     'Mark of Sentinel': { 'check': ['insight', 'perception'] },
     'Mark of Shadow': { 'check': ['stealth', 'performance'] },
     'Mark of Storm': { 'check': ['acrobatics', "navigator's tools"] },
-    'Mark of Warding': { 'check': ['investigation', "thieves' tools"] }
+    'Mark of Warding': { 'check': ['investigation', "thieves' tools"] },
+    'Arcane Eloquence': { 'check': ['deception', 'intimidation', 'persuasion'] },
+    'Arcane Undertaker': { 'check': ['history', 'medicine'] },
 });
 
 const buffsDebuffs = {
@@ -4055,6 +4062,12 @@ const buffsDebuffs = {
       "+2d6": {
         "tohit": "0",
         "dmg": "+2d6",
+        "save": "0",
+        "check": "0",
+      },
+      "+3d6": {
+        "tohit": "0",
+        "dmg": "+3d6",
         "save": "0",
         "check": "0",
       },
@@ -4869,6 +4882,33 @@ const buffsDebuffs = {
     },
     "type": "feat",
   },
+  "Arcane Eloquence":{
+      "tohit": "0",
+      "dmg": "0",
+      "save": "0",
+      "check": "0",
+      "replace": /(.)$/gi,//last character
+      "replaceType": {
+        "check": `.ct-skills__item:contains("Persuasion"), .ct-skills__item:contains("Intimidation"), .ct-skills__item:contains("Deception")` 
+      },
+      "newRoll": '$1+1d4',
+        
+      "type": "feat",
+  },
+  "Arcane Undertaker":{
+      "tohit": "0",
+      "dmg": "0",
+      "save": "0",
+      "check": "0",
+      "replace": /(.)$/gi,//last character
+      "replaceType": {
+        "check": `.ct-skills__item:contains("History"), .ct-skills__item:contains("Medicine")` 
+      },
+      "newRoll": '$1+1d4',
+        
+      "type": "feat",
+  },
+
   "Great Weapon Fighting": {
     "multiOptions": {
       "2024": { 
