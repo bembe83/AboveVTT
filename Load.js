@@ -58,6 +58,7 @@
         "rpg-dice-roller.bundle.min.js",
         //GoDiceLibrary
         "godice-roller.bundle.js",
+        "GoDiceIntegration.js",
         "color-picker.js",
         "mousetrap.1.6.5.min.js",
         "peerjs.min.js",
@@ -122,6 +123,7 @@
         "rpg-dice-roller.bundle.min.js",
 	//GoDiceLibrary
 	"godice-roller.bundle.js",
+	"GoDiceIntegration.js",
         // AboveVTT files that execute when loaded        
         "CharactersPage.js" // Make sure CharactersPage executes last
     ];

@@ -528,6 +528,7 @@ async function init_character_sheet_page() {
         convertToRPGRoller();
         window.EXPERIMENTAL_SETTINGS['rpgRoller'] = event.data.rpgRoller;
 		window.EXPERIMENTAL_SETTINGS['godiceRoller'] = event.data.godiceRoller;
+		window.AboveVTTGoDice.setEnabled(event.data.godiceRoller);
         if(window.sendToTab != false || event.data.tab == undefined){
           window.sendToTab = (window.self != window.top) ? event.data.iframeTab : event.data.tab;     
         }
@@ -538,6 +539,7 @@ async function init_character_sheet_page() {
       if(event.data.msgType =='removeObserver'){
         delete window.EXPERIMENTAL_SETTINGS['rpgRoller'];
 		delete window.EXPERIMENTAL_SETTINGS['godiceRoller'] ;
+		window.AboveVTTGoDice.setEnabled(false);
         window.sendToTabRPGRoller = undefined;
         window.sendToTab = undefined;
         setTimeout(function(){

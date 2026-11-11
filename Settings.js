@@ -1138,11 +1138,7 @@ function set_avtt_setting_value(name, newValue) {
 			        iframeTab: window.PLAYER_ID,
 			        godiceRoller: newValue
 			      })
-			  	//Enable GoDice RollBar and Roller
-			  	if(window.godice.dicebar){
-			  		window.godice.dicebar.enable(window.EXPERIMENTAL_SETTINGS['godiceRoller']);
-			  		window.godice.dicebar.render();
-			  	}
+				window.AboveVTTGoDice.setEnabled(newValue);
 				if(newValue == true && window.EXPERIMENTAL_SETTINGS['rpgRoller'] ==  true)
 					document.getElementsByName("rpgRoller")[0].click();
 		    }
@@ -1255,6 +1251,7 @@ const debounceCampaignSettings = mydebounce(()=>{
 function init_settings() {
 	let suggestedCampaignSettings = window.AVTT_CAMPAIGN_INFO.campaignSettings ?? {};
 	window.EXPERIMENTAL_SETTINGS = $.extend({}, suggestedCampaignSettings, window.EXPERIMENTAL_SETTINGS);
+	window.AboveVTTGoDice.setEnabled(get_avtt_setting_value('godiceRoller'));
 	let body = settingsPanel.body;
 
 	body.append(`<h2 style='margin-top:10px; padding-bottom:2px;margin-bottom:2px; text-align:center'><img width='200px' src='${window.EXTENSION_PATH}assets/logo.png'><div style='margin-left:20px; display:inline;vertical-align:bottom;'>${window.AVTT_VERSION}${AVTT_ENVIRONMENT.versionSuffix}</div></h2>`);

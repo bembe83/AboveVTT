@@ -117,6 +117,7 @@
 			"peerVideo.js",
 			"onedrive/*",
 			"godice-roller.bundle.js",
+			"GoDiceIntegration.js",
 			"WeatherOverlay.js",
 			"iframe.html",
 			"avttS3Upload.js",

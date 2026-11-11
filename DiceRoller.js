@@ -162,7 +162,7 @@ class DiceRoll {
             separateDiceExpressions = parsedExpression.match(rpgDiceRegex);
         }
 		if (!separateDiceExpressions && window.EXPERIMENTAL_SETTINGS['godiceRoller'] == true) {
-			separateDiceExpressions = parsedExpression.match(window.godice.godiceDiceRegex);
+			separateDiceExpressions = window.AboveVTTGoDice.matchExpression(parsedExpression);
 		}
         if (!separateDiceExpressions) {
             console.warn("Not parsing expression because there are no valid dice expressions within it", expression);
@@ -1095,8 +1095,9 @@ class DiceRoller {
 			if(window.EXPERIMENTAL_SETTINGS['godiceRoller'] == true) {
 				forceCritType = Number(window.CHARACTER_AVTT_SETTINGS.crit || 0);
 				critRange = Number(window.CHARACTER_AVTT_SETTINGS.critRange || 20);
-				logo = window.godice.godiceext.godicelogo;
-				roll = await window.godice.rollResult.rollDice(diceRoll.expression,forceCritType); 
+				const dice = await window.AboveVTTGoDice.ready();
+				logo = dice.godicelogo;
+				roll = await dice.rollResult.rollDice(diceRoll.expression,forceCritType);
                 diceRoll.expression = roll.notation;
 			}			
             let regExpression = new RegExp(`${diceRoll.expression.replace(/[+-]/g, '\\$&')}:\\s`);
@@ -1300,6 +1301,11 @@ class DiceRoller {
                        
 
         } catch (error) {
+            if (error.code === 'GODICE_CANCELLED') {
+                this.#resetVariables();
+                console.groupEnd();
+                return true;
+            }
             console.warn("failed to parse and send expression as DDB roll; expression: ", diceRoll.expression, error);
             this.#resetVariables();
             console.groupEnd();
